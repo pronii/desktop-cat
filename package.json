@@ -1,0 +1,24 @@
+{
+  "name": "desktop-cat",
+  "version": "0.1.0",
+  "description": "A tiny Electron desktop cat pet for Windows.",
+  "main": "src/main/main.js",
+  "type": "commonjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "smoke:click": "electron scripts/click-smoke.js",
+    "smoke:fullscreen": "electron scripts/fullscreen-guard-smoke.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "electron",
+    "desktop-pet",
+    "cat"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^42.5.1"
+  }
+}
