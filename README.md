@@ -10,7 +10,7 @@ Windows desktop pet prototype built with Electron.
 - Idle breathing, blinking, and tail animation
 - Small random roaming movement
 - Happy feedback when clicked
-- Right-click menu with Quit
+- Enhanced right-click menu for roaming, topmost, centering, hiding, and exit
 
 Not included yet: feeding, mood, levels, settings, external image assets, or an installer.
 
