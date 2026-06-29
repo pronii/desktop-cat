@@ -34,10 +34,19 @@ function enforceTemporaryHide(window, state, now = Date.now()) {
   return true;
 }
 
+function revealTemporaryHiddenWindow(window, state) {
+  clearTemporaryHide(state);
+
+  if (window && typeof window.showInactive === 'function') {
+    window.showInactive();
+  }
+}
+
 module.exports = {
   clearTemporaryHide,
   createTemporaryHideState,
   enforceTemporaryHide,
   isTemporaryHideActive,
+  revealTemporaryHiddenWindow,
   startTemporaryHide
 };

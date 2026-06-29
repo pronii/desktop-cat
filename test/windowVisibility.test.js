@@ -6,6 +6,7 @@ const {
   createTemporaryHideState,
   enforceTemporaryHide,
   isTemporaryHideActive,
+  revealTemporaryHiddenWindow,
   startTemporaryHide
 } = require('../src/main/windowVisibility');
 
@@ -76,4 +77,22 @@ test('clearTemporaryHide ends the active hidden interval', () => {
   clearTemporaryHide(state);
 
   assert.equal(isTemporaryHideActive(state, 2000), false);
+});
+
+test('revealTemporaryHiddenWindow clears temporary hide and shows the window inactive', () => {
+  const calls = [];
+  const state = createTemporaryHideState();
+  startTemporaryHide(state, 300000, 1000);
+
+  revealTemporaryHiddenWindow(
+    {
+      showInactive() {
+        calls.push(['showInactive']);
+      }
+    },
+    state
+  );
+
+  assert.equal(isTemporaryHideActive(state, 2000), false);
+  assert.deepEqual(calls, [['showInactive']]);
 });

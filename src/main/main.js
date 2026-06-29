@@ -1,5 +1,13 @@
 const path = require('node:path');
-const { app, BrowserWindow, Menu, ipcMain, screen } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  ipcMain,
+  nativeImage,
+  screen
+} = require('electron');
 const { centerInWorkArea, clampToWorkArea } = require('./windowMovement');
 const {
   createPetWindowOptions,
@@ -19,10 +27,16 @@ const {
   clearTemporaryHide,
   createTemporaryHideState,
   enforceTemporaryHide,
+  revealTemporaryHiddenWindow,
   startTemporaryHide
 } = require('./windowVisibility');
+const {
+  createTrayIconDataUrl,
+  createTrayMenuTemplate
+} = require('./trayMenu');
 
 let petWindow = null;
+let tray = null;
 let topmostTimer = null;
 let hideTimer = null;
 let topmostSuspended = false;
@@ -149,6 +163,7 @@ function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
   startTemporaryHide(temporaryHideState, durationMs);
   suspendWindowTopmost(window);
   window.hide();
+  updateTrayMenu(window);
   hideTimer = setTimeout(() => {
     hideTimer = null;
     clearTemporaryHide(temporaryHideState);
@@ -166,11 +181,30 @@ function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
 function togglePetRoaming(window) {
   petMenuState = toggleRoamingPaused(petMenuState);
   sendRoamingPausedState(window);
+  updateTrayMenu(window);
 }
 
 function togglePetAlwaysOnTop(window) {
   petMenuState = toggleAlwaysOnTop(petMenuState);
   refreshTopmost(window);
+  updateTrayMenu(window);
+}
+
+function showPetWindow(window, { center = true } = {}) {
+  if (!window || window.isDestroyed()) return;
+
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+
+  if (center) {
+    centerWindowOnScreen(window);
+  }
+
+  revealTemporaryHiddenWindow(window, temporaryHideState);
+  refreshTopmost(window);
+  updateTrayMenu(window);
 }
 
 function createPetContextMenu(window) {
@@ -187,6 +221,47 @@ function createPetContextMenu(window) {
   );
 }
 
+function createTrayImage() {
+  const image = nativeImage.createFromDataURL(createTrayIconDataUrl());
+  return image.resize({ width: 16, height: 16 });
+}
+
+function createTrayContextMenu(window) {
+  return Menu.buildFromTemplate(
+    createTrayMenuTemplate({
+      state: petMenuState,
+      actions: {
+        showPet: () => showPetWindow(window),
+        hideTemporarily: () => hideWindowTemporarily(window),
+        toggleRoamingPaused: () => togglePetRoaming(window),
+        toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window)
+      }
+    })
+  );
+}
+
+function updateTrayMenu(window) {
+  if (!tray || !window || window.isDestroyed()) return;
+  tray.setContextMenu(createTrayContextMenu(window));
+}
+
+function createApplicationTray(window) {
+  if (tray) {
+    updateTrayMenu(window);
+    return;
+  }
+
+  tray = new Tray(createTrayImage());
+  tray.setToolTip('desktop-cat');
+  tray.on('click', () => {
+    showPetWindow(window);
+  });
+  tray.on('double-click', () => {
+    showPetWindow(window);
+  });
+  updateTrayMenu(window);
+}
+
 function createPetWindow() {
   petWindow = new BrowserWindow(
     createPetWindowOptions({
@@ -196,6 +271,7 @@ function createPetWindow() {
 
   keepWindowOnTop(petWindow);
   startTopmostWatch(petWindow);
+  createApplicationTray(petWindow);
   petWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   petWindow.once('ready-to-show', () => {
@@ -228,6 +304,13 @@ app.whenReady().then(() => {
       createPetWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 app.on('window-all-closed', () => {

@@ -9,6 +9,7 @@
     "start": "electron .",
     "smoke:click": "electron scripts/click-smoke.js",
     "smoke:fullscreen": "electron scripts/fullscreen-guard-smoke.js",
+    "smoke:tray": "electron scripts/tray-smoke.js",
     "test": "node --test"
   },
   "keywords": [

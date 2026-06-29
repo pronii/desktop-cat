@@ -11,6 +11,7 @@
 - 会在小范围内随机移动
 - 点击小猫会触发开心反馈
 - 检测到视频或游戏等全屏窗口时，会临时取消置顶
+- 隐藏后可通过系统托盘图标立即呼出
 - 右键菜单支持：
   - 暂停 / 恢复随机移动
   - 开启 / 关闭总是置顶
@@ -57,6 +58,12 @@ npm run smoke:click
 
 ```powershell
 npm run smoke:fullscreen
+```
+
+系统托盘冒烟测试：
+
+```powershell
+npm run smoke:tray
 ```
 
 ## 项目结构
