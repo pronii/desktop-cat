@@ -15,6 +15,12 @@ const {
   toggleAlwaysOnTop,
   toggleRoamingPaused
 } = require('./menuState');
+const {
+  clearTemporaryHide,
+  createTemporaryHideState,
+  enforceTemporaryHide,
+  startTemporaryHide
+} = require('./windowVisibility');
 
 let petWindow = null;
 let topmostTimer = null;
@@ -22,6 +28,7 @@ let hideTimer = null;
 let topmostSuspended = false;
 let topmostChecking = false;
 let petMenuState = createPetMenuState();
+let temporaryHideState = createTemporaryHideState();
 
 function clampWindowToWorkArea(bounds, targetX, targetY) {
   const display = screen.getDisplayMatching(bounds);
@@ -70,6 +77,7 @@ function suspendWindowTopmost(window) {
 
 async function refreshTopmost(window) {
   if (!window || window.isDestroyed() || topmostChecking) return;
+  if (enforceTemporaryHide(window, temporaryHideState)) return;
 
   if (!petMenuState.alwaysOnTopEnabled) {
     topmostSuspended = false;
@@ -93,6 +101,8 @@ async function refreshTopmost(window) {
   } finally {
     topmostChecking = false;
   }
+
+  if (enforceTemporaryHide(window, temporaryHideState)) return;
 
   if (topmostSuspended) {
     suspendWindowTopmost(window);
@@ -136,9 +146,12 @@ function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
     clearTimeout(hideTimer);
   }
 
+  startTemporaryHide(temporaryHideState, durationMs);
+  suspendWindowTopmost(window);
   window.hide();
   hideTimer = setTimeout(() => {
     hideTimer = null;
+    clearTemporaryHide(temporaryHideState);
 
     if (!window || window.isDestroyed()) return;
     window.showInactive();
@@ -202,6 +215,7 @@ function createPetWindow() {
     hideTimer = null;
     topmostSuspended = false;
     topmostChecking = false;
+    temporaryHideState = createTemporaryHideState();
     petWindow = null;
   });
 }
