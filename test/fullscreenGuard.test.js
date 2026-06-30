@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 
 const {
   calculateCoverage,
+  createTopmostSuspendState,
   isFullscreenForeground,
+  resolveTopmostSuspend,
   shouldSuspendTopmost,
   normalizeWindowSnapshot
   , isIgnoredSystemWindow
@@ -42,6 +44,16 @@ test('isFullscreenForeground returns false for a normal window', () => {
       display
     ),
     false
+  );
+});
+
+test('isFullscreenForeground returns true for a nearly fullscreen media window', () => {
+  assert.equal(
+    isFullscreenForeground(
+      { hwnd: '123', x: 0, y: 0, width: 1920, height: 1050 },
+      display
+    ),
+    true
   );
 });
 
@@ -121,6 +133,40 @@ test('shouldSuspendTopmost keeps previous state when detection fails', () => {
       previousSuspend: true
     }),
     true
+  );
+});
+
+test('resolveTopmostSuspend holds suspension through a brief missed fullscreen probe', () => {
+  const state = createTopmostSuspendState();
+
+  assert.equal(
+    resolveTopmostSuspend({
+      state,
+      detectedSuspend: true,
+      now: 1000,
+      holdMs: 3000
+    }),
+    true
+  );
+
+  assert.equal(
+    resolveTopmostSuspend({
+      state,
+      detectedSuspend: false,
+      now: 2500,
+      holdMs: 3000
+    }),
+    true
+  );
+
+  assert.equal(
+    resolveTopmostSuspend({
+      state,
+      detectedSuspend: false,
+      now: 4001,
+      holdMs: 3000
+    }),
+    false
   );
 });
 

@@ -1,6 +1,7 @@
 const { execFile } = require('node:child_process');
 
-const DEFAULT_FULLSCREEN_THRESHOLD = 0.98;
+const DEFAULT_FULLSCREEN_THRESHOLD = 0.97;
+const DEFAULT_SUSPEND_HOLD_MS = 3000;
 
 const foregroundProbeScript = String.raw`
 Add-Type @"
@@ -237,6 +238,26 @@ function shouldSuspendTopmost({
   return isFullscreenForeground(foreground, display);
 }
 
+function createTopmostSuspendState() {
+  return {
+    suspendUntil: 0
+  };
+}
+
+function resolveTopmostSuspend({
+  state,
+  detectedSuspend,
+  now = Date.now(),
+  holdMs = DEFAULT_SUSPEND_HOLD_MS
+}) {
+  if (detectedSuspend) {
+    state.suspendUntil = now + Math.max(0, holdMs);
+    return true;
+  }
+
+  return Number(state.suspendUntil) > now;
+}
+
 function normalizeWindowSnapshot(raw) {
   if (!raw || raw.hwnd === undefined) return null;
 
@@ -319,10 +340,12 @@ async function probeForegroundWindow() {
 
 module.exports = {
   calculateCoverage,
+  createTopmostSuspendState,
   isFullscreenForeground,
   isIgnoredSystemWindow,
   normalizeWindowSnapshot,
   normalizeDisplaySnapshot,
   probeForegroundWindow,
+  resolveTopmostSuspend,
   shouldSuspendTopmost
 };

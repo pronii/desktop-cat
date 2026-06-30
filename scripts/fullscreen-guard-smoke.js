@@ -38,7 +38,7 @@ async function run() {
       coverage: calculateCoverage(windowSnapshot, windowSnapshot.display),
       ignored: isIgnoredSystemWindow(windowSnapshot)
     }))
-    .filter((windowSnapshot) => windowSnapshot.coverage > 0.98);
+    .filter((windowSnapshot) => windowSnapshot.coverage > 0.97);
   const suspend = shouldSuspendTopmost({
     foreground: snapshot.foreground,
     windows: snapshot.windows,

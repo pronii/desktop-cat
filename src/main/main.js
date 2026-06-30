@@ -14,7 +14,9 @@ const {
   getAlwaysOnTopPolicy
 } = require('./windowOptions');
 const {
+  createTopmostSuspendState,
   probeForegroundWindow,
+  resolveTopmostSuspend,
   shouldSuspendTopmost
 } = require('./fullscreenGuard');
 const {
@@ -43,6 +45,7 @@ let topmostSuspended = false;
 let topmostChecking = false;
 let petMenuState = createPetMenuState();
 let temporaryHideState = createTemporaryHideState();
+let topmostSuspendState = createTopmostSuspendState();
 
 function clampWindowToWorkArea(bounds, targetX, targetY) {
   const display = screen.getDisplayMatching(bounds);
@@ -103,12 +106,16 @@ async function refreshTopmost(window) {
 
   try {
     const snapshot = await probeForegroundWindow();
-    topmostSuspended = shouldSuspendTopmost({
+    const detectedSuspend = shouldSuspendTopmost({
       foreground: snapshot?.foreground,
       windows: snapshot?.windows,
       display: snapshot?.display,
       petWindowId: getNativeWindowId(window),
       previousSuspend: topmostSuspended
+    });
+    topmostSuspended = resolveTopmostSuspend({
+      state: topmostSuspendState,
+      detectedSuspend
     });
   } catch (_error) {
     // Keep the previous topmost state when OS probing fails.
@@ -142,7 +149,7 @@ function startTopmostWatch(window) {
 
   topmostTimer = setInterval(() => {
     refreshTopmost(window);
-  }, 1000);
+  }, 500);
 }
 
 function sendRoamingPausedState(window) {
@@ -292,6 +299,7 @@ function createPetWindow() {
     topmostSuspended = false;
     topmostChecking = false;
     temporaryHideState = createTemporaryHideState();
+    topmostSuspendState = createTopmostSuspendState();
     petWindow = null;
   });
 }
