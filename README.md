@@ -60,6 +60,12 @@ npm run smoke:click
 npm run smoke:fullscreen
 ```
 
+随机移动冒烟测试：
+
+```powershell
+npm run smoke:roam-window
+```
+
 系统托盘冒烟测试：
 
 ```powershell

@@ -52,6 +52,6 @@
     if (roamingPaused) return;
     if (happyState.isHappy) return;
 
-    desktopCat.nudgeWindow(createRoamOffset({ maxStep: 18 }));
-  }, 5200);
+    desktopCat.nudgeWindow(createRoamOffset({ maxStep: 28, minStep: 12 }));
+  }, 4000);
 })();

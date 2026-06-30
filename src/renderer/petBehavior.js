@@ -2,14 +2,29 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function createRoamOffset({ maxStep = 18, random = Math.random } = {}) {
+function createRoamOffset({
+  maxStep = 18,
+  minStep = 0,
+  random = Math.random
+} = {}) {
   const boundedStep = Math.max(0, maxStep);
+  const minimumStep = Math.min(Math.max(0, minStep), boundedStep);
   const nextAxis = () => Math.round((random() * 2 - 1) * boundedStep);
-
-  return {
+  const offset = {
     x: nextAxis(),
     y: nextAxis()
   };
+
+  if (
+    minimumStep > 0 &&
+    Math.max(Math.abs(offset.x), Math.abs(offset.y)) < minimumStep
+  ) {
+    const axis = Math.abs(offset.x) >= Math.abs(offset.y) ? 'x' : 'y';
+    const sign = offset[axis] < 0 ? -1 : 1;
+    offset[axis] = sign * minimumStep;
+  }
+
+  return offset;
 }
 
 function createHappyState({ now = Date.now(), duration = 900 } = {}) {

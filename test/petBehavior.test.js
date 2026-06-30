@@ -25,6 +25,16 @@ test('createRoamOffset returns a bounded movement from deterministic random valu
   assert.deepEqual(offset, { x: 12, y: 12 });
 });
 
+test('createRoamOffset keeps at least one axis visibly moving when minStep is set', () => {
+  const offset = createRoamOffset({
+    maxStep: 28,
+    minStep: 12,
+    random: () => 0.51
+  });
+
+  assert.equal(Math.max(Math.abs(offset.x), Math.abs(offset.y)) >= 12, true);
+});
+
 test('createHappyState and clearHappyState toggle the happy feedback flag', () => {
   const happy = createHappyState({ now: 1000, duration: 900 });
 
