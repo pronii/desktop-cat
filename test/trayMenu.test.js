@@ -9,7 +9,6 @@ const {
 test('createTrayMenuTemplate exposes the expected desktop cat controls', () => {
   const template = createTrayMenuTemplate({
     state: {
-      roamingPaused: false,
       alwaysOnTopEnabled: true
     },
     actions: {}
@@ -38,12 +37,6 @@ test('createTrayMenuTemplate exposes the expected desktop cat controls', () => {
       {
         label: undefined,
         type: 'separator',
-        checked: undefined,
-        role: undefined
-      },
-      {
-        label: '暂停随机移动',
-        type: undefined,
         checked: undefined,
         role: undefined
       },

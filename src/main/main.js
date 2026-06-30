@@ -4,11 +4,10 @@ const {
   BrowserWindow,
   Menu,
   Tray,
-  ipcMain,
   nativeImage,
   screen
 } = require('electron');
-const { centerInWorkArea, clampToWorkArea } = require('./windowMovement');
+const { centerInWorkArea } = require('./windowMovement');
 const {
   createPetWindowOptions,
   getAlwaysOnTopPolicy
@@ -22,8 +21,7 @@ const {
 const {
   createPetContextMenuTemplate,
   createPetMenuState,
-  toggleAlwaysOnTop,
-  toggleRoamingPaused
+  toggleAlwaysOnTop
 } = require('./menuState');
 const {
   clearTemporaryHide,
@@ -46,17 +44,6 @@ let topmostChecking = false;
 let petMenuState = createPetMenuState();
 let temporaryHideState = createTemporaryHideState();
 let topmostSuspendState = createTopmostSuspendState();
-
-function clampWindowToWorkArea(bounds, targetX, targetY) {
-  const display = screen.getDisplayMatching(bounds);
-  return clampToWorkArea(bounds, display.workArea, targetX, targetY);
-}
-
-function moveWindowTo(window, x, y) {
-  const bounds = window.getBounds();
-  const next = clampWindowToWorkArea(bounds, x, y);
-  window.setPosition(next.x, next.y, false);
-}
 
 function centerWindowOnScreen(window) {
   const bounds = window.getBounds();
@@ -152,14 +139,6 @@ function startTopmostWatch(window) {
   }, 500);
 }
 
-function sendRoamingPausedState(window) {
-  if (!window || window.isDestroyed()) return;
-  window.webContents.send(
-    'pet-controls:roaming-paused',
-    petMenuState.roamingPaused
-  );
-}
-
 function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
   if (!window || window.isDestroyed()) return;
 
@@ -183,12 +162,6 @@ function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
   if (typeof hideTimer.unref === 'function') {
     hideTimer.unref();
   }
-}
-
-function togglePetRoaming(window) {
-  petMenuState = toggleRoamingPaused(petMenuState);
-  sendRoamingPausedState(window);
-  updateTrayMenu(window);
 }
 
 function togglePetAlwaysOnTop(window) {
@@ -219,7 +192,6 @@ function createPetContextMenu(window) {
     createPetContextMenuTemplate({
       state: petMenuState,
       actions: {
-        toggleRoamingPaused: () => togglePetRoaming(window),
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
         centerOnScreen: () => centerWindowOnScreen(window),
         hideTemporarily: () => hideWindowTemporarily(window)
@@ -240,7 +212,6 @@ function createTrayContextMenu(window) {
       actions: {
         showPet: () => showPetWindow(window),
         hideTemporarily: () => hideWindowTemporarily(window),
-        toggleRoamingPaused: () => togglePetRoaming(window),
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window)
       }
     })
@@ -283,7 +254,6 @@ function createPetWindow() {
 
   petWindow.once('ready-to-show', () => {
     petWindow.showInactive();
-    sendRoamingPausedState(petWindow);
     refreshTopmost(petWindow);
   });
 
@@ -325,12 +295,4 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-});
-
-ipcMain.on('pet-window:nudge', (event, offset) => {
-  const window = BrowserWindow.fromWebContents(event.sender);
-  if (!window) return;
-
-  const bounds = window.getBounds();
-  moveWindowTo(window, bounds.x + offset.x, bounds.y + offset.y);
 });

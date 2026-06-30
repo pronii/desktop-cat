@@ -17,7 +17,6 @@ async function run() {
     Menu.buildFromTemplate(
       createTrayMenuTemplate({
         state: {
-          roamingPaused: false,
           alwaysOnTopEnabled: true
         },
         actions: {}

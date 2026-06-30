@@ -9,8 +9,6 @@
     "start": "electron .",
     "smoke:click": "electron scripts/click-smoke.js",
     "smoke:fullscreen": "electron scripts/fullscreen-guard-smoke.js",
-    "smoke:roam": "electron scripts/roam-smoke.js",
-    "smoke:roam-window": "electron scripts/roam-window-smoke.js",
     "smoke:tray": "electron scripts/tray-smoke.js",
     "test": "node --test"
   },

@@ -1,18 +1,14 @@
 (() => {
   const {
-    createRoamOffset,
     createHappyState,
     clearHappyState,
-    shouldClearHappyState,
-    createDesktopCatBridge
+    shouldClearHappyState
   } = window.petBehavior;
 
   const cat = document.querySelector('.cat');
-  const desktopCat = createDesktopCatBridge(window.desktopCat);
 
   let happyState = clearHappyState();
   let happyTimer = null;
-  let roamingPaused = false;
 
   window.desktopCatDebug = {
     rendererReady: true,
@@ -44,14 +40,4 @@
     event.preventDefault();
   });
 
-  desktopCat.onRoamingPausedChanged((paused) => {
-    roamingPaused = paused;
-  });
-
-  window.setInterval(() => {
-    if (roamingPaused) return;
-    if (happyState.isHappy) return;
-
-    desktopCat.nudgeWindow(createRoamOffset({ maxStep: 28, minStep: 12 }));
-  }, 4000);
 })();

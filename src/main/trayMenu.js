@@ -14,10 +14,6 @@ function createTrayMenuTemplate({ state, actions = {} }) {
       type: 'separator'
     },
     {
-      label: state.roamingPaused ? '恢复随机移动' : '暂停随机移动',
-      click: actions.toggleRoamingPaused || noop
-    },
-    {
       label: '总是置顶',
       type: 'checkbox',
       checked: state.alwaysOnTopEnabled,
