@@ -497,58 +497,56 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* --- 喝水计数器 --- */
-.water-counter {
-  width: 50px;
-  height: 50px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  padding: 0;
-  border: 2px solid rgba(60, 43, 36, 0.72);
-  border-radius: 16px;
-  background: rgba(255, 250, 241, 0.88);
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 8px 18px rgba(91, 56, 29, 0.22);
-  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  white-space: nowrap;
+/* --- 手绘风胶囊按钮（通用） --- */
+.sketch-btn {
+  height: 40px;
+  padding: 0 16px;
+  border: 2.5px solid var(--sketch-border);
+  border-radius: 20px;
+  background: var(--sketch-bg);
+  box-shadow: 0 4px 0 var(--sketch-border);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  -webkit-app-region: no-drag;
 }
 
-.water-counter:hover {
-  transform: translateY(-2px);
-  background: #fffaf1;
-  border-color: rgba(60, 43, 36, 0.9);
+.sketch-btn:hover {
+  transform: translateY(-1px);
+  background: #fffbf0;
 }
 
-.water-counter:active {
-  transform: translateY(0) scale(0.96);
+.sketch-btn:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 2px 0 var(--sketch-border);
 }
 
-.water-counter[aria-expanded="true"] {
-  background: #e0f7fa;
-  border-color: #2196F3;
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18), 0 8px 18px rgba(91, 56, 29, 0.22);
+.sketch-btn[aria-expanded="true"] {
+  background: var(--sketch-fill);
+  border-color: var(--sketch-accent);
+  box-shadow: 0 4px 0 var(--sketch-accent);
 }
 
-.water-counter .water-counter-icon {
-  font-size: 20px;
+.sketch-btn-icon {
+  font-size: 16px;
   line-height: 1;
 }
 
-.water-counter .water-counter-num {
-  font-size: 11px;
+.sketch-btn-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sketch-text);
   line-height: 1;
 }
 
+/* 喝水按钮专属 */
 .water-counter.just-drank {
-  background: #e0f7fa;
-  border-color: #2196F3;
+  background: #c8e6c9;
+  border-color: #4caf50;
+  box-shadow: 0 4px 0 #4caf50;
   transform: scale(1.12);
 }
 
@@ -613,41 +611,6 @@ body {
     opacity: 0;
     transform: scale(6);
   }
-}
-
-/* 剪贴板按钮样式 */
-.clipboard-btn {
-  width: 50px;
-  height: 50px;
-  border: 2px solid rgba(60, 43, 36, 0.72);
-  border-radius: 16px;
-  background: rgba(255, 250, 241, 0.88);
-  cursor: pointer;
-  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 8px 18px rgba(91, 56, 29, 0.22);
-}
-
-.clipboard-btn:hover {
-  transform: translateY(-2px);
-  background: #fffaf1;
-  border-color: rgba(60, 43, 36, 0.9);
-}
-
-.clipboard-btn:active {
-  transform: translateY(0) scale(0.96);
-}
-
-.clipboard-btn[aria-expanded="true"] {
-  background: #fff6df;
-  border-color: #d99738;
-  box-shadow: 0 0 0 3px rgba(217, 151, 56, 0.18), 0 8px 18px rgba(91, 56, 29, 0.22);
-}
-
-.clipboard-btn svg {
-  display: block;
 }
 
 /* 剪贴板面板样式 */
