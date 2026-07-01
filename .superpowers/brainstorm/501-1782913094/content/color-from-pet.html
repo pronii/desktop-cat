@@ -1,0 +1,93 @@
+<h2>从宠物配色提取手绘风主题，你喜欢哪种取色方式？</h2>
+<p class="subtitle">宠物当前是橘黄色调，可以根据它的毛色自动生成配套配色</p>
+
+<div class="cards">
+  <div class="card" data-choice="fur-tones" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff8ec; padding:16px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:#f7c875;border:2px solid #d99738;"></div>
+        <span style="font-size:11px;color:#8b6f47;">← 宠物毛色</span>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #8b6f47;box-shadow:0 4px 0 #8b6f47;display:flex;align-items:center;justify-content:center;font-size:20px;">💧</div>
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #8b6f47;box-shadow:0 4px 0 #8b6f47;display:flex;align-items:center;justify-content:center;font-size:20px;">📋</div>
+      </div>
+      <div style="width:90%;background:#fff;border:2.5px solid #8b6f47;border-radius:10px;box-shadow:0 4px 0 #8b6f47;overflow:hidden;">
+        <div style="background:#d99738;color:#fff;padding:4px 8px;font-size:11px;font-weight:700;">💧 喝水记录</div>
+        <div style="padding:8px;font-size:11px;color:#8b6f47;">今日 8 杯</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 毛色同色系</h3>
+      <p>描边用深棕（毛色加深），标题栏用焦糖橙（毛色主色），与宠物浑然一体</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="complement" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f6ff; padding:16px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:#f7c875;border:2px solid #d99738;"></div>
+        <span style="font-size:20px;">→</span>
+        <div style="width:36px;height:36px;border-radius:50%;background:#5b8fb9;border:2px solid #2c5f7c;"></div>
+        <span style="font-size:11px;color:#2c5f7c;">互补色</span>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #2c5f7c;box-shadow:0 4px 0 #2c5f7c;display:flex;align-items:center;justify-content:center;font-size:20px;">💧</div>
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #2c5f7c;box-shadow:0 4px 0 #2c5f7c;display:flex;align-items:center;justify-content:center;font-size:20px;">📋</div>
+      </div>
+      <div style="width:90%;background:#fff;border:2.5px solid #2c5f7c;border-radius:10px;box-shadow:0 4px 0 #2c5f7c;overflow:hidden;">
+        <div style="background:#5b8fb9;color:#fff;padding:4px 8px;font-size:11px;font-weight:700;">💧 喝水记录</div>
+        <div style="padding:8px;font-size:11px;color:#2c5f7c;">今日 8 杯</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 互补撞色</h3>
+      <p>橘猫配蓝调（互补色），冷暖对比鲜明，活泼有张力</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="split-complement" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f5f0ff; padding:16px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+        <div style="width:32px;height:32px;border-radius:50%;background:#f7c875;border:2px solid #d99738;"></div>
+        <span style="font-size:16px;">+</span>
+        <div style="width:32px;height:32px;border-radius:50%;background:#7b6cb0;border:2px solid #4a3d75;"></div>
+        <span style="font-size:16px;">+</span>
+        <div style="width:32px;height:32px;border-radius:50%;background:#5ba89c;border:2px solid #2f6b60;"></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #4a3d75;box-shadow:0 4px 0 #4a3d75;display:flex;align-items:center;justify-content:center;font-size:20px;">💧</div>
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #2f6b60;box-shadow:0 4px 0 #2f6b60;display:flex;align-items:center;justify-content:center;font-size:20px;">📋</div>
+      </div>
+      <div style="width:90%;background:#fff;border:2.5px solid #4a3d75;border-radius:10px;box-shadow:0 4px 0 #4a3d75;overflow:hidden;">
+        <div style="background:#7b6cb0;color:#fff;padding:4px 8px;font-size:11px;font-weight:700;">💧 喝水记录</div>
+        <div style="padding:8px;font-size:11px;color:#4a3d75;">今日 8 杯</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 分裂互补</h3>
+      <p>橘色 + 紫蓝 + 青绿，丰富有层次但不刺眼，两个面板可用不同辅色</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="theme-presets" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:linear-gradient(135deg,#fff8ec 0%,#f0f6ff 50%,#f5f0ff 100%); padding:16px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+      <div style="display:flex; gap:6px; margin-bottom:4px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:#f7c875;border:2px solid #d99738;"></div>
+        <div style="width:28px;height:28px;border-radius:50%;background:#a8c66c;border:2px solid #5a4a3a;"></div>
+        <div style="width:28px;height:28px;border-radius:50%;background:#c44536;border:2px solid #8b2e22;"></div>
+        <div style="width:28px;height:28px;border-radius:50%;background:#5b8fb9;border:2px solid #2c5f7c;"></div>
+        <div style="width:28px;height:28px;border-radius:50%;background:#7b6cb0;border:2px solid #4a3d75;"></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #5a4a3a;box-shadow:0 4px 0 #5a4a3a;display:flex;align-items:center;justify-content:center;font-size:20px;">💧</div>
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:2.5px solid #2c5f7c;box-shadow:0 4px 0 #2c5f7c;display:flex;align-items:center;justify-content:center;font-size:20px;">📋</div>
+      </div>
+      <div style="font-size:10px;color:#666;">用户可在设置中切换 5+ 种主题</div>
+    </div>
+    <div class="card-body">
+      <h3>D. 主题预设切换</h3>
+      <p>默认跟宠物毛色，但提供多套预设主题让用户自由切换</p>
+    </div>
+  </div>
+</div>

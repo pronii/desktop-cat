@@ -1,0 +1,104 @@
+<h2>悬浮窗的布局结构，你更喜欢哪种？</h2>
+<p class="subtitle">手绘风 + 毛色同色系已确定，现在选择悬浮窗内部布局</p>
+
+<div class="cards">
+  <div class="card" data-choice="compact-card" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff8ec; padding:14px; display:flex; align-items:center; justify-content:center;">
+      <div style="width:88%;background:#fff;border:2.5px solid #8b6f47;border-radius:12px;box-shadow:0 4px 0 #8b6f47;overflow:hidden;font-family:sans-serif;">
+        <div style="background:#d99738;color:#fff;padding:5px 10px;font-size:11px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+          <span>💧 喝水记录</span><span style="opacity:0.7;font-size:14px;">×</span>
+        </div>
+        <div style="padding:10px;">
+          <div style="text-align:center;margin-bottom:8px;">
+            <div style="font-size:9px;color:#8b6f47;opacity:0.7;">今日已喝</div>
+            <div style="font-size:24px;font-weight:800;color:#d99738;line-height:1.1;">8 <span style="font-size:11px;color:#8b6f47;">杯</span></div>
+          </div>
+          <div style="background:#fff3d5;border:1.5px solid #d99738;border-radius:6px;padding:5px;text-align:center;font-size:11px;font-weight:700;color:#8b5a00;margin-bottom:8px;">🥤 记录一杯</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#8b6f47;margin-bottom:6px;">
+            <span style="font-weight:600;">提醒</span>
+            <span style="width:30px;height:16px;background:#d99738;border-radius:8px;position:relative;display:inline-block;">
+              <span style="position:absolute;right:2px;top:2px;width:12px;height:12px;background:#fff;border-radius:50%;"></span>
+            </span>
+          </div>
+          <div style="display:flex;gap:3px;margin-bottom:6px;">
+            <span style="flex:1;background:#d99738;color:#fff;text-align:center;font-size:9px;padding:2px;border-radius:4px;font-weight:700;">30分</span>
+            <span style="flex:1;background:#fff;border:1px solid #8b6f47;color:#8b6f47;text-align:center;font-size:9px;padding:2px;border-radius:4px;">1时</span>
+            <span style="flex:1;background:#fff;border:1px solid #8b6f47;color:#8b6f47;text-align:center;font-size:9px;padding:2px;border-radius:4px;">2时</span>
+          </div>
+          <div style="text-align:center;font-size:8px;color:#8b6f47;opacity:0.6;">25分钟前提醒</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 紧凑卡片式</h3>
+      <p>所有信息一张卡片装下，大杯数居中，操作按钮在下方，信息密度高</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="progress-ring" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff8ec; padding:14px; display:flex; align-items:center; justify-content:center;">
+      <div style="width:88%;background:#fff;border:2.5px solid #8b6f47;border-radius:12px;box-shadow:0 4px 0 #8b6f47;overflow:hidden;font-family:sans-serif;">
+        <div style="background:#d99738;color:#fff;padding:5px 10px;font-size:11px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+          <span>💧 喝水记录</span><span style="opacity:0.7;font-size:14px;">×</span>
+        </div>
+        <div style="padding:10px;display:flex;gap:10px;align-items:center;">
+          <div style="width:60px;height:60px;border-radius:50%;border:3px solid #ffe0a0;position:relative;flex-shrink:0;">
+            <div style="position:absolute;inset:0;border-radius:50%;background:conic-gradient(#d99738 0deg 270deg, transparent 270deg);"></div>
+            <div style="position:absolute;inset:6px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="font-size:18px;font-weight:800;color:#d99738;line-height:1;">8</span>
+              <span style="font-size:7px;color:#8b6f47;">/10杯</span>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div style="background:#fff3d5;border:1.5px solid #d99738;border-radius:6px;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#8b5a00;margin-bottom:5px;">🥤 记录</div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:#8b6f47;margin-bottom:3px;">
+              <span>提醒</span><span style="color:#d99738;font-weight:700;">开</span>
+            </div>
+            <div style="display:flex;gap:2px;">
+              <span style="flex:1;background:#d99738;color:#fff;text-align:center;font-size:8px;padding:1px;border-radius:3px;">30m</span>
+              <span style="flex:1;border:1px solid #8b6f47;color:#8b6f47;text-align:center;font-size:8px;padding:1px;border-radius:3px;">1h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 进度环式</h3>
+      <p>左侧圆环显示今日进度（8/10杯），右侧操作区，直观有目标感</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="two-section" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff8ec; padding:14px; display:flex; align-items:center; justify-content:center;">
+      <div style="width:88%;background:#fff;border:2.5px solid #8b6f47;border-radius:12px;box-shadow:0 4px 0 #8b6f47;overflow:hidden;font-family:sans-serif;">
+        <div style="background:#d99738;color:#fff;padding:5px 10px;font-size:11px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+          <span>💧 喝水记录</span><span style="opacity:0.7;font-size:14px;">×</span>
+        </div>
+        <div style="padding:8px 10px;text-align:center;border-bottom:1.5px dashed #e8d5b7;">
+          <div style="font-size:9px;color:#8b6f47;opacity:0.7;">今日已喝</div>
+          <div style="font-size:22px;font-weight:800;color:#d99738;line-height:1.1;">8 杯</div>
+          <div style="background:#fff3d5;border:1.5px solid #d99738;border-radius:6px;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#8b5a00;margin-top:4px;">🥤 记录一杯</div>
+        </div>
+        <div style="padding:8px 10px;">
+          <div style="font-size:9px;color:#8b6f47;font-weight:700;margin-bottom:4px;">提醒设置</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#8b6f47;margin-bottom:4px;">
+            <span>定时提醒</span>
+            <span style="width:26px;height:14px;background:#d99738;border-radius:7px;position:relative;display:inline-block;">
+              <span style="position:absolute;right:2px;top:2px;width:10px;height:10px;background:#fff;border-radius:50%;"></span>
+            </span>
+          </div>
+          <div style="display:flex;gap:2px;">
+            <span style="flex:1;background:#d99738;color:#fff;text-align:center;font-size:8px;padding:2px;border-radius:3px;">15m</span>
+            <span style="flex:1;background:#d99738;color:#fff;text-align:center;font-size:8px;padding:2px;border-radius:3px;">30m</span>
+            <span style="flex:1;border:1px solid #8b6f47;color:#8b6f47;text-align:center;font-size:8px;padding:2px;border-radius:3px;">1h</span>
+            <span style="flex:1;border:1px solid #8b6f47;color:#8b6f47;text-align:center;font-size:8px;padding:2px;border-radius:3px;">2h</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 上下分栏式</h3>
+      <p>上半部分：杯数+记录按钮；下半部分：提醒设置，分区清晰</p>
+    </div>
+  </div>
+</div>

@@ -137,7 +137,7 @@ function createWaterReminder() {
   }
 
   function setIntervalMinutes(minutes) {
-    if (typeof minutes !== 'number' || minutes < 1) return false;
+    if (typeof minutes !== 'number' || minutes <= 0) return false;
     config.interval = minutes;
     // 切换间隔时重置提醒起点，确保倒计时从新间隔重新开始
     config.lastTriggerAt = new Date().toISOString();
