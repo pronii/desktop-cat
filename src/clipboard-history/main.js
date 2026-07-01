@@ -13,13 +13,17 @@ function getState() {
 }
 
 function sendStateChanged() {
-  if (historyWindow && !historyWindow.isDestroyed()) {
-    historyWindow.webContents.send('clipboard-history:state-changed', getState());
-  }
-
   for (const window of BrowserWindow.getAllWindows()) {
-    if (window !== historyWindow && !window.isDestroyed()) {
+    if (!window.isDestroyed()) {
       window.webContents.send('clipboard-history:state-changed', getState());
+    }
+  }
+}
+
+function sendNewItem(record) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send('clipboard-history:new-item', record);
     }
   }
 }
@@ -123,11 +127,7 @@ function initClipboardHistory({ preloadPath }) {
     };
     console.log('[Clipboard History] Record created:', record.id);
     storage.add(record);
-
-    if (historyWindow && !historyWindow.isDestroyed()) {
-      console.log('[Clipboard History] Sending new-item event to window');
-      historyWindow.webContents.send('clipboard-history:new-item', record);
-    }
+    sendNewItem(record);
   });
 
   registerIpcHandlers();
