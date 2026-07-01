@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
+    "pack": "electron-builder --dir",
     "smoke:click": "electron scripts/click-smoke.js",
     "smoke:fullscreen": "electron scripts/fullscreen-guard-smoke.js",
     "smoke:tray": "electron scripts/tray-smoke.js"
@@ -19,6 +20,24 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.desktopcat.app",
+    "productName": "desktop-cat",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "dir"
+      ]
+    }
   }
 }
