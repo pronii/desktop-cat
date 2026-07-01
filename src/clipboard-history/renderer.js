@@ -5,9 +5,12 @@
   const grid = document.getElementById('grid');
   const emptyMsg = document.getElementById('emptyMsg');
   const clearBtn = document.getElementById('clearBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
   const toast = document.getElementById('toast');
 
   let toastTimer = null;
+  let itemsCache = [];
+  let isPaused = false;
 
   function showToast(msg) {
     toast.textContent = msg;
@@ -31,19 +34,52 @@
     return new Date(ts).toLocaleDateString('zh-CN');
   }
 
+  function applyState(state) {
+    isPaused = Boolean(state?.isPaused);
+    pauseBtn.textContent = isPaused ? '恢复记录' : '暂停记录';
+    pauseBtn.setAttribute('aria-pressed', String(isPaused));
+    pauseBtn.classList.toggle('is-paused', isPaused);
+    document.body.classList.toggle('is-paused', isPaused);
+  }
+
+  function createDeleteButton(item, card) {
+    const button = document.createElement('button');
+    button.className = 'ch-card-delete';
+    button.type = 'button';
+    button.textContent = '×';
+    button.setAttribute('aria-label', '删除这条历史');
+
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      api.removeItem(item.id).then((items) => {
+        if (Array.isArray(items)) {
+          renderItems(items);
+        } else {
+          card.remove();
+          itemsCache = itemsCache.filter((cached) => cached.id !== item.id);
+          emptyMsg.style.display = itemsCache.length === 0 ? 'block' : 'none';
+        }
+        showToast('已删除');
+      });
+    });
+
+    return button;
+  }
+
   function createCard(item) {
     const card = document.createElement('div');
     card.className = 'ch-card';
     card.dataset.id = item.id;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', '复制这条剪贴板历史');
 
     if (item.type === 'text') {
-      // For text items, show text preview instead of image
       const textPreview = document.createElement('div');
       textPreview.className = 'ch-card-text';
       textPreview.textContent = item.content || '';
       card.appendChild(textPreview);
     } else {
-      // For image and video items
       const img = document.createElement('img');
       if (item.type === 'video') {
         img.src = item.thumbnail || 'data:image/svg+xml,' + encodeURIComponent(
@@ -67,39 +103,48 @@
     time.className = 'ch-card-time';
     time.textContent = formatTime(item.timestamp);
     card.appendChild(time);
+    card.appendChild(createDeleteButton(item, card));
 
-    card.addEventListener('click', () => {
+    const copyItem = () => {
       api.copyItem(item.id).then(() => {
         showToast('已复制');
         const overlay = document.createElement('div');
         overlay.className = 'ch-card-copied';
-        overlay.textContent = '✓ 已复制';
+        overlay.textContent = '已复制';
         card.appendChild(overlay);
         setTimeout(() => overlay.remove(), 1000);
       });
+    };
+
+    card.addEventListener('click', copyItem);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        copyItem();
+      }
     });
 
     return card;
   }
 
   function renderItems(items) {
-    // Remove all cards, keep empty message
+    itemsCache = Array.isArray(items) ? items : [];
     grid.querySelectorAll('.ch-card').forEach(el => el.remove());
 
-    if (!items || items.length === 0) {
+    if (itemsCache.length === 0) {
       emptyMsg.style.display = 'block';
       return;
     }
 
     emptyMsg.style.display = 'none';
-    for (const item of items) {
+    for (const item of itemsCache) {
       grid.appendChild(createCard(item));
     }
   }
 
   function addItem(item) {
+    itemsCache = [item, ...itemsCache.filter((cached) => cached.id !== item.id)];
     emptyMsg.style.display = 'none';
-    // Insert at the top
     const firstCard = grid.querySelector('.ch-card');
     if (firstCard) {
       grid.insertBefore(createCard(item), firstCard);
@@ -108,16 +153,29 @@
     }
   }
 
-  // Load initial items
   api.getItems().then(renderItems);
+  api.getState().then(applyState);
 
-  // Listen for new items in real-time
   api.onNewItem((item) => {
     addItem(item);
   });
 
-  // Clear button
+  api.onStateChanged((state) => {
+    applyState(state);
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    api.setPaused(!isPaused).then((state) => {
+      applyState(state);
+      showToast(state.isPaused ? '已暂停记录' : '已恢复记录');
+    });
+  });
+
   clearBtn.addEventListener('click', () => {
+    if (itemsCache.length === 0) return;
+    const confirmed = window.confirm('确定清空所有剪贴板历史吗？');
+    if (!confirmed) return;
+
     api.clearHistory().then(() => {
       renderItems([]);
       showToast('已清空历史');

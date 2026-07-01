@@ -6,6 +6,23 @@ const { startClipboardWatch } = require('./watcher');
 let storage = null;
 let watcher = null;
 let historyWindow = null;
+let isPaused = false;
+
+function getState() {
+  return { isPaused };
+}
+
+function sendStateChanged() {
+  if (historyWindow && !historyWindow.isDestroyed()) {
+    historyWindow.webContents.send('clipboard-history:state-changed', getState());
+  }
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window !== historyWindow && !window.isDestroyed()) {
+      window.webContents.send('clipboard-history:state-changed', getState());
+    }
+  }
+}
 
 function createHistoryWindow(preloadPath) {
   if (historyWindow && !historyWindow.isDestroyed()) {
@@ -47,6 +64,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle('clipboard-history:clear', () => {
     storage.clear();
+    return storage.getAll();
+  });
+
+  ipcMain.handle('clipboard-history:removeById', (_event, id) => {
+    storage.removeById(id);
+    return storage.getAll();
   });
 
   ipcMain.handle('clipboard-history:copy', (_event, id) => {
@@ -67,6 +90,16 @@ function registerIpcHandlers() {
       clipboard.writeText(item.content);
     }
   });
+
+  ipcMain.handle('clipboard-history:get-state', () => {
+    return getState();
+  });
+
+  ipcMain.handle('clipboard-history:set-paused', (_event, paused) => {
+    isPaused = Boolean(paused);
+    sendStateChanged();
+    return getState();
+  });
 }
 
 function initClipboardHistory({ preloadPath }) {
@@ -74,6 +107,10 @@ function initClipboardHistory({ preloadPath }) {
   storage = new ClipboardStorage({ dir: historyDir });
 
   watcher = startClipboardWatch((item) => {
+    if (isPaused) {
+      return;
+    }
+
     console.log('[Clipboard History] Watcher callback triggered, item type:', item.type);
     const id = `${item.type}_${item.timestamp}`;
     const record = {
@@ -105,6 +142,7 @@ function teardownClipboardHistory() {
     watcher();
     watcher = null;
   }
+  isPaused = false;
   storage = null;
 }
 

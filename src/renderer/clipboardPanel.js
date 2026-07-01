@@ -4,8 +4,15 @@
   const clipboardPanel = document.getElementById('clipboardPanel');
   const clipboardPanelClose = document.getElementById('clipboardPanelClose');
   const clipboardPanelContent = document.getElementById('clipboardPanelContent');
+  const clipboardPauseBtn = document.getElementById('clipboardPauseBtn');
+  const clipboardClearBtn = document.getElementById('clipboardClearBtn');
 
   const api = window.desktopCat?.clipboardHistory;
+  let itemsCache = [];
+  let isPaused = false;
+  const videoPlaceholder = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="72" viewBox="0 0 160 72"><rect fill="#f3f0eb" width="160" height="72"/><circle cx="80" cy="36" r="18" fill="#7d6ac7"/><polygon points="76,27 76,45 91,36" fill="white"/></svg>'
+  );
 
   function formatTime(ts) {
     const diff = Date.now() - ts;
@@ -25,6 +32,14 @@
     clipboardBtn?.setAttribute('aria-expanded', String(isOpen));
   }
 
+  function applyState(state) {
+    isPaused = Boolean(state?.isPaused);
+    clipboardPauseBtn.textContent = isPaused ? '恢复' : '暂停';
+    clipboardPauseBtn.setAttribute('aria-pressed', String(isPaused));
+    clipboardPauseBtn.classList.toggle('is-paused', isPaused);
+    clipboardPanel.classList.toggle('is-paused', isPaused);
+  }
+
   function createTimeEl(timestamp) {
     const timeEl = document.createElement('div');
     timeEl.className = 'clipboard-item-time';
@@ -35,19 +50,47 @@
   function createEmptyEl() {
     const emptyEl = document.createElement('div');
     emptyEl.className = 'clipboard-empty';
-    emptyEl.textContent = '暂无剪贴板历史';
+    emptyEl.textContent = isPaused ? '记录已暂停' : '暂无剪贴板历史';
     return emptyEl;
   }
 
+  function createDeleteButton(item, itemEl) {
+    const button = document.createElement('button');
+    button.className = 'clipboard-item-delete';
+    button.type = 'button';
+    button.textContent = '×';
+    button.setAttribute('aria-label', '删除这条历史');
+
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!api?.removeById) return;
+
+      api.removeById(item.id).then((items) => {
+        if (Array.isArray(items)) {
+          renderClipboardItems(items);
+        } else {
+          itemsCache = itemsCache.filter((cached) => cached.id !== item.id);
+          itemEl.remove();
+          if (itemsCache.length === 0) {
+            renderClipboardItems([]);
+          }
+        }
+      });
+    });
+
+    return button;
+  }
+
   function renderClipboardItems(items) {
+    itemsCache = Array.isArray(items) ? items : [];
     clipboardPanelContent.replaceChildren();
 
-    if (!items || items.length === 0) {
+    if (itemsCache.length === 0) {
       clipboardPanelContent.appendChild(createEmptyEl());
       return;
     }
 
-    items.forEach((item) => {
+    itemsCache.forEach((item) => {
       const itemEl = document.createElement('div');
       itemEl.className = 'clipboard-item';
       itemEl.tabIndex = 0;
@@ -61,10 +104,12 @@
         itemEl.append(textEl, createTimeEl(item.timestamp));
       } else if (item.type === 'image' || item.type === 'video') {
         const imgEl = document.createElement('img');
-        imgEl.src = item.thumbnail;
+        imgEl.src = item.thumbnail || videoPlaceholder;
         imgEl.alt = item.type === 'video' ? '视频缩略图' : '图片缩略图';
         itemEl.append(imgEl, createTimeEl(item.timestamp));
       }
+
+      itemEl.appendChild(createDeleteButton(item, itemEl));
 
       const copyItem = () => {
         if (!api?.copy) return;
@@ -89,9 +134,7 @@
     });
   }
 
-  function openClipboardPanel() {
-    setPanelOpen(true);
-
+  function refreshItems() {
     if (api?.getAll) {
       api.getAll().then((items) => {
         renderClipboardItems(items);
@@ -99,6 +142,12 @@
     } else {
       renderClipboardItems([]);
     }
+  }
+
+  function openClipboardPanel() {
+    setPanelOpen(true);
+    refreshItems();
+    api?.getState?.().then(applyState);
   }
 
   function closeClipboardPanel() {
@@ -123,6 +172,25 @@
     });
   }
 
+  clipboardPauseBtn?.addEventListener('click', () => {
+    api?.setPaused?.(!isPaused).then((state) => {
+      applyState(state);
+      if (itemsCache.length === 0) {
+        renderClipboardItems([]);
+      }
+    });
+  });
+
+  clipboardClearBtn?.addEventListener('click', () => {
+    if (itemsCache.length === 0 || !api?.clear) return;
+    const confirmed = window.confirm('确定清空所有剪贴板历史吗？');
+    if (!confirmed) return;
+
+    api.clear().then(() => {
+      renderClipboardItems([]);
+    });
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && clipboardPanel.classList.contains('show')) {
       closeClipboardPanel();
@@ -132,10 +200,19 @@
   if (api?.onNewItem) {
     api.onNewItem(() => {
       if (clipboardPanel.classList.contains('show')) {
-        api.getAll().then((items) => {
-          renderClipboardItems(items);
-        });
+        refreshItems();
       }
     });
   }
+
+  if (api?.onStateChanged) {
+    api.onStateChanged((state) => {
+      applyState(state);
+      if (itemsCache.length === 0) {
+        renderClipboardItems([]);
+      }
+    });
+  }
+
+  api?.getState?.().then(applyState);
 })();
