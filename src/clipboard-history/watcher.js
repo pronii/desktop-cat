@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 const { clipboard } = require('electron');
 
 const SUPPORTED_VIDEO_EXTS = new Set(['.mp4', '.mov', '.avi']);
+const DEFAULT_INTERVAL_MS = 1500;
+const THUMBNAIL_MAX_SIZE = 220;
 
 function isSupportedVideoPath(filePath) {
   if (typeof filePath !== 'string') return false;
@@ -10,61 +12,75 @@ function isSupportedVideoPath(filePath) {
 }
 
 function createContentFingerprint(content) {
-  const raw = typeof content.raw === 'string' ? content.raw : JSON.stringify(content.raw);
-  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16);
+  const hash = crypto.createHash('sha256');
+  if (Buffer.isBuffer(content.raw)) {
+    hash.update(content.raw);
+  } else {
+    const raw = typeof content.raw === 'string' ? content.raw : JSON.stringify(content.raw);
+    hash.update(raw);
+  }
+  return hash.digest('hex').slice(0, 16);
 }
 
-function startClipboardWatch(onChange, { intervalMs = 800 } = {}) {
+function createThumbnailDataUrl(image, size) {
+  const scale = Math.min(THUMBNAIL_MAX_SIZE / size.width, THUMBNAIL_MAX_SIZE / size.height, 1);
+  const width = Math.max(1, Math.round(size.width * scale));
+  const height = Math.max(1, Math.round(size.height * scale));
+  return image.resize({ width, height, quality: 'good' }).toDataURL();
+}
+
+function createThumbnailImage(image, size) {
+  const scale = Math.min(THUMBNAIL_MAX_SIZE / size.width, THUMBNAIL_MAX_SIZE / size.height, 1);
+  const width = Math.max(1, Math.round(size.width * scale));
+  const height = Math.max(1, Math.round(size.height * scale));
+  return image.resize({ width, height, quality: 'good' });
+}
+
+function startClipboardWatch(onChange, { intervalMs = DEFAULT_INTERVAL_MS } = {}) {
   let currentFingerprint = null;
+
+  function emitIfChanged(raw, createItem) {
+    const fingerprint = createContentFingerprint({ raw });
+    if (fingerprint === currentFingerprint) return;
+
+    currentFingerprint = fingerprint;
+    onChange({ ...createItem(), timestamp: Date.now() });
+  }
 
   const poll = () => {
     try {
-      let item = null;
-
-      // 1. Check for image
       const img = clipboard.readImage();
       if (!img.isEmpty()) {
         const size = img.getSize();
-        console.log('[Clipboard Watcher] Image detected, size:', size);
         if (size.width > 4 || size.height > 4) {
-          const dataUrl = img.toDataURL();
-          item = { type: 'image', raw: dataUrl, thumbnail: dataUrl, width: size.width, height: size.height };
-          console.log('[Clipboard Watcher] Image item created, data URL length:', dataUrl.length);
+          const thumbnailImage = createThumbnailImage(img, size);
+          const thumbnailBuffer = thumbnailImage.toPNG();
+          emitIfChanged(thumbnailBuffer, () => ({
+            type: 'image',
+            raw: thumbnailBuffer,
+            imageBuffer: img.toPNG(),
+            thumbnail: thumbnailImage.toDataURL(),
+            width: size.width,
+            height: size.height
+          }));
+          return;
         }
       }
 
-      // 2. Check for video files
-      if (!item) {
-        const fileList = clipboard.read('public.file-urls');
-        if (fileList) {
-          const files = fileList.split('\n').filter(Boolean);
-          for (const filePath of files) {
-            if (isSupportedVideoPath(filePath)) {
-              item = { type: 'video', raw: filePath, filePath, thumbnail: null };
-              break;
-            }
+      const fileList = clipboard.read('public.file-urls');
+      if (fileList) {
+        const files = fileList.split('\n').filter(Boolean);
+        for (const filePath of files) {
+          if (isSupportedVideoPath(filePath)) {
+            emitIfChanged(filePath, () => ({ type: 'video', raw: filePath, filePath, thumbnail: null }));
+            return;
           }
         }
       }
 
-      // 3. Check for text
-      if (!item) {
-        const text = clipboard.readText();
-        if (text && text.trim().length > 0) {
-          item = { type: 'text', raw: text, content: text };
-        }
-      }
-
-      if (item) {
-        const fingerprint = createContentFingerprint(item);
-        console.log('[Clipboard Watcher] Item fingerprint:', fingerprint, 'current:', currentFingerprint);
-        if (fingerprint !== currentFingerprint) {
-          currentFingerprint = fingerprint;
-          console.log('[Clipboard Watcher] New item detected, type:', item.type, 'timestamp:', Date.now());
-          onChange({ ...item, timestamp: Date.now() });
-        } else {
-          console.log('[Clipboard Watcher] Item unchanged, skipping');
-        }
+      const text = clipboard.readText();
+      if (text && text.trim().length > 0) {
+        emitIfChanged(text, () => ({ type: 'text', raw: text, content: text }));
       }
     } catch (err) {
       console.error('[Clipboard Watcher] Error polling clipboard:', err);
@@ -78,4 +94,4 @@ function startClipboardWatch(onChange, { intervalMs = 800 } = {}) {
   return () => clearInterval(timer);
 }
 
-module.exports = { startClipboardWatch, isSupportedVideoPath, createContentFingerprint };
+module.exports = { startClipboardWatch, isSupportedVideoPath, createContentFingerprint, createThumbnailDataUrl };

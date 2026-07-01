@@ -1,12 +1,14 @@
-const { BrowserWindow, clipboard, ipcMain, app } = require('electron');
+const { BrowserWindow, clipboard, ipcMain, app, nativeImage } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { ClipboardStorage } = require('./storage');
-const { startClipboardWatch } = require('./watcher');
+const { createThumbnailDataUrl, startClipboardWatch } = require('./watcher');
 
 let storage = null;
 let watcher = null;
 let historyWindow = null;
 let isPaused = false;
+let imageDir = null;
 
 function getState() {
   return { isPaused };
@@ -25,6 +27,65 @@ function sendNewItem(record) {
     if (!window.isDestroyed()) {
       window.webContents.send('clipboard-history:new-item', record);
     }
+  }
+}
+
+function ensureImageDir() {
+  if (!fs.existsSync(imageDir)) {
+    fs.mkdirSync(imageDir, { recursive: true });
+  }
+}
+
+function createImagePath(id) {
+  ensureImageDir();
+  return path.join(imageDir, `${id}.png`);
+}
+
+function removeImageFile(item) {
+  if (item?.type !== 'image' || !item.imagePath) return;
+  try {
+    fs.rmSync(item.imagePath, { force: true });
+  } catch {
+    // Ignore cleanup failures; history removal should still succeed.
+  }
+}
+
+function persistImageItem(item, id) {
+  if (item.type !== 'image' || !Buffer.isBuffer(item.imageBuffer)) return {};
+
+  const imagePath = createImagePath(id);
+  fs.writeFileSync(imagePath, item.imageBuffer);
+  return { imagePath };
+}
+
+function migrateLegacyImageRecords() {
+  const items = storage.getAll();
+  let changed = false;
+
+  const migrated = items.map((item) => {
+    if (item.type !== 'image' || item.imagePath || typeof item.thumbnail !== 'string') {
+      return item;
+    }
+
+    try {
+      const image = nativeImage.createFromDataURL(item.thumbnail);
+      if (image.isEmpty()) return item;
+
+      const imagePath = createImagePath(item.id);
+      fs.writeFileSync(imagePath, image.toPNG());
+      changed = true;
+      return {
+        ...item,
+        imagePath,
+        thumbnail: createThumbnailDataUrl(image, image.getSize())
+      };
+    } catch {
+      return item;
+    }
+  });
+
+  if (changed) {
+    storage.setItems(migrated);
   }
 }
 
@@ -67,12 +128,13 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('clipboard-history:clear', () => {
-    storage.clear();
+    const removed = storage.clear();
+    removed.forEach(removeImageFile);
     return storage.getAll();
   });
 
   ipcMain.handle('clipboard-history:removeById', (_event, id) => {
-    storage.removeById(id);
+    removeImageFile(storage.removeById(id));
     return storage.getAll();
   });
 
@@ -82,8 +144,11 @@ function registerIpcHandlers() {
     if (!item) return;
 
     if (item.type === 'image') {
-      const nativeImg = require('electron').nativeImage.createFromDataURL(item.thumbnail);
-      clipboard.writeImage(nativeImg);
+      if (item.imagePath && fs.existsSync(item.imagePath)) {
+        clipboard.writeImage(nativeImage.createFromBuffer(fs.readFileSync(item.imagePath)));
+      } else {
+        clipboard.writeImage(nativeImage.createFromDataURL(item.thumbnail));
+      }
     } else if (item.type === 'video' && item.filePath) {
       // On Windows, writing a file to clipboard requires a specific format.
       // For simplicity, we'll just copy the path as text, or if it's more complex,
@@ -108,25 +173,26 @@ function registerIpcHandlers() {
 
 function initClipboardHistory({ preloadPath }) {
   const historyDir = path.join(app.getPath('userData'), 'clipboard-history');
+  imageDir = path.join(historyDir, 'images');
   storage = new ClipboardStorage({ dir: historyDir });
+  migrateLegacyImageRecords();
 
   watcher = startClipboardWatch((item) => {
     if (isPaused) {
       return;
     }
 
-    console.log('[Clipboard History] Watcher callback triggered, item type:', item.type);
     const id = `${item.type}_${item.timestamp}`;
     const record = {
       id,
       type: item.type,
       thumbnail: item.thumbnail,
       filePath: item.filePath,
-      content: item.content, // for text
-      timestamp: item.timestamp
+      content: item.content,
+      timestamp: item.timestamp,
+      ...persistImageItem(item, id)
     };
-    console.log('[Clipboard History] Record created:', record.id);
-    storage.add(record);
+    storage.add(record).forEach(removeImageFile);
     sendNewItem(record);
   });
 
@@ -144,6 +210,7 @@ function teardownClipboardHistory() {
   }
   isPaused = false;
   storage = null;
+  imageDir = null;
 }
 
 module.exports = { initClipboardHistory, openHistoryWindow, teardownClipboardHistory };
