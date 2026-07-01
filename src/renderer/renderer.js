@@ -37,18 +37,6 @@
     }, 1500);
   }
 
-  async function recordDrink() {
-    try {
-      const newCount = await window.desktopCat.waterReminder.recordDrink();
-      const numEl = waterCounter.querySelector('.water-counter-num');
-      if (numEl) numEl.textContent = newCount;
-      waterCounter.classList.add('just-drank');
-      window.setTimeout(() => waterCounter.classList.remove('just-drank'), 1200);
-    } catch (_e) {
-      // Non-critical.
-    }
-  }
-
   async function setDrinking() {
     if (drinkState.isDrinking) return;
 
@@ -56,7 +44,7 @@
     cat.classList.add('is-drinking');
     waterBowl.classList.add('is-visible');
 
-    waterBubble.textContent = '该喝水啦！点击猫咪记录喝水';
+    waterBubble.textContent = '该喝水啦！';
 
     window.clearTimeout(drinkTimer);
     drinkTimer = window.setTimeout(async () => {
@@ -116,14 +104,8 @@
         dragEntered = false;
       }
     } else {
-      // 短按 → 开心反馈
-      if (drinkState.isDrinking) {
-        // 正在提醒喝水，记录一杯 + 开心
-        setHappy();
-        recordDrink();
-      } else {
-        setHappy();
-      }
+      // 短按 → 开心反馈（不记录杯数，杯数只在悬浮窗手动记录）
+      setHappy();
     }
     isLongPress = false;
   });
