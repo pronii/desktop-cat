@@ -1,6 +1,6 @@
 {
   "name": "desktop-cat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A tiny Electron desktop cat pet for Windows.",
   "main": "src/main/main.js",
   "type": "commonjs",

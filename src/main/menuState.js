@@ -14,7 +14,11 @@ function toggleAlwaysOnTop(state) {
   };
 }
 
-function createPetContextMenuTemplate({ state, actions = {} }) {
+function createPetContextMenuTemplate({ state, waterReminderConfig = {}, actions = {} }) {
+  const dailyInfo = waterReminderConfig.dailyCount !== undefined
+    ? `今日已喝: ${waterReminderConfig.dailyCount} 杯`
+    : null;
+
   return [
     {
       label: '总是置顶',
@@ -30,6 +34,25 @@ function createPetContextMenuTemplate({ state, actions = {} }) {
       label: '隐藏 5 分钟',
       click: actions.hideTemporarily || noop
     },
+    {
+      type: 'separator'
+    },
+    {
+      label: '喝水提醒',
+      type: 'checkbox',
+      checked: waterReminderConfig.enabled !== false,
+      click: actions.toggleWaterReminder || noop
+    },
+    {
+      label: '触发喝水提醒',
+      click: actions.testWaterReminder || noop
+    },
+    ...(dailyInfo
+      ? [{
+        label: dailyInfo,
+        enabled: false
+      }]
+      : []),
     {
       type: 'separator'
     },

@@ -1,6 +1,10 @@
 function noop() {}
 
-function createTrayMenuTemplate({ state, actions = {} }) {
+function createTrayMenuTemplate({ state, waterReminderConfig = {}, actions = {} }) {
+  const dailyInfo = waterReminderConfig.dailyCount !== undefined
+    ? `今日已喝: ${waterReminderConfig.dailyCount} 杯`
+    : null;
+
   return [
     {
       label: '显示小猫',
@@ -19,6 +23,22 @@ function createTrayMenuTemplate({ state, actions = {} }) {
       checked: state.alwaysOnTopEnabled,
       click: actions.toggleAlwaysOnTop || noop
     },
+    {
+      label: '喝水提醒',
+      type: 'checkbox',
+      checked: waterReminderConfig.enabled !== false,
+      click: actions.toggleWaterReminder || noop
+    },
+    {
+      label: '触发喝水提醒',
+      click: actions.testWaterReminder || noop
+    },
+    ...(dailyInfo
+      ? [{
+        label: dailyInfo,
+        enabled: false
+      }]
+      : []),
     {
       type: 'separator'
     },

@@ -20,11 +20,32 @@ function shouldClearHappyState(state, now = Date.now()) {
   return Boolean(state.isHappy && now >= state.happyUntil);
 }
 
+function createDrinkState({ now = Date.now(), duration = 3200 } = {}) {
+  return {
+    isDrinking: true,
+    drinkUntil: now + duration
+  };
+}
+
+function clearDrinkState() {
+  return {
+    isDrinking: false,
+    drinkUntil: 0
+  };
+}
+
+function shouldClearDrinkState(state, now = Date.now()) {
+  return Boolean(state.isDrinking && now >= state.drinkUntil);
+}
+
 const petBehavior = {
   clamp,
   createHappyState,
   clearHappyState,
-  shouldClearHappyState
+  shouldClearHappyState,
+  createDrinkState,
+  clearDrinkState,
+  shouldClearDrinkState
 };
 
 if (typeof window !== 'undefined') {

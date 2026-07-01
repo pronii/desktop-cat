@@ -37,6 +37,12 @@ const {
   createTrayMenuTemplate
 } = require('./trayMenu');
 const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = require('../clipboard-history/main');
+const { getForegroundProbeWorker } = require('./foregroundWorker');
+const { createWaterReminder } = require('./waterReminder');
+
+const TOPMOST_FAST_INTERVAL = 500;
+const TOPMOST_CALM_INTERVAL = 3000;
+const CALM_THRESHOLD = 4;
 
 let petWindow = null;
 let tray = null;
@@ -44,15 +50,67 @@ let topmostTimer = null;
 let hideTimer = null;
 let topmostSuspended = false;
 let topmostChecking = false;
+let displayChangeTeardown = null;
+let calmProbes = 0;
+let currentTopmostInterval = TOPMOST_FAST_INTERVAL;
 let petMenuState = createPetMenuState();
 let temporaryHideState = createTemporaryHideState();
 let topmostSuspendState = createTopmostSuspendState();
+let waterReminder = createWaterReminder();
 
 function centerWindowOnScreen(window) {
   const bounds = window.getBounds();
   const display = screen.getDisplayMatching(bounds);
   const next = centerInWorkArea(bounds, display.workArea);
   window.setPosition(next.x, next.y, false);
+}
+
+let displayRecoveryTimer = null;
+
+function recoverWindowIntoWorkArea(window) {
+  if (!window || window.isDestroyed()) return;
+
+  const bounds = window.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  const workArea = display.workArea;
+
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+  const inWorkArea =
+    centerX >= workArea.x &&
+    centerX <= workArea.x + workArea.width &&
+    centerY >= workArea.y &&
+    centerY <= workArea.y + workArea.height;
+
+  if (!inWorkArea) {
+    const next = centerInWorkArea(bounds, workArea);
+    window.setPosition(next.x, next.y, false);
+  }
+}
+
+function scheduleDisplayRecovery(window) {
+  if (!window || window.isDestroyed()) return;
+  if (displayRecoveryTimer) return;
+  displayRecoveryTimer = setTimeout(() => {
+    displayRecoveryTimer = null;
+    recoverWindowIntoWorkArea(window);
+  }, 200);
+  if (typeof displayRecoveryTimer.unref === 'function') {
+    displayRecoveryTimer.unref();
+  }
+}
+
+function setupDisplayChangeHandlers(window) {
+  const handler = () => scheduleDisplayRecovery(window);
+  screen.on('display-added', handler);
+  screen.on('display-removed', handler);
+  screen.on('display-metrics-changed', handler);
+
+  return () => {
+    screen.removeListener('display-added', handler);
+    screen.removeListener('display-removed', handler);
+    screen.removeListener('display-metrics-changed', handler);
+  };
 }
 
 function keepWindowOnTop(window) {
@@ -110,6 +168,8 @@ async function refreshTopmost(window) {
 
   if (enforceTemporaryHide(window, temporaryHideState)) return;
 
+  applyAdaptiveInterval(window, topmostSuspended);
+
   if (topmostSuspended) {
     suspendWindowTopmost(window);
     return;
@@ -118,23 +178,59 @@ async function refreshTopmost(window) {
   keepWindowOnTop(window);
 }
 
+function restartTopmostTimer(window, interval) {
+  if (topmostTimer) {
+    clearInterval(topmostTimer);
+  }
+  currentTopmostInterval = interval;
+  topmostTimer = setInterval(() => {
+    refreshTopmost(window);
+  }, interval);
+}
+
+function applyAdaptiveInterval(window, suspended) {
+  if (suspended) {
+    calmProbes = 0;
+    if (currentTopmostInterval !== TOPMOST_FAST_INTERVAL) {
+      restartTopmostTimer(window, TOPMOST_FAST_INTERVAL);
+    }
+    return;
+  }
+
+  calmProbes += 1;
+  if (
+    calmProbes >= CALM_THRESHOLD &&
+    currentTopmostInterval !== TOPMOST_CALM_INTERVAL
+  ) {
+    restartTopmostTimer(window, TOPMOST_CALM_INTERVAL);
+  }
+}
+
+function resetToFastInterval(window) {
+  calmProbes = 0;
+  if (currentTopmostInterval !== TOPMOST_FAST_INTERVAL) {
+    restartTopmostTimer(window, TOPMOST_FAST_INTERVAL);
+  }
+}
+
 function startTopmostWatch(window) {
   window.on('show', () => {
+    resetToFastInterval(window);
     refreshTopmost(window);
   });
   window.on('focus', () => {
+    resetToFastInterval(window);
     refreshTopmost(window);
   });
   window.on('blur', () => {
     refreshTopmost(window);
   });
   window.on('restore', () => {
+    resetToFastInterval(window);
     refreshTopmost(window);
   });
 
-  topmostTimer = setInterval(() => {
-    refreshTopmost(window);
-  }, 500);
+  restartTopmostTimer(window, TOPMOST_FAST_INTERVAL);
 }
 
 function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
@@ -189,11 +285,18 @@ function createPetContextMenu(window) {
   return Menu.buildFromTemplate(
     createPetContextMenuTemplate({
       state: petMenuState,
+      waterReminderConfig: waterReminder.getConfig(),
       actions: {
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
         centerOnScreen: () => centerWindowOnScreen(window),
         hideTemporarily: () => hideWindowTemporarily(window),
-        openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js'))
+        openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js')),
+        toggleWaterReminder: () => {
+          const enabled = waterReminder.toggleEnabled();
+          updateTrayMenu(window);
+          return enabled;
+        },
+        testWaterReminder: () => waterReminder.fire()
       }
     })
   );
@@ -208,11 +311,18 @@ function createTrayContextMenu(window) {
   return Menu.buildFromTemplate(
     createTrayMenuTemplate({
       state: petMenuState,
+      waterReminderConfig: waterReminder.getConfig(),
       actions: {
         showPet: () => showPetWindow(window),
         hideTemporarily: () => hideWindowTemporarily(window),
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
-        openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js'))
+        openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js')),
+        toggleWaterReminder: () => {
+          const enabled = waterReminder.toggleEnabled();
+          updateTrayMenu(window);
+          return enabled;
+        },
+        testWaterReminder: () => waterReminder.fire()
       }
     })
   );
@@ -249,6 +359,7 @@ function createPetWindow() {
 
   keepWindowOnTop(petWindow);
   startTopmostWatch(petWindow);
+  displayChangeTeardown = setupDisplayChangeHandlers(petWindow);
   createApplicationTray(petWindow);
   petWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
@@ -264,10 +375,20 @@ function createPetWindow() {
   petWindow.on('closed', () => {
     clearInterval(topmostTimer);
     clearTimeout(hideTimer);
+    if (displayRecoveryTimer) {
+      clearTimeout(displayRecoveryTimer);
+      displayRecoveryTimer = null;
+    }
+    if (displayChangeTeardown) {
+      displayChangeTeardown();
+      displayChangeTeardown = null;
+    }
     topmostTimer = null;
     hideTimer = null;
     topmostSuspended = false;
     topmostChecking = false;
+    calmProbes = 0;
+    currentTopmostInterval = TOPMOST_FAST_INTERVAL;
     temporaryHideState = createTemporaryHideState();
     topmostSuspendState = createTopmostSuspendState();
     petWindow = null;
@@ -279,21 +400,59 @@ function suspendWindowTopmost(window) {
   window.setAlwaysOnTop(false);
 }
 
-app.whenReady().then(() => {
-  initClipboardHistory({
-    preloadPath: path.join(__dirname, '..', 'clipboard-history', 'preload.js')
-  });
-  createPetWindow();
+/* --- 喝水提醒 IPC --- */
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createPetWindow();
-    }
-  });
+ipcMain.handle('water-reminder:get-config', () => waterReminder.getConfig());
+
+ipcMain.handle('water-reminder:toggle', () => {
+  const enabled = waterReminder.toggleEnabled();
+  updateTrayMenu(petWindow);
+  return enabled;
 });
 
+ipcMain.handle('water-reminder:set-interval', (_event, minutes) => {
+  return waterReminder.setIntervalMinutes(minutes);
+});
+
+ipcMain.handle('water-reminder:record-drink', () => waterReminder.recordDrink());
+
+ipcMain.handle('water-reminder:test-trigger', () => {
+  waterReminder.fire();
+  return true;
+});
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!petWindow || petWindow.isDestroyed()) return;
+    if (petWindow.isMinimized()) petWindow.restore();
+    showPetWindow(petWindow, { center: false });
+    petWindow.focus();
+  });
+
+  app.whenReady().then(() => {
+    getForegroundProbeWorker().start();
+    initClipboardHistory({
+      preloadPath: path.join(__dirname, '..', 'clipboard-history', 'preload.js')
+    });
+    waterReminder.start();
+    createPetWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createPetWindow();
+      }
+    });
+  });
+}
+
 app.on('before-quit', () => {
+  waterReminder.stop();
   teardownClipboardHistory();
+  getForegroundProbeWorker().stop();
   if (tray) {
     tray.destroy();
     tray = null;

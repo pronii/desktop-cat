@@ -376,6 +376,147 @@ body {
   transform: translateY(0) scale(1);
 }
 
+/* --- 舌头 --- */
+.tongue {
+  position: absolute;
+  left: 60px;
+  top: 84px;
+  width: 9px;
+  height: 4px;
+  border-radius: 0 0 5px 5px;
+  background: #f58da8;
+  opacity: 0;
+  transform: scaleY(0);
+  transform-origin: top center;
+  z-index: 4;
+}
+
+.cat.is-drinking .tongue {
+  opacity: 1;
+  animation: tongue-lick 0.45s ease-in-out 3;
+}
+
+/* --- 喝水泡泡 --- */
+.water-bubble {
+  position: absolute;
+  left: -6px;
+  top: -14px;
+  padding: 5px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  background: #e0f7fa;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px) scale(0.92);
+  transition: opacity 240ms ease, transform 240ms ease;
+  z-index: 13;
+  pointer-events: none;
+}
+
+.cat.is-drinking .water-bubble {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* --- 水碗 --- */
+.water-bowl {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 52px;
+  height: 22px;
+  margin-left: -26px;
+  border: 3px solid var(--ink);
+  border-radius: 6px 6px 16px 16px;
+  background: #d7eef5;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 4px 10px var(--shadow);
+  opacity: 0;
+  transform: translateY(10px) scale(0.9);
+  transition: opacity 260ms ease, transform 260ms ease;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.water-bowl.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.water-surf {
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  right: 5px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(100, 181, 246, 0.35);
+}
+
+.water-ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: rgba(100, 181, 246, 0.6);
+  opacity: 0;
+}
+
+.water-bowl.is-visible .water-ripple {
+  animation: ripple 0.6s ease-out infinite;
+  animation-delay: 0.3s;
+}
+
+/* --- 喝水状态 --- */
+.cat.is-drinking {
+  animation: none;
+  transform: translateY(4px);
+}
+
+.cat.is-drinking .head {
+  transform: rotate(6deg) translateX(3px);
+}
+
+.cat.is-drinking .body {
+  transform: translateY(4px);
+}
+
+.cat.is-drinking .tail {
+  animation-duration: 0.7s;
+}
+
+/* --- 喝水计数器 --- */
+.water-counter {
+  position: fixed;
+  top: 6px;
+  right: 14px;
+  padding: 3px 9px;
+  border: 2px solid rgba(60, 43, 36, 0.55);
+  border-radius: 14px;
+  background: rgba(255, 250, 241, 0.92);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  z-index: 1010;
+  box-shadow: 0 3px 9px rgba(91, 56, 29, 0.16);
+  transition: transform 200ms ease, background 200ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.water-counter.just-drank {
+  background: #e0f7fa;
+  border-color: #2196F3;
+  transform: scale(1.12);
+}
+
 @keyframes breathe {
   0%,
   100% {
@@ -414,6 +555,28 @@ body {
   }
   50% {
     transform: rotate(14deg);
+  }
+}
+
+@keyframes tongue-lick {
+  0%,
+  100% {
+    transform: scaleY(0);
+  }
+  40%,
+  60% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(6);
   }
 }
 

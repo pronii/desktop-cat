@@ -7,7 +7,9 @@ const THUMBNAIL_MAX_SIZE = 220;
 
 function isSupportedVideoPath(filePath) {
   if (typeof filePath !== 'string') return false;
-  const ext = filePath.toLowerCase().slice(filePath.lastIndexOf('.'));
+  const dot = filePath.lastIndexOf('.');
+  if (dot < 0) return false;
+  const ext = filePath.toLowerCase().slice(dot);
   return SUPPORTED_VIDEO_EXTS.has(ext);
 }
 
@@ -38,17 +40,30 @@ function createThumbnailImage(image, size) {
 
 function startClipboardWatch(onChange, { intervalMs = DEFAULT_INTERVAL_MS } = {}) {
   let currentFingerprint = null;
+  let lastType = null;
 
   function emitIfChanged(raw, createItem) {
     const fingerprint = createContentFingerprint({ raw });
     if (fingerprint === currentFingerprint) return;
 
     currentFingerprint = fingerprint;
-    onChange({ ...createItem(), timestamp: Date.now() });
+    const item = { ...createItem(), timestamp: Date.now() };
+    lastType = item.type;
+    onChange(item);
   }
 
   const poll = () => {
     try {
+      // 快速短路：先读文本（开销小），若文本指纹与上次相同且上次也是文本类型，
+      // 说明剪贴板内容未变化，跳过昂贵的 readImage/resize/toPNG 流程。
+      const quickText = clipboard.readText();
+      if (quickText && lastType === 'text') {
+        const quickFp = createContentFingerprint({ raw: quickText });
+        if (quickFp === currentFingerprint) {
+          return;
+        }
+      }
+
       const img = clipboard.readImage();
       if (!img.isEmpty()) {
         const size = img.getSize();
@@ -78,9 +93,8 @@ function startClipboardWatch(onChange, { intervalMs = DEFAULT_INTERVAL_MS } = {}
         }
       }
 
-      const text = clipboard.readText();
-      if (text && text.trim().length > 0) {
-        emitIfChanged(text, () => ({ type: 'text', raw: text, content: text }));
+      if (quickText && quickText.trim().length > 0) {
+        emitIfChanged(quickText, () => ({ type: 'text', raw: quickText, content: quickText }));
       }
     } catch (err) {
       console.error('[Clipboard Watcher] Error polling clipboard:', err);

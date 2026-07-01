@@ -208,6 +208,9 @@ function teardownClipboardHistory() {
     watcher();
     watcher = null;
   }
+  if (storage) {
+    storage.flushSync();
+  }
   isPaused = false;
   storage = null;
   imageDir = null;

@@ -1,4 +1,5 @@
 const { execFile } = require('node:child_process');
+const { getForegroundProbeWorker } = require('./foregroundWorker');
 
 const DEFAULT_FULLSCREEN_THRESHOLD = 0.97;
 const DEFAULT_SUSPEND_HOLD_MS = 3000;
@@ -302,23 +303,9 @@ function execFileAsync(command, args, options) {
   });
 }
 
-async function probeForegroundWindow() {
-  if (process.platform !== 'win32') {
-    return null;
-  }
-
-  const stdout = await execFileAsync(
-    'powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', foregroundProbeScript],
-    {
-      windowsHide: true,
-      timeout: 800,
-      maxBuffer: 1024 * 64
-    }
-  );
-  const raw = JSON.parse(stdout || '{}');
-  const foregroundRaw = raw.foreground || raw;
-  const windowRaws = Array.isArray(raw.windows) ? raw.windows : [];
+function normalizeSnapshot(raw) {
+  const foregroundRaw = raw?.foreground || raw;
+  const windowRaws = Array.isArray(raw?.windows) ? raw.windows : [];
 
   return {
     foreground: normalizeWindowSnapshot(foregroundRaw),
@@ -336,6 +323,35 @@ async function probeForegroundWindow() {
       })
       .filter(Boolean)
   };
+}
+
+async function probeForegroundWindow() {
+  if (process.platform !== 'win32') {
+    return null;
+  }
+
+  // 优先走常驻 PowerShell worker：省去每次轮询的进程启动 + Add-Type 编译开销
+  const worker = getForegroundProbeWorker();
+  if (!worker.broken) {
+    try {
+      const raw = await worker.probe();
+      return normalizeSnapshot(raw);
+    } catch (_err) {
+      // worker 不可用或超时，回退到一次性 spawn
+    }
+  }
+
+  const stdout = await execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', foregroundProbeScript],
+    {
+      windowsHide: true,
+      timeout: 800,
+      maxBuffer: 1024 * 64
+    }
+  );
+  const raw = JSON.parse(stdout || '{}');
+  return normalizeSnapshot(raw);
 }
 
 module.exports = {
