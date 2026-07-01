@@ -211,6 +211,8 @@
           waterPanelIntervals.querySelectorAll('.sketch-interval').forEach((b) => {
             b.classList.toggle('is-active', b === btn);
           });
+          // 刷新配置以更新倒计时
+          refreshConfig();
         }
       } catch (_e) {
         // Non-critical.

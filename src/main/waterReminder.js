@@ -100,6 +100,11 @@ function createWaterReminder() {
 
   function start() {
     config = loadConfig();
+    // 如果提醒已启用但从未设置过起始时间，用当前时间作为初始值
+    if (config.enabled && !config.lastTriggerAt) {
+      config.lastTriggerAt = new Date().toISOString();
+      persistConfig(config);
+    }
     schedule();
   }
 
@@ -134,6 +139,8 @@ function createWaterReminder() {
   function setIntervalMinutes(minutes) {
     if (typeof minutes !== 'number' || minutes < 1) return false;
     config.interval = minutes;
+    // 切换间隔时重置提醒起点，确保倒计时从新间隔重新开始
+    config.lastTriggerAt = new Date().toISOString();
     persistConfig(config);
     schedule();
     return true;
@@ -142,6 +149,8 @@ function createWaterReminder() {
   function recordDrink() {
     resetDailyCount();
     config.dailyCount += 1;
+    // 记录喝水时重置提醒起点，倒计时重新开始
+    config.lastTriggerAt = new Date().toISOString();
     persistConfig(config);
     return config.dailyCount;
   }
