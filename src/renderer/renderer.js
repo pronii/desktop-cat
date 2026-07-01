@@ -40,6 +40,12 @@
   async function setDrinking() {
     if (drinkState.isDrinking) return;
 
+    // 清除上一次的重试定时器
+    if (window.__waterRetryTimer) {
+      window.clearTimeout(window.__waterRetryTimer);
+      window.__waterRetryTimer = null;
+    }
+
     drinkState = createDrinkState({ duration: 3200 });
     cat.classList.add('is-drinking');
     waterBowl.classList.add('is-visible');
@@ -53,9 +59,11 @@
         cat.classList.remove('is-drinking');
         waterBowl.classList.remove('is-visible');
       }
+      // 动画结束后，5 秒后再次提醒（如果用户还没记录）
+      window.__waterRetryTimer = window.setTimeout(() => {
+        setDrinking();
+      }, 5000);
     }, 3500);
-
-    // 不自动记录喝水，等用户点击猫咪确认
   }
 
   async function loadWaterCount() {

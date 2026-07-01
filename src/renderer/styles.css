@@ -984,6 +984,16 @@ body {
   color: #2e7d32;
 }
 
+.sketch-action-btn-snooze {
+  background: #fff;
+  border-color: var(--sketch-border);
+  color: var(--sketch-text);
+}
+
+.sketch-action-btn-snooze:hover {
+  background: #f0ebe0;
+}
+
 .water-panel-row {
   display: flex;
   align-items: center;

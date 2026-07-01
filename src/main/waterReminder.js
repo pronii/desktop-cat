@@ -155,6 +155,13 @@ function createWaterReminder() {
     return config.dailyCount;
   }
 
+  function snooze() {
+    // "下次再提醒"：只重置倒计时，不增加杯数
+    config.lastTriggerAt = new Date().toISOString();
+    persistConfig(config);
+    return true;
+  }
+
   return {
     start,
     stop,
@@ -162,6 +169,7 @@ function createWaterReminder() {
     toggleEnabled,
     setIntervalMinutes,
     recordDrink,
+    snooze,
     fire // exposed for testing
   };
 }

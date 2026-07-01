@@ -416,6 +416,11 @@ ipcMain.handle('water-reminder:set-interval', (_event, minutes) => {
 
 ipcMain.handle('water-reminder:record-drink', () => waterReminder.recordDrink());
 
+ipcMain.handle('water-reminder:snooze', () => {
+  // "下次再提醒"：停止了重试提醒，阻止 fire 重新调度
+  return waterReminder.snooze();
+});
+
 ipcMain.handle('water-reminder:test-trigger', () => {
   waterReminder.fire();
   return true;

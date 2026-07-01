@@ -15,6 +15,7 @@
   const waterPanelClose = document.getElementById('waterPanelClose');
   const waterPanelCount = document.getElementById('waterPanelCount');
   const waterPanelDrinkBtn = document.getElementById('waterPanelDrinkBtn');
+  const waterPanelSnoozeBtn = document.getElementById('waterPanelSnoozeBtn');
   const waterPanelToggle = document.getElementById('waterPanelToggle');
   const waterPanelIntervals = document.getElementById('waterPanelIntervals');
   const waterPanelLast = document.getElementById('waterPanelLast');
@@ -101,6 +102,14 @@
     }
   }
 
+  // 停止 renderer.js 中设置的 5 秒重试提醒
+  function stopRetry() {
+    if (window.__waterRetryTimer) {
+      window.clearTimeout(window.__waterRetryTimer);
+      window.__waterRetryTimer = null;
+    }
+  }
+
   function applyConfig(config) {
     if (!config) return;
     currentConfig = config;
@@ -166,6 +175,8 @@
   if (waterPanelDrinkBtn) {
     waterPanelDrinkBtn.addEventListener('click', async () => {
       if (!api?.recordDrink) return;
+      // 停止重试提醒
+      stopRetry();
       try {
         const newCount = await api.recordDrink();
         waterPanelCount.textContent = newCount;
@@ -177,6 +188,21 @@
         waterPanelDrinkBtn.classList.add('is-copied');
         window.setTimeout(() => waterPanelDrinkBtn.classList.remove('is-copied'), 400);
         // 刷新配置以更新倒计时
+        refreshConfig();
+      } catch (_e) {
+        // Non-critical.
+      }
+    });
+  }
+
+  // "下次再提醒我喝" 按钮
+  if (waterPanelSnoozeBtn) {
+    waterPanelSnoozeBtn.addEventListener('click', async () => {
+      if (!api?.snooze) return;
+      // 停止重试提醒
+      stopRetry();
+      try {
+        await api.snooze();
         refreshConfig();
       } catch (_e) {
         // Non-critical.

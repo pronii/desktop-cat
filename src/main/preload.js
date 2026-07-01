@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('desktopCat', {
     toggle: () => ipcRenderer.invoke('water-reminder:toggle'),
     setInterval: (minutes) => ipcRenderer.invoke('water-reminder:set-interval', minutes),
     recordDrink: () => ipcRenderer.invoke('water-reminder:record-drink'),
+    snooze: () => ipcRenderer.invoke('water-reminder:snooze'),
     onTrigger: (callback) => {
       const handler = (_event) => callback();
       ipcRenderer.on('water-reminder:trigger', handler);
