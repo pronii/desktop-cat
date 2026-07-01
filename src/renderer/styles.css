@@ -26,8 +26,9 @@ body {
 
 body {
   display: grid;
-  place-items: center;
+  place-items: end center;
   font-family: Arial, sans-serif;
+  padding-bottom: 8px;
 }
 
 .stage {
@@ -419,11 +420,11 @@ body {
 /* 剪贴板按钮样式 */
 .clipboard-btn {
   position: fixed;
-  bottom: 12px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  width: 52px;
-  height: 52px;
+  width: 50px;
+  height: 50px;
   border: 2px solid rgba(60, 43, 36, 0.72);
   border-radius: 16px;
   background: rgba(255, 250, 241, 0.88);
@@ -460,10 +461,10 @@ body {
 /* 剪贴板面板样式 */
 .clipboard-panel {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: 74px;
-  max-height: 142px;
+  left: 14px;
+  right: 14px;
+  bottom: 76px;
+  max-height: 258px;
   background: rgba(255, 250, 241, 0.96);
   border-radius: 8px;
   box-shadow: 0 12px 28px rgba(60, 43, 36, 0.28);
@@ -486,7 +487,7 @@ body {
 }
 
 .clipboard-panel-header {
-  padding: 7px 8px 7px 10px;
+  padding: 7px 8px 6px 10px;
   background: #7d6ac7;
   display: flex;
   justify-content: space-between;
@@ -530,7 +531,7 @@ body {
 .clipboard-panel-actions {
   display: flex;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   background: rgba(255, 250, 241, 0.98);
   border-bottom: 1px solid rgba(60, 43, 36, 0.1);
 }
@@ -538,7 +539,7 @@ body {
 .clipboard-panel-action {
   flex: 1;
   min-width: 0;
-  height: 24px;
+  height: 22px;
   border: 1px solid rgba(60, 43, 36, 0.18);
   border-radius: 6px;
   background: #fff;
@@ -568,7 +569,7 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 8px;
+  padding: 7px 8px 8px;
   min-height: 0;
   background: rgba(255, 250, 241, 0.98);
 }
@@ -578,8 +579,8 @@ body {
   background: #ffffff;
   border: 1px solid rgba(60, 43, 36, 0.12);
   border-radius: 6px;
-  padding: 7px;
-  margin-bottom: 7px;
+  padding: 7px 28px 7px 7px;
+  margin-bottom: 6px;
   cursor: pointer;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
   box-shadow: 0 2px 7px rgba(60, 43, 36, 0.08);
@@ -645,7 +646,7 @@ body {
 
 .clipboard-item img {
   width: 100%;
-  height: 56px;
+  height: 74px;
   object-fit: contain;
   border-radius: 4px;
   display: block;
@@ -658,7 +659,7 @@ body {
   font-size: 12px;
   line-height: 1.4;
   word-break: break-word;
-  max-height: 48px;
+  max-height: 64px;
   overflow: hidden;
   margin-bottom: 5px;
   white-space: pre-wrap;
