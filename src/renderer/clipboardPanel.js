@@ -154,13 +154,17 @@
     setPanelOpen(false);
   }
 
+  // 曝光关闭方法，供其他面板切换用
+  window.__closeClipboardPanel = closeClipboardPanel;
+
   if (clipboardBtn) {
     clipboardBtn.addEventListener('click', () => {
       if (clipboardPanel.classList.contains('show')) {
         closeClipboardPanel();
         return;
       }
-
+      // 如果喝水面板开着，先关掉
+      window.__closeWaterPanel?.();
       openClipboardPanel();
     });
   }

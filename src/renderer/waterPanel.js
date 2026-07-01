@@ -152,13 +152,18 @@
     stopCountdown();
   }
 
-  // 点击计数器按钮：切换面板
+  // 曝光关闭方法，供其他面板切换用
+  window.__closeWaterPanel = closePanel;
+
+  // 点击计数器按钮：切换面板（打开前先关掉剪贴板）
   if (waterCounter) {
     waterCounter.addEventListener('click', () => {
       if (waterPanel.classList.contains('show')) {
         closePanel();
         return;
       }
+      // 如果剪贴板面板开着，先关掉
+      window.__closeClipboardPanel?.();
       openPanel();
     });
   }

@@ -829,7 +829,7 @@ body {
   left: 14px;
   right: 14px;
   bottom: 80px;
-  max-height: 280px;
+  height: 280px;
   background: var(--sketch-bg);
   border: 2.5px solid var(--sketch-border);
   border-radius: 12px;
@@ -902,15 +902,18 @@ body {
 
 /* --- 喝水面板 --- */
 .water-panel-body {
-  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
   display: flex;
-  gap: 12px;
-  align-items: stretch;
+  gap: 10px;
+  align-items: flex-start;
+  overflow-y: auto;
 }
 
 .water-progress-ring {
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   position: relative;
   flex-shrink: 0;
@@ -927,18 +930,18 @@ body {
 
 .water-progress-inner {
   position: absolute;
-  inset: 6px;
+  inset: 5px;
   border-radius: 50%;
   background: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 0;
 }
 
 .water-progress-num {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--sketch-accent);
   line-height: 1;
@@ -958,6 +961,12 @@ body {
   min-width: 0;
 }
 
+/* 两个操作按钮并排 */
+.water-panel-btns {
+  display: flex;
+  gap: 6px;
+}
+
 .sketch-action-btn {
   border: 1.5px solid var(--sketch-accent);
   border-radius: 8px;
@@ -965,9 +974,11 @@ body {
   color: #8b5a00;
   font-size: 11px;
   font-weight: 700;
-  padding: 5px;
+  padding: 6px 4px;
   cursor: pointer;
   transition: background 160ms ease, transform 160ms ease;
+  flex: 1;
+  white-space: nowrap;
 }
 
 .sketch-action-btn:hover {
@@ -999,17 +1010,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .water-panel-row-column {
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 2px;
 }
 
 .water-panel-row-label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--sketch-text);
 }
@@ -1018,8 +1029,8 @@ body {
 .sketch-switch {
   position: relative;
   display: inline-block;
-  width: 30px;
-  height: 16px;
+  width: 28px;
+  height: 14px;
   flex-shrink: 0;
 }
 
@@ -1070,11 +1081,11 @@ body {
   flex: 1;
   height: 22px;
   border: 1.5px solid var(--sketch-border);
-  border-radius: 5px;
+  border-radius: 4px;
   background: #fff;
   color: var(--sketch-text);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
@@ -1095,20 +1106,20 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding-top: 4px;
+  gap: 1px;
+  padding-top: 3px;
   border-top: 1px dashed rgba(139, 111, 71, 0.2);
   margin-top: 2px;
 }
 
 .water-panel-last {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--sketch-text-light);
   text-align: center;
 }
 
 .water-panel-next {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--sketch-accent);
   text-align: center;
