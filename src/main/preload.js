@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktopCat', {
+  dragMode: {
+    enter: () => ipcRenderer.send('drag-mode:enter'),
+    exit: () => ipcRenderer.send('drag-mode:exit')
+  },
   waterReminder: {
     getConfig: () => ipcRenderer.invoke('water-reminder:get-config'),
     toggle: () => ipcRenderer.invoke('water-reminder:toggle'),

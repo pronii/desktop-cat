@@ -421,6 +421,40 @@ ipcMain.handle('water-reminder:test-trigger', () => {
   return true;
 });
 
+/* --- 长按拖动 IPC --- */
+
+let dragModeActive = false;
+let dragOffset = { x: 0, y: 0 };
+let dragTick = null;
+
+ipcMain.on('drag-mode:enter', () => {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const cursor = screen.getCursorScreenPoint();
+  const winBounds = petWindow.getBounds();
+  dragOffset = { x: cursor.x - winBounds.x, y: cursor.y - winBounds.y };
+  dragModeActive = true;
+
+  if (dragTick) clearInterval(dragTick);
+  // 每 16ms（约 60fps）跟随鼠标移动窗口
+  dragTick = setInterval(() => {
+    if (!dragModeActive || !petWindow || petWindow.isDestroyed()) {
+      if (dragTick) clearInterval(dragTick);
+      dragTick = null;
+      return;
+    }
+    const cur = screen.getCursorScreenPoint();
+    petWindow.setPosition(cur.x - dragOffset.x, cur.y - dragOffset.y);
+  }, 16);
+});
+
+ipcMain.on('drag-mode:exit', () => {
+  dragModeActive = false;
+  if (dragTick) {
+    clearInterval(dragTick);
+    dragTick = null;
+  }
+});
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
