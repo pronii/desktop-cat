@@ -18,8 +18,13 @@
   const waterPanelToggle = document.getElementById('waterPanelToggle');
   const waterPanelIntervals = document.getElementById('waterPanelIntervals');
   const waterPanelLast = document.getElementById('waterPanelLast');
+  const waterPanelNext = document.getElementById('waterPanelNext');
 
   const api = window.desktopCat?.waterReminder;
+
+  // 当前配置缓存，用于倒计时计算
+  let currentConfig = null;
+  let countdownTimer = null;
 
   function setPanelOpen(isOpen) {
     waterPanel.classList.toggle('show', isOpen);
@@ -39,12 +44,71 @@
     return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   }
 
+  function formatNextTrigger(config) {
+    if (!config) return '⏰ 等待提醒';
+    if (!config.enabled) return '⏸ 提醒已关闭';
+    if (!config.lastTriggerAt) return '⏰ 等待第一次提醒';
+
+    const lastTime = new Date(config.lastTriggerAt).getTime();
+    if (isNaN(lastTime)) return '⏰ 等待提醒';
+
+    const intervalMs = config.interval * 60 * 1000;
+    const nextTime = lastTime + intervalMs;
+    const remaining = nextTime - Date.now();
+
+    if (remaining <= 0) return '🚨 该喝水啦！';
+
+    const totalSec = Math.floor(remaining / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+
+    if (min >= 60) {
+      const hr = Math.floor(min / 60);
+      const remainMin = min % 60;
+      return `⏰ ${hr}时${remainMin}分后提醒`;
+    }
+    if (min > 0) {
+      return `⏰ ${min}分${String(sec).padStart(2, '0')}秒后提醒`;
+    }
+    return `⏰ ${sec}秒后提醒`;
+  }
+
+  function isUrgent(config) {
+    if (!config || !config.enabled || !config.lastTriggerAt) return false;
+    const lastTime = new Date(config.lastTriggerAt).getTime();
+    if (isNaN(lastTime)) return false;
+    const nextTime = lastTime + config.interval * 60 * 1000;
+    const remaining = nextTime - Date.now();
+    return remaining <= 0;
+  }
+
+  function updateCountdown() {
+    if (!currentConfig) return;
+    waterPanelNext.textContent = formatNextTrigger(currentConfig);
+    waterPanelNext.classList.toggle('is-urgent', isUrgent(currentConfig));
+  }
+
+  function startCountdown() {
+    stopCountdown();
+    updateCountdown();
+    countdownTimer = window.setInterval(updateCountdown, 1000);
+  }
+
+  function stopCountdown() {
+    if (countdownTimer) {
+      window.clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+  }
+
   function applyConfig(config) {
     if (!config) return;
+    currentConfig = config;
     waterPanelCount.textContent = config.dailyCount;
     updateProgressRing(config.dailyCount);
     waterPanelToggle.checked = Boolean(config.enabled);
     waterPanelLast.textContent = formatLastTrigger(config.lastTriggerAt);
+    updateCountdown();
 
     // 同步底部计数器数字
     const bottomNum = waterCounter?.querySelector('.water-counter-num');
@@ -71,10 +135,12 @@
   function openPanel() {
     setPanelOpen(true);
     refreshConfig();
+    startCountdown();
   }
 
   function closePanel() {
     setPanelOpen(false);
+    stopCountdown();
   }
 
   // 点击计数器按钮：切换面板
@@ -110,6 +176,8 @@
         window.setTimeout(() => waterCounter?.classList.remove('just-drank'), 1200);
         waterPanelDrinkBtn.classList.add('is-copied');
         window.setTimeout(() => waterPanelDrinkBtn.classList.remove('is-copied'), 400);
+        // 刷新配置以更新倒计时
+        refreshConfig();
       } catch (_e) {
         // Non-critical.
       }
