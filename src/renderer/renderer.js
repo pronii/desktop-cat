@@ -57,7 +57,8 @@
 
     try {
       const newCount = await window.desktopCat.waterReminder.recordDrink();
-      waterCounter.textContent = `💧 ${newCount}`;
+      const numEl = waterCounter.querySelector('.water-counter-num');
+      if (numEl) numEl.textContent = newCount;
       waterCounter.classList.add('just-drank');
       window.setTimeout(() => waterCounter.classList.remove('just-drank'), 1200);
     } catch (_e) {
@@ -68,22 +69,72 @@
   async function loadWaterCount() {
     try {
       const config = await window.desktopCat.waterReminder.getConfig();
-      waterCounter.textContent = `💧 ${config.dailyCount}`;
+      const numEl = waterCounter.querySelector('.water-counter-num');
+      if (numEl) numEl.textContent = config.dailyCount;
     } catch (_e) {
       // Non-critical.
     }
   }
 
+  const LONG_PRESS_MS = 250;
+  let longPressTimer = null;
+  let isLongPress = false;
+  let dragEntered = false;
+
   cat.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return;
 
-    if (drinkState.isDrinking) {
-      setHappy();
-    } else {
-      setHappy();
-    }
+    isLongPress = false;
+    dragEntered = false;
+
+    longPressTimer = window.setTimeout(() => {
+      isLongPress = true;
+      cat.classList.add('is-dragging');
+      if (window.desktopCat?.dragMode) {
+        window.desktopCat.dragMode.enter();
+        dragEntered = true;
+      }
+    }, LONG_PRESS_MS);
 
     event.preventDefault();
+  });
+
+  cat.addEventListener('mouseup', () => {
+    if (longPressTimer) {
+      window.clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+
+    if (isLongPress) {
+      cat.classList.remove('is-dragging');
+      if (dragEntered && window.desktopCat?.dragMode) {
+        window.desktopCat.dragMode.exit();
+        dragEntered = false;
+      }
+    } else {
+      // 短按 → 开心反馈
+      if (drinkState.isDrinking) {
+        setHappy();
+      } else {
+        setHappy();
+      }
+    }
+    isLongPress = false;
+  });
+
+  cat.addEventListener('mouseleave', () => {
+    if (longPressTimer) {
+      window.clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    if (isLongPress) {
+      cat.classList.remove('is-dragging');
+      if (dragEntered && window.desktopCat?.dragMode) {
+        window.desktopCat.dragMode.exit();
+        dragEntered = false;
+      }
+      isLongPress = false;
+    }
   });
 
   cat.addEventListener('dragstart', (event) => {
