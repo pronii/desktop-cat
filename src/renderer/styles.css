@@ -7,6 +7,18 @@
   --blush: #f58da8;
   --cream: #fff3d5;
   --shadow: rgba(91, 56, 29, 0.24);
+
+  /* 手绘风主题色 - 从毛色提取 */
+  --sketch-border: #8b6f47;
+  --sketch-shadow: #5a4a3a;
+  --sketch-accent: #d99738;
+  --sketch-bg: #fff;
+  --sketch-page-bg: #fff8ec;
+  --sketch-text: #8b6f47;
+  --sketch-text-light: rgba(139, 111, 71, 0.6);
+  --sketch-fill: #fff3d5;
+  --sketch-ring-track: #ffe0a0;
+  --sketch-clipboard-accent: #7b6ac7;
 }
 
 * {
@@ -492,23 +504,66 @@ body {
   animation-duration: 0.7s;
 }
 
+/* --- 底部工具栏 --- */
+.bottom-bar {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  -webkit-app-region: no-drag;
+}
+
 /* --- 喝水计数器 --- */
 .water-counter {
-  position: fixed;
-  top: 6px;
-  right: 14px;
-  padding: 3px 9px;
-  border: 2px solid rgba(60, 43, 36, 0.55);
-  border-radius: 14px;
-  background: rgba(255, 250, 241, 0.92);
+  width: 50px;
+  height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border: 2px solid rgba(60, 43, 36, 0.72);
+  border-radius: 16px;
+  background: rgba(255, 250, 241, 0.88);
   color: var(--ink);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.4;
-  z-index: 1010;
-  box-shadow: 0 3px 9px rgba(91, 56, 29, 0.16);
-  transition: transform 200ms ease, background 200ms ease;
-  -webkit-app-region: no-drag;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(91, 56, 29, 0.22);
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.water-counter:hover {
+  transform: translateY(-2px);
+  background: #fffaf1;
+  border-color: rgba(60, 43, 36, 0.9);
+}
+
+.water-counter:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.water-counter[aria-expanded="true"] {
+  background: #e0f7fa;
+  border-color: #2196F3;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18), 0 8px 18px rgba(91, 56, 29, 0.22);
+}
+
+.water-counter .water-counter-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.water-counter .water-counter-num {
+  font-size: 11px;
+  line-height: 1;
 }
 
 .water-counter.just-drank {
@@ -582,10 +637,6 @@ body {
 
 /* 剪贴板按钮样式 */
 .clipboard-btn {
-  position: fixed;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
   width: 50px;
   height: 50px;
   border: 2px solid rgba(60, 43, 36, 0.72);
@@ -593,22 +644,20 @@ body {
   background: rgba(255, 250, 241, 0.88);
   cursor: pointer;
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  z-index: 1000;
   padding: 0;
   display: grid;
   place-items: center;
   box-shadow: 0 8px 18px rgba(91, 56, 29, 0.22);
-  -webkit-app-region: no-drag;
 }
 
 .clipboard-btn:hover {
-  transform: translateX(-50%) translateY(-2px);
+  transform: translateY(-2px);
   background: #fffaf1;
   border-color: rgba(60, 43, 36, 0.9);
 }
 
 .clipboard-btn:active {
-  transform: translateX(-50%) translateY(0) scale(0.96);
+  transform: translateY(0) scale(0.96);
 }
 
 .clipboard-btn[aria-expanded="true"] {
@@ -626,13 +675,13 @@ body {
   position: fixed;
   left: 14px;
   right: 14px;
-  bottom: 76px;
+  bottom: 80px;
   max-height: 258px;
   background: rgba(255, 250, 241, 0.96);
   border-radius: 8px;
   box-shadow: 0 12px 28px rgba(60, 43, 36, 0.28);
   border: 2px solid rgba(60, 43, 36, 0.28);
-  z-index: 900;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
   opacity: 0;
@@ -857,4 +906,257 @@ body {
   text-align: center;
   padding: 22px 10px;
   font-size: 12px;
+}
+
+/* ===== 喝水记录悬浮面板 ===== */
+.water-panel {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: 80px;
+  background: rgba(255, 250, 241, 0.96);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(60, 43, 36, 0.28);
+  border: 2px solid rgba(60, 43, 36, 0.28);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  transform-origin: 50% 100%;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.water-panel.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.water-panel-header {
+  padding: 7px 8px 6px 10px;
+  background: #2196F3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(60, 43, 36, 0.14);
+  flex-shrink: 0;
+}
+
+.water-panel-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.water-panel-close {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  padding: 0;
+}
+
+.water-panel-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.water-panel-body {
+  padding: 12px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 250, 241, 0.98);
+}
+
+.water-panel-today {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 4px;
+}
+
+.water-panel-today-label {
+  font-size: 11px;
+  color: rgba(60, 43, 36, 0.58);
+  font-weight: 600;
+}
+
+.water-panel-today-count {
+  font-size: 30px;
+  font-weight: 800;
+  color: #2196F3;
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.water-panel-today-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(60, 43, 36, 0.58);
+}
+
+.water-panel-drink-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border: 2px solid #2196F3;
+  border-radius: 8px;
+  background: #e3f2fd;
+  color: #1565c0;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.water-panel-drink-btn:hover {
+  background: #bbdefb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(33, 150, 243, 0.25);
+}
+
+.water-panel-drink-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.water-panel-drink-btn.is-copied {
+  background: #c8e6c9;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.water-panel-drink-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.water-panel-divider {
+  height: 1px;
+  background: rgba(60, 43, 36, 0.12);
+  margin: 2px 0;
+}
+
+.water-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.water-panel-row-column {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.water-panel-row-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(60, 43, 36, 0.74);
+}
+
+/* 开关样式 */
+.water-panel-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.water-panel-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.water-panel-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background 200ms ease;
+}
+
+.water-panel-switch-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 200ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.water-panel-switch input:checked + .water-panel-switch-slider {
+  background: #2196F3;
+}
+
+.water-panel-switch input:checked + .water-panel-switch-slider::before {
+  transform: translateX(18px);
+}
+
+/* 间隔按钮组 */
+.water-panel-intervals {
+  display: flex;
+  gap: 5px;
+  width: 100%;
+}
+
+.water-panel-interval {
+  flex: 1;
+  height: 26px;
+  border: 1px solid rgba(60, 43, 36, 0.2);
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(60, 43, 36, 0.74);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.water-panel-interval:hover {
+  border-color: rgba(33, 150, 243, 0.5);
+  color: #1565c0;
+}
+
+.water-panel-interval.is-active {
+  background: #2196F3;
+  border-color: #2196F3;
+  color: #fff;
+}
+
+.water-panel-last {
+  font-size: 10px;
+  color: rgba(60, 43, 36, 0.5);
+  text-align: center;
+  padding-top: 2px;
 }
