@@ -23,6 +23,13 @@ function createTrayMenuTemplate({ state, actions = {} }) {
       type: 'separator'
     },
     {
+      label: '剪切板历史',
+      click: actions.openClipboardHistory || noop
+    },
+    {
+      type: 'separator'
+    },
+    {
       label: '退出',
       role: 'quit'
     }

@@ -415,3 +415,211 @@ body {
     transform: rotate(14deg);
   }
 }
+
+/* 剪贴板按钮样式 */
+.clipboard-btn {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52px;
+  height: 52px;
+  border: 2px solid rgba(60, 43, 36, 0.72);
+  border-radius: 16px;
+  background: rgba(255, 250, 241, 0.88);
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  z-index: 1000;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 18px rgba(91, 56, 29, 0.22);
+  -webkit-app-region: no-drag;
+}
+
+.clipboard-btn:hover {
+  transform: translateX(-50%) translateY(-2px);
+  background: #fffaf1;
+  border-color: rgba(60, 43, 36, 0.9);
+}
+
+.clipboard-btn:active {
+  transform: translateX(-50%) translateY(0) scale(0.96);
+}
+
+.clipboard-btn[aria-expanded="true"] {
+  background: #fff6df;
+  border-color: #d99738;
+  box-shadow: 0 0 0 3px rgba(217, 151, 56, 0.18), 0 8px 18px rgba(91, 56, 29, 0.22);
+}
+
+.clipboard-btn svg {
+  display: block;
+}
+
+/* 剪贴板面板样式 */
+.clipboard-panel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 74px;
+  max-height: 142px;
+  background: rgba(255, 250, 241, 0.96);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(60, 43, 36, 0.28);
+  border: 2px solid rgba(60, 43, 36, 0.28);
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  transform-origin: 50% 100%;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.clipboard-panel.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.clipboard-panel-header {
+  padding: 7px 8px 7px 10px;
+  background: #7d6ac7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(60, 43, 36, 0.14);
+  flex-shrink: 0;
+}
+
+.clipboard-panel-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.clipboard-panel-close {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  padding: 0;
+}
+
+.clipboard-panel-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.clipboard-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  min-height: 0;
+  background: rgba(255, 250, 241, 0.98);
+}
+
+.clipboard-item {
+  background: #ffffff;
+  border: 1px solid rgba(60, 43, 36, 0.12);
+  border-radius: 6px;
+  padding: 7px;
+  margin-bottom: 7px;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+  box-shadow: 0 2px 7px rgba(60, 43, 36, 0.08);
+  overflow: hidden;
+}
+
+.clipboard-item:last-child {
+  margin-bottom: 0;
+}
+
+.clipboard-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(217, 151, 56, 0.52);
+  box-shadow: 0 5px 12px rgba(60, 43, 36, 0.14);
+}
+
+.clipboard-item:focus-visible {
+  outline: 2px solid rgba(125, 106, 199, 0.6);
+  outline-offset: 2px;
+}
+
+.clipboard-item:active {
+  transform: translateY(0);
+}
+
+.clipboard-item.is-copied {
+  background: #eef9ed;
+  border-color: rgba(88, 166, 92, 0.55);
+}
+
+.clipboard-item img {
+  width: 100%;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+  margin-bottom: 5px;
+  background: #f3f0eb;
+}
+
+.clipboard-item-text {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+  max-height: 48px;
+  overflow: hidden;
+  margin-bottom: 5px;
+  white-space: pre-wrap;
+}
+
+.clipboard-item-time {
+  color: rgba(60, 43, 36, 0.58);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.clipboard-panel-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.clipboard-panel-content::-webkit-scrollbar-track {
+  background: rgba(60, 43, 36, 0.06);
+  border-radius: 2px;
+}
+
+.clipboard-panel-content::-webkit-scrollbar-thumb {
+  background: rgba(60, 43, 36, 0.24);
+  border-radius: 2px;
+}
+
+.clipboard-panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(60, 43, 36, 0.34);
+}
+
+.clipboard-empty {
+  color: rgba(60, 43, 36, 0.64);
+  text-align: center;
+  padding: 22px 10px;
+  font-size: 12px;
+}

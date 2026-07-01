@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>剪贴板历史</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="ch-header">
+    <h1 class="ch-title">剪贴板历史</h1>
+    <button class="ch-clear-btn" id="clearBtn">清空</button>
+  </div>
+  <div class="ch-grid" id="grid">
+    <div class="ch-empty" id="emptyMsg">暂无剪贴板历史</div>
+  </div>
+  <div class="ch-toast" id="toast" aria-live="polite"></div>
+  <script src="./renderer.js"></script>
+</body>
+</html>

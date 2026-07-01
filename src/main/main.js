@@ -5,7 +5,8 @@ const {
   Menu,
   Tray,
   nativeImage,
-  screen
+  screen,
+  ipcMain
 } = require('electron');
 const { centerInWorkArea } = require('./windowMovement');
 const {
@@ -29,11 +30,13 @@ const {
   enforceTemporaryHide,
   revealTemporaryHiddenWindow,
   startTemporaryHide
-} = require('./windowVisibility');
+} =
+require('./windowVisibility');
 const {
   createTrayIconDataUrl,
   createTrayMenuTemplate
 } = require('./trayMenu');
+const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = require('../clipboard-history/main');
 
 let petWindow = null;
 let tray = null;
@@ -72,11 +75,6 @@ function getNativeWindowId(window) {
   }
 
   return String(handle.readUInt32LE(0));
-}
-
-function suspendWindowTopmost(window) {
-  if (!window || window.isDestroyed()) return;
-  window.setAlwaysOnTop(false);
 }
 
 async function refreshTopmost(window) {
@@ -194,7 +192,8 @@ function createPetContextMenu(window) {
       actions: {
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
         centerOnScreen: () => centerWindowOnScreen(window),
-        hideTemporarily: () => hideWindowTemporarily(window)
+        hideTemporarily: () => hideWindowTemporarily(window),
+        openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js'))
       }
     })
   );
@@ -212,7 +211,8 @@ function createTrayContextMenu(window) {
       actions: {
         showPet: () => showPetWindow(window),
         hideTemporarily: () => hideWindowTemporarily(window),
-        toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window)
+        toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
+        openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js'))
       }
     })
   );
@@ -257,7 +257,7 @@ function createPetWindow() {
     refreshTopmost(petWindow);
   });
 
-  petWindow.webContents.on('context-menu', () => {
+  petWindow.on('context-menu', () => {
     createPetContextMenu(petWindow).popup({ window: petWindow });
   });
 
@@ -274,7 +274,15 @@ function createPetWindow() {
   });
 }
 
+function suspendWindowTopmost(window) {
+  if (!window || window.isDestroyed()) return;
+  window.setAlwaysOnTop(false);
+}
+
 app.whenReady().then(() => {
+  initClipboardHistory({
+    preloadPath: path.join(__dirname, '..', 'clipboard-history', 'preload.js')
+  });
   createPetWindow();
 
   app.on('activate', () => {
@@ -285,6 +293,7 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  teardownClipboardHistory();
   if (tray) {
     tray.destroy();
     tray = null;
