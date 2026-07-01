@@ -851,255 +851,267 @@ body {
   font-size: 12px;
 }
 
-/* ===== 喝水记录悬浮面板 ===== */
-.water-panel {
+/* --- 手绘风面板（通用） --- */
+.sketch-panel {
   position: fixed;
   left: 14px;
   right: 14px;
   bottom: 80px;
-  background: rgba(255, 250, 241, 0.96);
-  border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(60, 43, 36, 0.28);
-  border: 2px solid rgba(60, 43, 36, 0.28);
+  background: var(--sketch-bg);
+  border: 2.5px solid var(--sketch-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 var(--sketch-border);
   z-index: 1100;
   display: flex;
   flex-direction: column;
-  opacity: 0;
   overflow: hidden;
+  opacity: 0;
   pointer-events: none;
   transform: translateY(8px) scale(0.98);
   transform-origin: 50% 100%;
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.water-panel.show {
+.sketch-panel.show {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0) scale(1);
 }
 
-.water-panel-header {
-  padding: 7px 8px 6px 10px;
-  background: #2196F3;
+.sketch-panel-header {
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(60, 43, 36, 0.14);
   flex-shrink: 0;
 }
 
-.water-panel-header h3 {
+.sketch-panel-header-water {
+  background: var(--sketch-accent);
+}
+
+.sketch-panel-header-clipboard {
+  background: var(--sketch-clipboard-accent);
+}
+
+.sketch-panel-header h3 {
   margin: 0;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
-.water-panel-close {
+.sketch-panel-close {
   width: 22px;
   height: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.46);
-  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1;
   border-radius: 6px;
   cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   font-weight: 700;
   padding: 0;
+  transition: background 160ms ease;
 }
 
-.water-panel-close:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
+.sketch-panel-close:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
+/* --- 喝水面板 --- */
 .water-panel-body {
-  padding: 12px 12px 10px;
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.water-progress-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+  background: var(--sketch-ring-track);
+}
+
+.water-progress-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--sketch-accent) 0deg, var(--sketch-ring-track) 0deg);
+  transition: background 300ms ease;
+}
+
+.water-progress-inner {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: rgba(255, 250, 241, 0.98);
-}
-
-.water-panel-today {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 0 4px;
-}
-
-.water-panel-today-label {
-  font-size: 11px;
-  color: rgba(60, 43, 36, 0.58);
-  font-weight: 600;
-}
-
-.water-panel-today-count {
-  font-size: 30px;
-  font-weight: 800;
-  color: #2196F3;
-  line-height: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.water-panel-today-unit {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(60, 43, 36, 0.58);
-}
-
-.water-panel-drink-btn {
-  display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1px;
+}
+
+.water-progress-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--sketch-accent);
+  line-height: 1;
+}
+
+.water-progress-goal {
+  font-size: 8px;
+  color: var(--sketch-text-light);
+  line-height: 1;
+}
+
+.water-panel-actions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  height: 34px;
-  border: 2px solid #2196F3;
+  min-width: 0;
+}
+
+.sketch-action-btn {
+  border: 1.5px solid var(--sketch-accent);
   border-radius: 8px;
-  background: #e3f2fd;
-  color: #1565c0;
-  font-size: 13px;
+  background: var(--sketch-fill);
+  color: #8b5a00;
+  font-size: 11px;
   font-weight: 700;
+  padding: 5px;
   cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  transition: background 160ms ease, transform 160ms ease;
 }
 
-.water-panel-drink-btn:hover {
-  background: #bbdefb;
+.sketch-action-btn:hover {
+  background: #ffe9b8;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(33, 150, 243, 0.25);
 }
 
-.water-panel-drink-btn:active {
-  transform: translateY(0) scale(0.98);
+.sketch-action-btn:active {
+  transform: scale(0.98);
 }
 
-.water-panel-drink-btn.is-copied {
+.sketch-action-btn.is-copied {
   background: #c8e6c9;
   border-color: #4caf50;
   color: #2e7d32;
-}
-
-.water-panel-drink-icon {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.water-panel-divider {
-  height: 1px;
-  background: rgba(60, 43, 36, 0.12);
-  margin: 2px 0;
 }
 
 .water-panel-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .water-panel-row-column {
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
 }
 
 .water-panel-row-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(60, 43, 36, 0.74);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sketch-text);
 }
 
-/* 开关样式 */
-.water-panel-switch {
+/* 手绘风开关 */
+.sketch-switch {
   position: relative;
   display: inline-block;
-  width: 38px;
-  height: 20px;
+  width: 30px;
+  height: 16px;
   flex-shrink: 0;
 }
 
-.water-panel-switch input {
+.sketch-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.water-panel-switch-slider {
+.sketch-switch-slider {
   position: absolute;
   cursor: pointer;
   inset: 0;
   background: #ccc;
-  border-radius: 20px;
+  border-radius: 8px;
   transition: background 200ms ease;
 }
 
-.water-panel-switch-slider::before {
+.sketch-switch-slider::before {
   content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
-  left: 3px;
-  top: 3px;
+  width: 12px;
+  height: 12px;
+  left: 2px;
+  top: 2px;
   background: #fff;
   border-radius: 50%;
   transition: transform 200ms ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-.water-panel-switch input:checked + .water-panel-switch-slider {
-  background: #2196F3;
+.sketch-switch input:checked + .sketch-switch-slider {
+  background: var(--sketch-accent);
 }
 
-.water-panel-switch input:checked + .water-panel-switch-slider::before {
-  transform: translateX(18px);
+.sketch-switch input:checked + .sketch-switch-slider::before {
+  transform: translateX(14px);
 }
 
 /* 间隔按钮组 */
 .water-panel-intervals {
   display: flex;
-  gap: 5px;
+  gap: 3px;
   width: 100%;
 }
 
-.water-panel-interval {
+.sketch-interval {
   flex: 1;
-  height: 26px;
-  border: 1px solid rgba(60, 43, 36, 0.2);
-  border-radius: 6px;
+  height: 22px;
+  border: 1.5px solid var(--sketch-border);
+  border-radius: 5px;
   background: #fff;
-  color: rgba(60, 43, 36, 0.74);
+  color: var(--sketch-text);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
-.water-panel-interval:hover {
-  border-color: rgba(33, 150, 243, 0.5);
-  color: #1565c0;
+.sketch-interval:hover {
+  border-color: var(--sketch-accent);
+  color: var(--sketch-accent);
 }
 
-.water-panel-interval.is-active {
-  background: #2196F3;
-  border-color: #2196F3;
+.sketch-interval.is-active {
+  background: var(--sketch-accent);
+  border-color: var(--sketch-accent);
   color: #fff;
 }
 
 .water-panel-last {
-  font-size: 10px;
-  color: rgba(60, 43, 36, 0.5);
+  font-size: 9px;
+  color: var(--sketch-text-light);
   text-align: center;
   padding-top: 2px;
 }
+

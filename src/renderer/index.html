@@ -69,41 +69,41 @@
     </div>
 
     <!-- 悬浮喝水面板 -->
-    <div class="water-panel" id="waterPanel">
-      <div class="water-panel-header">
+    <div class="water-panel sketch-panel" id="waterPanel">
+      <div class="sketch-panel-header sketch-panel-header-water">
         <h3>💧 喝水记录</h3>
-        <button class="water-panel-close" id="waterPanelClose" type="button" aria-label="关闭喝水记录">×</button>
+        <button class="sketch-panel-close" id="waterPanelClose" type="button" aria-label="关闭喝水记录">×</button>
       </div>
       <div class="water-panel-body">
-        <div class="water-panel-today">
-          <span class="water-panel-today-label">今日已喝</span>
-          <span class="water-panel-today-count">
-            <span id="waterPanelCount">0</span>
-            <span class="water-panel-today-unit">杯</span>
-          </span>
-        </div>
-        <button class="water-panel-drink-btn" id="waterPanelDrinkBtn" type="button">
-          <span class="water-panel-drink-icon">🥤</span>
-          <span>记录一杯</span>
-        </button>
-        <div class="water-panel-divider"></div>
-        <div class="water-panel-row">
-          <span class="water-panel-row-label">提醒</span>
-          <label class="water-panel-switch">
-            <input type="checkbox" id="waterPanelToggle">
-            <span class="water-panel-switch-slider"></span>
-          </label>
-        </div>
-        <div class="water-panel-row water-panel-row-column">
-          <span class="water-panel-row-label">提醒间隔</span>
-          <div class="water-panel-intervals" id="waterPanelIntervals">
-            <button class="water-panel-interval" data-minutes="15" type="button">15分</button>
-            <button class="water-panel-interval" data-minutes="30" type="button">30分</button>
-            <button class="water-panel-interval" data-minutes="60" type="button">1小时</button>
-            <button class="water-panel-interval" data-minutes="120" type="button">2小时</button>
+        <div class="water-progress-ring" id="waterProgressRing">
+          <div class="water-progress-fill"></div>
+          <div class="water-progress-inner">
+            <span class="water-progress-num" id="waterPanelCount">0</span>
+            <span class="water-progress-goal">/10杯</span>
           </div>
         </div>
-        <div class="water-panel-last" id="waterPanelLast">尚未提醒</div>
+        <div class="water-panel-actions">
+          <button class="sketch-action-btn" id="waterPanelDrinkBtn" type="button">
+            <span>🥤</span> 记录一杯
+          </button>
+          <div class="water-panel-row">
+            <span class="water-panel-row-label">提醒</span>
+            <label class="sketch-switch">
+              <input type="checkbox" id="waterPanelToggle">
+              <span class="sketch-switch-slider"></span>
+            </label>
+          </div>
+          <div class="water-panel-row water-panel-row-column">
+            <span class="water-panel-row-label">提醒间隔</span>
+            <div class="water-panel-intervals" id="waterPanelIntervals">
+              <button class="sketch-interval" data-minutes="15" type="button">15m</button>
+              <button class="sketch-interval" data-minutes="30" type="button">30m</button>
+              <button class="sketch-interval" data-minutes="60" type="button">1h</button>
+              <button class="sketch-interval" data-minutes="120" type="button">2h</button>
+            </div>
+          </div>
+          <div class="water-panel-last" id="waterPanelLast">尚未提醒</div>
+        </div>
       </div>
     </div>
 
