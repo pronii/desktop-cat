@@ -52,37 +52,6 @@ body {
   background: transparent;
 }
 
-.drag-handle {
-  position: absolute;
-  left: 50%;
-  top: 6px;
-  width: 54px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border: 3px solid var(--ink);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 5px 12px var(--shadow);
-  cursor: grab;
-  transform: translateX(-50%);
-  z-index: 10;
-  -webkit-app-region: drag;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.drag-handle span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ink);
-}
-
 .cat {
   position: relative;
   width: 178px;
@@ -101,6 +70,17 @@ body {
 
 .cat:active {
   cursor: pointer;
+}
+
+@keyframes drag-wiggle {
+  0%, 100% { transform: scale(1.06) rotate(-2deg); }
+  50% { transform: scale(1.06) rotate(2deg); }
+}
+
+.cat.is-dragging {
+  animation: drag-wiggle 0.8s ease-in-out infinite;
+  opacity: 0.85;
+  cursor: grabbing;
 }
 
 .cat * {
