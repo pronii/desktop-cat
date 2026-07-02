@@ -215,6 +215,19 @@ function shouldSuspendTopmost({
   petWindowId,
   previousSuspend = false
 }) {
+  if (foreground) {
+    if (petWindowId && String(foreground.hwnd) === String(petWindowId)) {
+      return false;
+    }
+    if (isIgnoredSystemWindow(foreground)) {
+      return false;
+    }
+
+    const foregroundDisplay = foreground.display || display;
+    if (!foregroundDisplay) return previousSuspend;
+    return isFullscreenForeground(foreground, foregroundDisplay);
+  }
+
   if (Array.isArray(windows)) {
     return windows.some((windowSnapshot) => {
       if (petWindowId && String(windowSnapshot.hwnd) === String(petWindowId)) {
@@ -231,12 +244,7 @@ function shouldSuspendTopmost({
     });
   }
 
-  if (!foreground || !display) return previousSuspend;
-  if (petWindowId && String(foreground.hwnd) === String(petWindowId)) {
-    return false;
-  }
-
-  return isFullscreenForeground(foreground, display);
+  return previousSuspend;
 }
 
 function createTopmostSuspendState() {
