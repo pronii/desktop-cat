@@ -35,6 +35,10 @@ function createPetContextMenuTemplate({ state, waterReminderConfig = {}, actions
       click: actions.hideTemporarily || noop
     },
     {
+      label: '好友同屏',
+      click: actions.openRoomPanel || noop
+    },
+    {
       type: 'separator'
     },
     {

@@ -34,5 +34,20 @@ contextBridge.exposeInMainWorld('desktopCat', {
       ipcRenderer.on('clipboard-history:state-changed', handler);
       return () => ipcRenderer.removeListener('clipboard-history:state-changed', handler);
     }
+  },
+  room: {
+    getState: () => ipcRenderer.invoke('room:get-state'),
+    join: (roomCode, nickname) => ipcRenderer.invoke('room:join', { roomCode, nickname }),
+    leave: () => ipcRenderer.invoke('room:leave'),
+    onStateChanged: (callback) => {
+      const handler = (_event, state) => callback(state);
+      ipcRenderer.on('room:state-changed', handler);
+      return () => ipcRenderer.removeListener('room:state-changed', handler);
+    },
+    onOpenPanel: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('room:open-panel', handler);
+      return () => ipcRenderer.removeListener('room:open-panel', handler);
+    }
   }
 });

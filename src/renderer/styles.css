@@ -19,6 +19,7 @@
   --sketch-fill: #fff3d5;
   --sketch-ring-track: #ffe0a0;
   --sketch-clipboard-accent: #7b6ac7;
+  --sketch-room-accent: #2f9a83;
 }
 
 * {
@@ -894,6 +895,10 @@ body {
   background: var(--sketch-clipboard-accent);
 }
 
+.sketch-panel-header-room {
+  background: var(--sketch-room-accent);
+}
+
 .sketch-panel-header h3 {
   margin: 0;
   font-size: 12px;
@@ -1012,6 +1017,12 @@ body {
 
 .sketch-action-btn:active {
   transform: scale(0.98);
+}
+
+.sketch-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .sketch-action-btn.is-copied {
@@ -1152,6 +1163,220 @@ body {
 .water-panel-next.is-urgent {
   color: #e53935;
   animation: pulse-text 1s ease-in-out infinite;
+}
+
+/* --- 好友同屏面板 --- */
+.room-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  background: rgba(250, 255, 251, 0.98);
+}
+
+.room-status-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 22px;
+}
+
+.room-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b9b1a6;
+  box-shadow: 0 0 0 3px rgba(60, 43, 36, 0.08);
+  flex-shrink: 0;
+}
+
+.room-status-dot.is-connected {
+  background: #2f9a83;
+}
+
+.room-status-dot.is-connecting {
+  background: #d99738;
+  animation: pulse-text 1s ease-in-out infinite;
+}
+
+.room-status-dot.is-error {
+  background: #d94b52;
+}
+
+.room-status-text {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.room-count {
+  margin-left: auto;
+  color: rgba(60, 43, 36, 0.6);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.room-current {
+  min-height: 20px;
+  padding: 5px 7px;
+  border: 1px dashed rgba(47, 154, 131, 0.45);
+  border-radius: 6px;
+  background: #f0fbf7;
+  color: #256b56;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.room-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.room-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.room-field span {
+  color: var(--sketch-text);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.room-field input {
+  width: 100%;
+  height: 28px;
+  border: 1.5px solid rgba(60, 43, 36, 0.22);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+  padding: 0 7px;
+}
+
+.room-field input:focus {
+  border-color: var(--sketch-room-accent);
+  box-shadow: 0 0 0 2px rgba(47, 154, 131, 0.16);
+}
+
+.room-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.room-actions .sketch-action-btn {
+  border-color: var(--sketch-room-accent);
+  background: #e8f7f1;
+  color: #256b56;
+}
+
+.room-actions .sketch-action-btn:hover {
+  background: #d8f0e7;
+}
+
+.room-actions .sketch-action-btn-snooze {
+  border-color: var(--sketch-border);
+  background: #fff;
+  color: var(--sketch-text);
+}
+
+.room-error {
+  min-height: 14px;
+  color: #c3363d;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.room-peer-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.room-peer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 6px 7px;
+  border: 1px solid rgba(60, 43, 36, 0.12);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(60, 43, 36, 0.07);
+}
+
+.room-peer-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f0fbf7;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.room-peer-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.room-peer-name {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-peer-meta,
+.room-empty {
+  color: rgba(60, 43, 36, 0.58);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.room-empty {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.room-peer-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.room-peer-list::-webkit-scrollbar-track {
+  background: rgba(60, 43, 36, 0.06);
+  border-radius: 2px;
+}
+
+.room-peer-list::-webkit-scrollbar-thumb {
+  background: rgba(47, 154, 131, 0.32);
+  border-radius: 2px;
 }
 
 @keyframes pulse-text {

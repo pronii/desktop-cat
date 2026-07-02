@@ -164,6 +164,7 @@
       }
       // 如果剪贴板面板开着，先关掉
       window.__closeClipboardPanel?.();
+      window.__closeRoomPanel?.();
       openPanel();
     });
   }

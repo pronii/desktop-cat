@@ -66,6 +66,19 @@
         <span class="sketch-btn-icon">📋</span>
         <span class="sketch-btn-text">历史</span>
       </button>
+
+      <button
+        class="sketch-btn room-btn"
+        id="roomBtn"
+        type="button"
+        aria-label="打开好友同屏"
+        aria-controls="roomPanel"
+        aria-expanded="false"
+        title="好友同屏"
+      >
+        <span class="sketch-btn-icon">👥</span>
+        <span class="sketch-btn-text">好友</span>
+      </button>
     </div>
 
     <div class="water-panel sketch-panel" id="waterPanel">
@@ -129,9 +142,42 @@
       </div>
     </div>
 
+    <div class="room-panel sketch-panel" id="roomPanel">
+      <div class="sketch-panel-header sketch-panel-header-room">
+        <h3>👥 好友同屏</h3>
+        <button class="sketch-panel-close" id="roomPanelClose" type="button" aria-label="关闭好友同屏">×</button>
+      </div>
+      <div class="room-panel-body">
+        <div class="room-status-row">
+          <span class="room-status-dot" id="roomStatusDot"></span>
+          <span class="room-status-text" id="roomStatusText">未连接</span>
+          <span class="room-count" id="roomPeerCount">0 在线</span>
+        </div>
+        <div class="room-current" id="roomCurrent">房间: -</div>
+        <div class="room-form">
+          <label class="room-field">
+            <span>昵称</span>
+            <input id="roomNicknameInput" type="text" maxlength="16" autocomplete="off" placeholder="小猫好友">
+          </label>
+          <label class="room-field">
+            <span>房间码</span>
+            <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="123456">
+          </label>
+        </div>
+        <div class="room-actions">
+          <button class="sketch-action-btn" id="roomCreateBtn" type="button">创建</button>
+          <button class="sketch-action-btn" id="roomJoinBtn" type="button">加入</button>
+          <button class="sketch-action-btn sketch-action-btn-snooze" id="roomLeaveBtn" type="button">退出</button>
+        </div>
+        <div class="room-error" id="roomError" role="status"></div>
+        <div class="room-peer-list" id="roomPeerList"></div>
+      </div>
+    </div>
+
     <script src="./petBehavior.js"></script>
     <script src="./renderer.js"></script>
     <script src="./clipboardPanel.js"></script>
     <script src="./waterPanel.js"></script>
+    <script src="./roomPanel.js"></script>
   </body>
 </html>

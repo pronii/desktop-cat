@@ -1,4 +1,5 @@
 const path = require('node:path');
+const crypto = require('node:crypto');
 const {
   app,
   BrowserWindow,
@@ -39,6 +40,9 @@ const {
 const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = require('../clipboard-history/main');
 const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
+const { createRoomClient, DEFAULT_ROOM_ENDPOINT } = require('./roomClient');
+const { SimpleWebSocket } = require('./simpleWebSocket');
+const { createPeerPetWindowManager } = require('./peerPetWindows');
 
 const TOPMOST_FAST_INTERVAL = 500;
 const TOPMOST_CALM_INTERVAL = 3000;
@@ -57,6 +61,11 @@ let petMenuState = createPetMenuState();
 let temporaryHideState = createTemporaryHideState();
 let topmostSuspendState = createTopmostSuspendState();
 let waterReminder = createWaterReminder();
+let roomClient = null;
+let roomStateTeardown = null;
+let roomPetStateTimer = null;
+let roomUserId = `cat-${crypto.randomUUID()}`;
+let peerPetWindowManager = null;
 
 function centerWindowOnScreen(window) {
   const bounds = window.getBounds();
@@ -290,6 +299,7 @@ function createPetContextMenu(window) {
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
         centerOnScreen: () => centerWindowOnScreen(window),
         hideTemporarily: () => hideWindowTemporarily(window),
+        openRoomPanel: () => openRoomPanel(window),
         openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js')),
         toggleWaterReminder: () => {
           const enabled = waterReminder.toggleEnabled();
@@ -316,6 +326,7 @@ function createTrayContextMenu(window) {
         showPet: () => showPetWindow(window),
         hideTemporarily: () => hideWindowTemporarily(window),
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
+        openRoomPanel: () => openRoomPanel(window),
         openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js')),
         toggleWaterReminder: () => {
           const enabled = waterReminder.toggleEnabled();
@@ -395,6 +406,123 @@ function createPetWindow() {
   });
 }
 
+function openRoomPanel(window) {
+  if (!window || window.isDestroyed()) return;
+  showPetWindow(window, { center: false });
+  window.webContents.send('room:open-panel');
+}
+
+function sendRoomStateToRenderer(state) {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  petWindow.webContents.send('room:state-changed', state);
+}
+
+function syncPeerPetsBesideLocal(peers, localBounds) {
+  if (!peerPetWindowManager) return;
+  if (!localBounds) {
+    peerPetWindowManager.destroyAll();
+    return;
+  }
+  peerPetWindowManager.syncPeers(peers || [], localBounds);
+}
+
+function handleRoomStateChanged(state) {
+  sendRoomStateToRenderer(state);
+  if (!peerPetWindowManager) return;
+  if (state.status === 'connected') {
+    if (!petWindow || petWindow.isDestroyed()) {
+      syncPeerPetsBesideLocal([], null);
+      return;
+    }
+    syncPeerPetsBesideLocal(state.peers || [], petWindow.getBounds());
+    return;
+  }
+  peerPetWindowManager.destroyAll();
+}
+
+function buildLocalPetState() {
+  if (!petWindow || petWindow.isDestroyed()) return null;
+  const bounds = petWindow.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  const workArea = display.workArea;
+  const relativeX = workArea.width > 0
+    ? (bounds.x - workArea.x) / workArea.width
+    : 0;
+  const relativeY = workArea.height > 0
+    ? (bounds.y - workArea.y) / workArea.height
+    : 0;
+
+  return {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    relativeX: Math.min(Math.max(relativeX, 0), 1),
+    relativeY: Math.min(Math.max(relativeY, 0), 1),
+    action: dragModeActive ? 'drag' : 'idle',
+    facing: 'right'
+  };
+}
+
+function startRoomPetStateReporting() {
+  if (roomPetStateTimer) return;
+  roomPetStateTimer = setInterval(() => {
+    if (!roomClient) return;
+    const petState = buildLocalPetState();
+    if (petState) {
+      roomClient.sendPetState(petState);
+      const roomState = roomClient.getState();
+      if (roomState.status === 'connected') {
+        syncPeerPetsBesideLocal(roomState.peers, petState);
+      }
+    }
+  }, 1000);
+  if (typeof roomPetStateTimer.unref === 'function') {
+    roomPetStateTimer.unref();
+  }
+}
+
+function stopRoomPetStateReporting() {
+  if (!roomPetStateTimer) return;
+  clearInterval(roomPetStateTimer);
+  roomPetStateTimer = null;
+}
+
+function setupRoomClient() {
+  if (roomClient) return;
+  if (!peerPetWindowManager) {
+    peerPetWindowManager = createPeerPetWindowManager({
+      BrowserWindow,
+      screen,
+      peerPetFile: path.join(__dirname, '..', 'renderer', 'peerPet.html'),
+      peerPetPreload: path.join(__dirname, 'peerPreload.js')
+    });
+  }
+  roomClient = createRoomClient({
+    WebSocket: globalThis.WebSocket || SimpleWebSocket,
+    endpoint: DEFAULT_ROOM_ENDPOINT,
+    userId: roomUserId
+  });
+  roomStateTeardown = roomClient.onStateChanged(handleRoomStateChanged);
+  startRoomPetStateReporting();
+}
+
+function teardownRoomClient() {
+  stopRoomPetStateReporting();
+  if (roomStateTeardown) {
+    roomStateTeardown();
+    roomStateTeardown = null;
+  }
+  if (roomClient) {
+    roomClient.leave();
+    roomClient = null;
+  }
+  if (peerPetWindowManager) {
+    peerPetWindowManager.destroyAll();
+    peerPetWindowManager = null;
+  }
+}
+
 function suspendWindowTopmost(window) {
   if (!window || window.isDestroyed()) return;
   window.setAlwaysOnTop(false);
@@ -424,6 +552,26 @@ ipcMain.handle('water-reminder:snooze', () => {
 ipcMain.handle('water-reminder:test-trigger', () => {
   waterReminder.fire();
   return true;
+});
+
+/* --- 好友同屏 IPC --- */
+
+ipcMain.handle('room:get-state', () => {
+  setupRoomClient();
+  return roomClient.getState();
+});
+
+ipcMain.handle('room:join', (_event, payload = {}) => {
+  setupRoomClient();
+  return roomClient.join({
+    roomCode: payload.roomCode,
+    nickname: payload.nickname
+  });
+});
+
+ipcMain.handle('room:leave', () => {
+  setupRoomClient();
+  return roomClient.leave();
 });
 
 /* --- 长按拖动 IPC --- */
@@ -478,6 +626,7 @@ if (!gotTheLock) {
       preloadPath: path.join(__dirname, '..', 'clipboard-history', 'preload.js')
     });
     waterReminder.start();
+    setupRoomClient();
     createPetWindow();
 
     app.on('activate', () => {
@@ -490,6 +639,7 @@ if (!gotTheLock) {
 
 app.on('before-quit', () => {
   waterReminder.stop();
+  teardownRoomClient();
   teardownClipboardHistory();
   getForegroundProbeWorker().stop();
   if (tray) {

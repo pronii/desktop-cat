@@ -168,6 +168,7 @@
       }
       // 如果喝水面板开着，先关掉
       window.__closeWaterPanel?.();
+      window.__closeRoomPanel?.();
       openClipboardPanel();
     });
   }
