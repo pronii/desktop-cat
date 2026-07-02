@@ -78,3 +78,34 @@ desktop-cat
 - Electron
 - HTML / CSS / JavaScript
 - Node.js
+
+## 多人桌宠房间服务端
+
+项目包含一个轻量 WebSocket 房间服务端，用于多人桌宠 MVP 的好友宠物同屏中转。第一版只做内存房间状态，不依赖数据库，服务重启后房间会清空。
+
+本地启动：
+
+```powershell
+npm run room:server
+```
+
+默认监听 `3001` 端口：
+
+- 健康检查：`http://127.0.0.1:3001/health`
+- WebSocket：`ws://127.0.0.1:3001/room`
+
+Docker 启动：
+
+```bash
+docker compose up -d --build
+```
+
+客户端消息协议：
+
+```json
+{"type":"room:join","roomCode":"123456","userId":"alice","nickname":"Alice"}
+{"type":"pet:update","pet":{"x":0.4,"y":0.5,"action":"walk","facing":"left"}}
+{"type":"room:leave"}
+```
+
+服务端会返回 `room:joined`，并向同房间其他客户端广播 `pet:join`、`pet:update` 和 `pet:leave`。

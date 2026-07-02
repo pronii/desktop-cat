@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "start": "node scripts/start.js",
+    "room:server": "node server/roomServer.js",
     "test": "node --test",
     "pack": "electron-builder --dir"
   },

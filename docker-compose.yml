@@ -1,0 +1,9 @@
+services:
+  room-server:
+    build: .
+    container_name: desktop-cat-room
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+    ports:
+      - "3001:3001"
