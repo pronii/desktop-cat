@@ -57,6 +57,13 @@ function createPetContextMenuTemplate({ state, waterReminderConfig = {}, actions
       type: 'separator'
     },
     {
+      label: '剪贴板历史',
+      click: actions.openClipboardHistory || noop
+    },
+    {
+      type: 'separator'
+    },
+    {
       label: '退出',
       role: 'quit'
     }

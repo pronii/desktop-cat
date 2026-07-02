@@ -7,10 +7,8 @@
   "private": true,
   "scripts": {
     "start": "node scripts/start.js",
-    "pack": "electron-builder --dir",
-    "smoke:click": "node scripts/start.js scripts/click-smoke.js",
-    "smoke:fullscreen": "node scripts/start.js scripts/fullscreen-guard-smoke.js",
-    "smoke:tray": "node scripts/start.js scripts/tray-smoke.js"
+    "test": "node --test",
+    "pack": "electron-builder --dir"
   },
   "keywords": [
     "electron",

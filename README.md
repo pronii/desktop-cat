@@ -43,7 +43,6 @@ v0.2.0 新增定时喝水提醒功能。
 - 喂食、心情、等级、养成系统
 - 设置页面
 - 打包安装器
-- 自动测试脚本
 
 ## 本地运行
 
@@ -59,33 +58,13 @@ npm install
 npm start
 ```
 
-## 可用脚本
-
-点击反馈冒烟测试：
-
-```powershell
-npm run smoke:click
-```
-
-全屏置顶避让冒烟测试：
-
-```powershell
-npm run smoke:fullscreen
-```
-
-系统托盘冒烟测试：
-
-```powershell
-npm run smoke:tray
-```
-
 ## 项目结构
 
 ```text
 desktop-cat
 ├─ docs
 │  └─ superpowers        剪贴板历史功能的设计与计划文档
-├─ scripts               手动冒烟检查脚本
+├─ scripts               启动辅助脚本
 ├─ src
 │  ├─ clipboard-history  剪贴板监听、存储、历史窗口和渲染层
 │  ├─ main               Electron 主进程，负责宠物窗口、菜单、置顶和系统检测

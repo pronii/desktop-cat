@@ -101,7 +101,10 @@
         const textEl = document.createElement('div');
         textEl.className = 'clipboard-item-text';
         textEl.textContent = item.content || '';
-        itemEl.append(textEl, createTimeEl(item.timestamp));
+        const metaEl = document.createElement('div');
+        metaEl.className = 'clipboard-item-meta';
+        metaEl.appendChild(createTimeEl(item.timestamp));
+        itemEl.append(textEl, metaEl);
       } else if (item.type === 'image' || item.type === 'video') {
         const imgEl = document.createElement('img');
         imgEl.src = item.thumbnail || videoPlaceholder;
