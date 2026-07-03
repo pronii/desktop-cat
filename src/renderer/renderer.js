@@ -42,6 +42,8 @@
   const CAT_SIZE_STORAGE_KEY = 'desktopCat.catScale';
   const CAT_SIZE_DRAG_PIXELS = CAT_SCALE_DRAG_PIXELS;
   const PET_SETTINGS_STORAGE_KEY = 'desktopCat.petSettings';
+  const HAPPY_BUBBLE_VISIBLE_MS = 1500;
+  const RANDOM_SPEECH_VISIBLE_MS = 6000;
   const bottomButtonControls = {
     water: waterCounter,
     clipboard: clipboardBtn,
@@ -193,7 +195,7 @@
   applyCatScale(readStoredCatScale());
   applySettings(petSettings);
 
-  function setHappy() {
+  function setHappy({ visibleMs = HAPPY_BUBBLE_VISIBLE_MS } = {}) {
     if (ENCOURAGEMENT_MESSAGES?.length) {
       const message = ENCOURAGEMENT_MESSAGES[encouragementIndex % ENCOURAGEMENT_MESSAGES.length];
       encouragementIndex += 1;
@@ -202,7 +204,7 @@
       }
     }
 
-    happyState = createHappyState({ duration: 900 });
+    happyState = createHappyState({ duration: visibleMs });
     window.desktopCatDebug.happyCount += 1;
     stage?.classList.add('is-happy');
     cat.classList.add('is-happy');
@@ -215,7 +217,7 @@
         stage?.classList.remove('is-happy');
         cat.classList.remove('is-happy');
       }
-    }, 1500);
+    }, visibleMs);
   }
 
   function canRunRandomSpeech() {
@@ -236,7 +238,7 @@
     randomSpeechTimer = window.setTimeout(() => {
       randomSpeechTimer = null;
       if (canRunRandomSpeech()) {
-        setHappy();
+        setHappy({ visibleMs: RANDOM_SPEECH_VISIBLE_MS });
       }
       scheduleRandomSpeech();
     }, createRandomSpeechDelay());
@@ -288,6 +290,8 @@
   let isLongPress = false;
   let dragEntered = false;
   let suppressNextCatClick = false;
+  let activePressTarget = null;
+  let activePointerId = null;
 
   function clearPendingLongPress() {
     if (!longPressTimer) return;
@@ -295,8 +299,41 @@
     longPressTimer = null;
   }
 
+  function capturePressPointer(event) {
+    if (event.pointerId === undefined || event.pointerId === null) return;
+
+    activePressTarget = event.currentTarget || event.target || null;
+    activePointerId = event.pointerId;
+
+    try {
+      activePressTarget?.setPointerCapture?.(activePointerId);
+    } catch (_error) {
+      // Losing capture is non-fatal; the global release fallbacks still run.
+    }
+  }
+
+  function releasePressPointer() {
+    if (activePressTarget && activePointerId !== null) {
+      try {
+        activePressTarget.releasePointerCapture?.(activePointerId);
+      } catch (_error) {
+        // The browser may already have released capture after pointerup/cancel.
+      }
+    }
+
+    activePressTarget = null;
+    activePointerId = null;
+  }
+
+  function isActivePressPointer(event) {
+    return activePointerId === null || event?.pointerId === undefined || event.pointerId === activePointerId;
+  }
+
   function finishCatPress() {
-    if (!pressActive && !isLongPress) return;
+    if (!pressActive && !isLongPress) {
+      releasePressPointer();
+      return;
+    }
 
     clearPendingLongPress();
 
@@ -311,12 +348,14 @@
 
     pressActive = false;
     isLongPress = false;
+    releasePressPointer();
   }
 
   function handleCatPressStart(event) {
     if (event.button !== 0) return;
 
     finishCatPress();
+    capturePressPointer(event);
     suppressNextCatClick = false;
     pressActive = true;
     isLongPress = false;
@@ -335,7 +374,8 @@
     event.preventDefault();
   }
 
-  function handleCatPressEnd() {
+  function handleCatPressEnd(event) {
+    if (!isActivePressPointer(event)) return;
     finishCatPress();
   }
 
@@ -353,6 +393,7 @@
     if (!isLongPress) {
       clearPendingLongPress();
       pressActive = false;
+      releasePressPointer();
     }
   }
 
@@ -360,11 +401,21 @@
     event.preventDefault();
   }
 
+  const supportsPointerEvents = 'PointerEvent' in window;
+
   for (const dragTarget of [cat, live2dCanvas].filter(Boolean)) {
-    dragTarget.addEventListener('mousedown', handleCatPressStart);
-    dragTarget.addEventListener('mouseup', handleCatPressEnd);
+    if (supportsPointerEvents) {
+      dragTarget.addEventListener('pointerdown', handleCatPressStart);
+      dragTarget.addEventListener('pointerup', handleCatPressEnd);
+      dragTarget.addEventListener('pointercancel', handleCatPressEnd);
+      dragTarget.addEventListener('pointerleave', handleCatPressLeave);
+      dragTarget.addEventListener('lostpointercapture', handleCatPressEnd);
+    } else {
+      dragTarget.addEventListener('mousedown', handleCatPressStart);
+      dragTarget.addEventListener('mouseup', handleCatPressEnd);
+      dragTarget.addEventListener('mouseleave', handleCatPressLeave);
+    }
     dragTarget.addEventListener('click', handleCatClick);
-    dragTarget.addEventListener('mouseleave', handleCatPressLeave);
     dragTarget.addEventListener('dragstart', preventElementDrag);
   }
 
@@ -415,8 +466,16 @@
     return isPointOverCatVisible(clientX, clientY) || isPointOverLive2DVisible(clientX, clientY);
   }
 
+  function isPointOverBottomControls(x, y) {
+    const clientX = Number(x);
+    const clientY = Number(y);
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY) || !bottomBar) return false;
+    const rect = bottomBar.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && isPointInRect(clientX, clientY, rect);
+  }
+
   function updateBottomControlsForPointer(x, y) {
-    if (isPointOverPetVisible(x, y)) {
+    if (isPointOverPetVisible(x, y) || isPointOverBottomControls(x, y)) {
       showCatSizeControl();
     } else {
       hideCatSizeControl();
@@ -518,14 +577,14 @@
   });
 
   window.addEventListener('pointerup', (event) => {
-    finishCatPress();
+    handleCatPressEnd(event);
     if (!catSizeDragState || event.pointerId !== catSizeDragState.pointerId) return;
     catSizeBtn?.releasePointerCapture?.(event.pointerId);
     stopCatSizeDrag({ persist: true });
   });
 
   window.addEventListener('pointercancel', (event) => {
-    finishCatPress();
+    handleCatPressEnd(event);
     if (!catSizeDragState || event.pointerId !== catSizeDragState.pointerId) return;
     catSizeBtn?.releasePointerCapture?.(event.pointerId);
     stopCatSizeDrag({ persist: true });

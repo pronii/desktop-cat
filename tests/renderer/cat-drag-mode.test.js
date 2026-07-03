@@ -51,6 +51,8 @@ class FakeElement {
     this.textContent = '';
     this.checked = false;
     this.rect = rect || { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+    this.capturedPointerIds = [];
+    this.releasedPointerIds = [];
   }
 
   addEventListener(type, listener) {
@@ -60,6 +62,12 @@ class FakeElement {
   }
 
   dispatch(type, event = {}) {
+    if (!event.currentTarget) {
+      event.currentTarget = this;
+    }
+    if (!event.target) {
+      event.target = this;
+    }
     for (const listener of this.listeners.get(type) || []) {
       listener(event);
     }
@@ -73,16 +81,20 @@ class FakeElement {
     this.attributes.set(name, String(value));
   }
 
-  setPointerCapture() {}
+  setPointerCapture(pointerId) {
+    this.capturedPointerIds.push(pointerId);
+  }
 
-  releasePointerCapture() {}
+  releasePointerCapture(pointerId) {
+    this.releasedPointerIds.push(pointerId);
+  }
 
   getBoundingClientRect() {
     return this.rect;
   }
 }
 
-function createRendererHarness() {
+function createRendererHarness({ supportsPointerEvents = false, bottomBarRect } = {}) {
   const source = readSource('src', 'renderer', 'renderer.js');
   const cat = new FakeElement();
   const stage = new FakeElement();
@@ -91,7 +103,7 @@ function createRendererHarness() {
   const happyBubble = new FakeElement();
   const waterBubble = new FakeElement();
   const waterCounter = new FakeElement();
-  const bottomBar = new FakeElement();
+  const bottomBar = new FakeElement({ rect: bottomBarRect });
   const catSizeBtn = new FakeElement();
   const settingsBtn = new FakeElement();
   const settingsPanel = new FakeElement();
@@ -109,6 +121,37 @@ function createRendererHarness() {
   let nextTimerId = 1;
   let dragEnterCount = 0;
   let dragExitCount = 0;
+  let now = 0;
+
+  class FakeDate extends Date {
+    constructor(...args) {
+      if (args.length) {
+        super(...args);
+      } else {
+        super(now);
+      }
+    }
+
+    static now() {
+      return now;
+    }
+  }
+
+  const contextualPetBehavior = {
+    ...petBehavior,
+    createHappyState(options = {}) {
+      return petBehavior.createHappyState({ ...options, now });
+    },
+    shouldClearHappyState(state) {
+      return petBehavior.shouldClearHappyState(state, now);
+    },
+    createDrinkState(options = {}) {
+      return petBehavior.createDrinkState({ ...options, now });
+    },
+    shouldClearDrinkState(state) {
+      return petBehavior.shouldClearDrinkState(state, now);
+    }
+  };
 
   cat.childrenBySelector.set('.happy-bubble', happyBubble);
   cat.childrenBySelector.set('.water-bubble', waterBubble);
@@ -119,7 +162,7 @@ function createRendererHarness() {
   }
 
   const fakeWindow = {
-    petBehavior,
+    petBehavior: contextualPetBehavior,
     desktopCatDebug: {},
     desktopCat: {
       dragMode: {
@@ -218,12 +261,16 @@ function createRendererHarness() {
       return [];
     }
   };
+  if (supportsPointerEvents) {
+    fakeWindow.PointerEvent = function PointerEvent() {};
+  }
 
   vm.runInNewContext(source, {
     window: fakeWindow,
     document: fakeDocument,
     console,
-    performance: { now: () => Date.now() }
+    Date: FakeDate,
+    performance: { now: () => now }
   });
 
   return {
@@ -246,6 +293,7 @@ function createRendererHarness() {
       for (const [id, timer] of Array.from(timers.entries())) {
         if (timer.delay < minDelay || timer.delay > maxDelay) continue;
         timers.delete(id);
+        now += timer.delay;
         timer.callback();
       }
     },
@@ -313,6 +361,45 @@ test('cat drag mode exits on mousemove after the mouse button is released', () =
     clientX: 20,
     clientY: 20
   });
+
+  assert.equal(harness.dragExitCount, 1);
+  assert.equal(harness.cat.classList.contains('is-dragging'), false);
+});
+
+test('cat drag mode captures the active pointer and exits on captured pointerup', () => {
+  const harness = createRendererHarness({ supportsPointerEvents: true });
+
+  harness.cat.dispatch('pointerdown', {
+    button: 0,
+    pointerId: 42,
+    preventDefault() {}
+  });
+
+  assert.deepEqual(harness.cat.capturedPointerIds, [42]);
+
+  harness.flushTimers();
+  assert.equal(harness.dragEnterCount, 1);
+
+  harness.cat.dispatch('pointerup', { pointerId: 42 });
+
+  assert.deepEqual(harness.cat.releasedPointerIds, [42]);
+  assert.equal(harness.dragExitCount, 1);
+  assert.equal(harness.cat.classList.contains('is-dragging'), false);
+});
+
+test('cat drag mode exits when the captured pointer is lost', () => {
+  const harness = createRendererHarness({ supportsPointerEvents: true });
+
+  harness.cat.dispatch('pointerdown', {
+    button: 0,
+    pointerId: 7,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  assert.equal(harness.dragEnterCount, 1);
+
+  harness.cat.dispatch('lostpointercapture', { pointerId: 7 });
 
   assert.equal(harness.dragExitCount, 1);
   assert.equal(harness.cat.classList.contains('is-dragging'), false);
@@ -476,6 +563,29 @@ test('bottom controls hide immediately when the pointer is not over the pet shap
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
 });
 
+test('bottom controls stay visible while moving from the pet to the toolbar', () => {
+  const harness = createRendererHarness({
+    bottomBarRect: { left: 80, top: 120, right: 240, bottom: 160, width: 160, height: 40 }
+  });
+
+  harness.document.dispatch('mousemove', { clientX: 20, clientY: 20 });
+
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
+
+  harness.document.dispatch('mousemove', { clientX: 120, clientY: 140 });
+
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
+  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
+
+  harness.settingsBtn.dispatch('click', {
+    preventDefault() {},
+    stopPropagation() {}
+  });
+
+  assert.equal(harness.settingsPanel.classList.contains('show'), true);
+  assert.equal(harness.settingsBtn.attributes.get('aria-expanded'), 'true');
+});
+
 test('random speech schedules a later encouragement and respects the settings toggle', () => {
   const harness = createRendererHarness();
 
@@ -495,6 +605,25 @@ test('random speech schedules a later encouragement and respects the settings to
 
   assert.equal(harness.window.desktopCatDebug.randomSpeechEnabled, false);
   assert.equal(harness.window.desktopCatDebug.happyCount, countAfterDisable);
+});
+
+test('random speech bubble stays visible long enough to notice', () => {
+  const harness = createRendererHarness();
+
+  harness.flushTimers({ minDelay: petBehavior.RANDOM_SPEECH_MIN_MS, maxDelay: Infinity });
+
+  assert.equal(harness.stage.classList.contains('is-happy'), true);
+  assert.equal(harness.cat.classList.contains('is-happy'), true);
+
+  harness.flushTimers({ minDelay: 1500, maxDelay: 1500 });
+
+  assert.equal(harness.stage.classList.contains('is-happy'), true);
+  assert.equal(harness.cat.classList.contains('is-happy'), true);
+
+  harness.flushTimers({ minDelay: 6000, maxDelay: 6000 });
+
+  assert.equal(harness.stage.classList.contains('is-happy'), false);
+  assert.equal(harness.cat.classList.contains('is-happy'), false);
 });
 
 test('settings can hide and restore bottom toolbar buttons without hiding settings', () => {
