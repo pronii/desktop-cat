@@ -31,6 +31,7 @@ test('renderer auto-loads Live2D from folder without adding an import button', (
 
   assert.match(preload, /appearance\s*:\s*\{/);
   assert.match(preload, /getLive2DModel:\s*\(\)\s*=>\s*ipcRenderer\.invoke\('appearance:get-live2d-model'\)/);
+  assert.match(preload, /getLive2DModels:\s*\(\)\s*=>\s*ipcRenderer\.invoke\('appearance:get-live2d-models'\)/);
 });
 
 test('live2d renderer script keeps the default cat when no model is configured', () => {

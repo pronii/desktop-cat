@@ -515,37 +515,52 @@ body {
 .bottom-bar {
   position: fixed;
   bottom: 14px;
-  left: 4px;
-  right: 4px;
+  left: 50%;
+  transform: translateX(-50%);
   transform-origin: 50% 100%;
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(58px, 0.85fr) minmax(68px, 1fr) minmax(68px, 1fr) 46px;
-  align-items: center;
-  justify-content: stretch;
-  gap: 4px;
   overflow: visible;
   z-index: 1000;
   transition: transform 180ms ease;
   -webkit-app-region: no-drag;
 }
 
-.bottom-bar .sketch-btn {
-  width: 100%;
+.toolbar-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.toolbar-primary .sketch-btn {
+  width: 68px;
   min-width: 0;
   padding: 0 8px;
   justify-content: center;
 }
 
-.bottom-bar .sketch-btn-text {
+.toolbar-primary .water-counter {
+  width: 58px;
+}
+
+.toolbar-primary .sketch-btn-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
 }
 
+.toolbar-utility {
+  position: absolute;
+  left: calc(100% + 6px);
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+}
+
 .bottom-bar .cat-size-btn {
-  width: 46px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   opacity: 0;
   pointer-events: none;
@@ -566,19 +581,13 @@ body {
   display: none;
 }
 
-.bottom-bar.is-compact {
-  grid-template-columns: repeat(4, 40px);
-  justify-content: center;
-  gap: 8px;
-}
-
-.bottom-bar.is-compact .sketch-btn {
+.bottom-bar.is-compact .toolbar-primary .sketch-btn {
   width: 40px;
   padding: 0;
   justify-content: center;
 }
 
-.bottom-bar.is-compact .sketch-btn-text {
+.bottom-bar.is-compact .toolbar-primary .sketch-btn-text {
   display: none;
 }
 
@@ -628,28 +637,29 @@ body {
 }
 
 .cat-size-btn {
-  border-radius: 12px;
+  border-radius: 11px;
   touch-action: none;
   cursor: nwse-resize;
+  box-shadow: 0 3px 0 var(--sketch-border);
 }
 
 .cat-size-btn.is-resizing {
   background: var(--sketch-fill);
   border-color: var(--sketch-accent);
-  box-shadow: 0 4px 0 var(--sketch-accent);
+  box-shadow: 0 3px 0 var(--sketch-accent);
   cursor: nwse-resize;
 }
 
 .cat-size-icon {
-  width: 26px;
-  height: 22px;
-  border-radius: 6px;
+  width: 20px;
+  height: 18px;
+  border-radius: 5px;
   background: #050505;
   color: #fff;
   display: inline-grid;
   grid-template-columns: repeat(2, 1fr);
   place-items: center;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
 }

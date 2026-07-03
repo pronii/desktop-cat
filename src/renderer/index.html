@@ -42,58 +42,62 @@
     </main>
 
     <div class="bottom-bar">
-      <button
-        class="sketch-btn water-counter"
-        id="waterCounter"
-        type="button"
-        aria-label="今日喝水杯数"
-        aria-controls="waterPanel"
-        aria-expanded="false"
-        title="喝水记录"
-      >
-        <span class="sketch-btn-icon">💧</span>
-        <span class="sketch-btn-text"><span class="water-counter-num">0</span>杯</span>
-      </button>
+      <div class="toolbar-primary">
+        <button
+          class="sketch-btn water-counter"
+          id="waterCounter"
+          type="button"
+          aria-label="今日喝水杯数"
+          aria-controls="waterPanel"
+          aria-expanded="false"
+          title="喝水记录"
+        >
+          <span class="sketch-btn-icon">💧</span>
+          <span class="sketch-btn-text"><span class="water-counter-num">0</span>杯</span>
+        </button>
 
-      <button
-        class="sketch-btn clipboard-btn"
-        id="clipboardBtn"
-        type="button"
-        aria-label="打开剪贴板历史"
-        aria-controls="clipboardPanel"
-        aria-expanded="false"
-        title="剪贴板历史"
-      >
-        <span class="sketch-btn-icon">📋</span>
-        <span class="sketch-btn-text">历史</span>
-      </button>
+        <button
+          class="sketch-btn clipboard-btn"
+          id="clipboardBtn"
+          type="button"
+          aria-label="打开剪贴板历史"
+          aria-controls="clipboardPanel"
+          aria-expanded="false"
+          title="剪贴板历史"
+        >
+          <span class="sketch-btn-icon">📋</span>
+          <span class="sketch-btn-text">历史</span>
+        </button>
 
-      <button
-        class="sketch-btn room-btn"
-        id="roomBtn"
-        type="button"
-        aria-label="打开好友同屏"
-        aria-controls="roomPanel"
-        aria-expanded="false"
-        title="好友同屏"
-      >
-        <span class="sketch-btn-icon">👥</span>
-        <span class="sketch-btn-text">好友</span>
-      </button>
+        <button
+          class="sketch-btn room-btn"
+          id="roomBtn"
+          type="button"
+          aria-label="打开好友同屏"
+          aria-controls="roomPanel"
+          aria-expanded="false"
+          title="好友同屏"
+        >
+          <span class="sketch-btn-icon">👥</span>
+          <span class="sketch-btn-text">好友</span>
+        </button>
+      </div>
 
-      <button
-        class="sketch-btn cat-size-btn"
-        id="catSizeBtn"
-        type="button"
-        aria-label="拖动调整小猫大小"
-        title="拖动调整小猫大小"
-      >
-        <span class="cat-size-icon" aria-hidden="true">
-          <span>↖</span>
-          <span>↘</span>
-        </span>
-        <span class="sketch-btn-text">大小</span>
-      </button>
+      <div class="toolbar-utility">
+        <button
+          class="sketch-btn cat-size-btn"
+          id="catSizeBtn"
+          type="button"
+          aria-label="拖动调整小猫大小"
+          title="拖动调整小猫大小"
+        >
+          <span class="cat-size-icon" aria-hidden="true">
+            <span>↖</span>
+            <span>↘</span>
+          </span>
+          <span class="sketch-btn-text">大小</span>
+        </button>
+      </div>
     </div>
 
     <div class="water-reminder-dialog" id="waterReminderDialog" role="dialog" aria-modal="false" aria-labelledby="waterReminderTitle">

@@ -610,6 +610,10 @@ ipcMain.handle('appearance:get-live2d-model', () => {
   return live2DAppearance.getCurrentModel();
 });
 
+ipcMain.handle('appearance:get-live2d-models', () => {
+  return live2DAppearance.getAvailableModels();
+});
+
 /* --- 好友同屏 IPC --- */
 
 ipcMain.handle('room:get-state', () => {

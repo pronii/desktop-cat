@@ -4,6 +4,7 @@ const path = require('node:path');
 const LIVE2D_PROTOCOL = 'desktop-cat-live2d';
 const MODEL_JSON_PATTERN = /\.model3\.json$/i;
 const MAX_SEARCH_DEPTH = 4;
+const BUILT_IN_LIVE2D_MODELS_DIR = path.join(__dirname, '..', 'renderer', 'live2d-models');
 
 function uniquePaths(paths) {
   const seen = new Set();
@@ -26,7 +27,8 @@ function resolveLive2DSearchRoots({
   portableExecutableDir = process.env.PORTABLE_EXECUTABLE_DIR,
   execPath = process.execPath,
   cwd = process.cwd(),
-  userDataDir
+  userDataDir,
+  builtInModelsDir = BUILT_IN_LIVE2D_MODELS_DIR
 } = {}) {
   const roots = [];
 
@@ -46,37 +48,38 @@ function resolveLive2DSearchRoots({
     roots.push(path.join(userDataDir, 'live2d'));
   }
 
+  if (builtInModelsDir) {
+    roots.push(builtInModelsDir);
+  }
+
   return uniquePaths(roots);
 }
 
-function findModelJson(rootDir, depth = 0) {
-  if (depth > MAX_SEARCH_DEPTH) return null;
+function findModelJsons(rootDir, depth = 0) {
+  if (depth > MAX_SEARCH_DEPTH) return [];
   let entries;
 
   try {
     entries = fs.readdirSync(rootDir, { withFileTypes: true });
   } catch (_error) {
-    return null;
+    return [];
   }
 
   const files = entries
     .filter((entry) => entry.isFile() && MODEL_JSON_PATTERN.test(entry.name))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  if (files[0]) {
-    return path.join(rootDir, files[0].name);
-  }
+  const found = files.map((file) => path.join(rootDir, file.name));
 
   const dirs = entries
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const dir of dirs) {
-    const found = findModelJson(path.join(rootDir, dir.name), depth + 1);
-    if (found) return found;
+    found.push(...findModelJsons(path.join(rootDir, dir.name), depth + 1));
   }
 
-  return null;
+  return found;
 }
 
 function readModelName(modelJsonPath) {
@@ -96,19 +99,45 @@ function createLive2DModelUrl(modelRootDir, filePath) {
   return `${LIVE2D_PROTOCOL}://active/${parts.join('/')}`;
 }
 
-function discoverLive2DModel({ searchRoots = [] } = {}) {
-  for (const root of searchRoots) {
-    const modelJsonPath = findModelJson(root);
-    if (!modelJsonPath) continue;
+function createLive2DModelRecord(searchRoot, modelJsonPath) {
+  const rootDir = path.dirname(modelJsonPath);
+  const relativeRoot = path.relative(searchRoot, rootDir);
+  const id = relativeRoot && !relativeRoot.startsWith('..')
+    ? relativeRoot.split(path.sep).filter(Boolean).join('/')
+    : path.basename(rootDir);
 
-    const rootDir = path.dirname(modelJsonPath);
-    return {
-      available: true,
-      name: readModelName(modelJsonPath),
-      rootDir,
-      modelJsonPath,
-      modelUrl: createLive2DModelUrl(rootDir, modelJsonPath)
-    };
+  return {
+    available: true,
+    id,
+    name: readModelName(modelJsonPath),
+    rootDir,
+    modelJsonPath,
+    modelUrl: createLive2DModelUrl(rootDir, modelJsonPath)
+  };
+}
+
+function discoverLive2DModels({ searchRoots = [] } = {}) {
+  const models = [];
+  const seen = new Set();
+
+  for (const root of searchRoots) {
+    for (const modelJsonPath of findModelJsons(root)) {
+      const key = process.platform === 'win32'
+        ? path.resolve(modelJsonPath).toLowerCase()
+        : path.resolve(modelJsonPath);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      models.push(createLive2DModelRecord(root, modelJsonPath));
+    }
+  }
+
+  return models;
+}
+
+function discoverLive2DModel({ searchRoots = [] } = {}) {
+  const [model] = discoverLive2DModels({ searchRoots });
+  if (model) {
+    return model;
   }
 
   return { available: false };
@@ -151,6 +180,7 @@ function resolveLive2DProtocolPath(model, requestUrl) {
 
 function createLive2DAppearance({ app, protocol }) {
   let currentModel = { available: false };
+  let availableModels = [];
 
   function refresh() {
     const searchRoots = resolveLive2DSearchRoots({
@@ -160,8 +190,18 @@ function createLive2DAppearance({ app, protocol }) {
       cwd: process.cwd(),
       userDataDir: app.getPath('userData')
     });
-    currentModel = discoverLive2DModel({ searchRoots });
+    availableModels = discoverLive2DModels({ searchRoots });
+    currentModel = availableModels[0] || { available: false };
     return currentModel;
+  }
+
+  function serializeModel(model) {
+    return {
+      available: true,
+      id: model.id,
+      name: model.name,
+      modelUrl: model.modelUrl
+    };
   }
 
   function getCurrentModel() {
@@ -173,11 +213,15 @@ function createLive2DAppearance({ app, protocol }) {
       return { available: false };
     }
 
-    return {
-      available: true,
-      name: currentModel.name,
-      modelUrl: currentModel.modelUrl
-    };
+    return serializeModel(currentModel);
+  }
+
+  function getAvailableModels() {
+    if (!availableModels.length) {
+      refresh();
+    }
+
+    return availableModels.map(serializeModel);
   }
 
   function registerProtocol() {
@@ -192,6 +236,7 @@ function createLive2DAppearance({ app, protocol }) {
   }
 
   return {
+    getAvailableModels,
     getCurrentModel,
     refresh,
     registerProtocol
@@ -203,6 +248,7 @@ module.exports = {
   createLive2DAppearance,
   createLive2DModelUrl,
   discoverLive2DModel,
+  discoverLive2DModels,
   resolveLive2DProtocolPath,
   resolveLive2DSearchRoots
 };

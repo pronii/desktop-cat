@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld('desktopCat', {
     exit: () => ipcRenderer.send('drag-mode:exit')
   },
   appearance: {
-    getLive2DModel: () => ipcRenderer.invoke('appearance:get-live2d-model')
+    getLive2DModel: () => ipcRenderer.invoke('appearance:get-live2d-model'),
+    getLive2DModels: () => ipcRenderer.invoke('appearance:get-live2d-models')
   },
   waterReminder: {
     getConfig: () => ipcRenderer.invoke('water-reminder:get-config'),

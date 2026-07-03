@@ -12,7 +12,7 @@
 - 小猫支持点击反馈、喝水动画、长按拖动窗口、拖动按钮调整大小。
 - 喝水提醒支持今日杯数、提醒间隔、稍后提醒和提醒开关。
 - 剪贴板历史支持文本、图片和视频文件路径，支持暂停记录、删除、清空和复制回剪贴板。
-- Live2D 会自动扫描本地 `live2d/` 目录，找到模型后替换默认 CSS 小猫。
+- Live2D 内置 Haru、Hiyori、Mao 三套样例形象，也支持用本地 `live2d/` 目录替换。
 - 好友同屏支持加入 6 位数字房间码，在同一房间中显示其他人的小猫。
 
 ## 环境要求
@@ -68,7 +68,9 @@ dist/desktop-cat 0.2.0.exe
 
 ## Live2D 外观
 
-应用启动时会自动搜索 `live2d/` 目录中的 Cubism `*.model3.json` 模型。找到模型后会加载 Live2D；没有找到或加载失败时，会继续使用默认小猫。
+应用启动时会优先搜索外置 `live2d/` 目录中的 Cubism `*.model3.json` 模型；没有外置模型时，会回退到内置的 Haru、Hiyori、Mao。找到模型后会加载 Live2D；加载失败时，会继续使用默认 CSS 小猫。
+
+内置模型放在 `src/renderer/live2d-models/`，会随 `npm run pack` 一起打进 portable `.exe`。这些样例模型来自 [Live2D/CubismWebSamples](https://github.com/Live2D/CubismWebSamples)，按 Live2D Free Material License 使用，仓库内保留了对应的 `LICENSE.Live2D.md` 和 `NOTICE.Live2D.md`。
 
 开发运行时，可以把模型放到项目根目录：
 
@@ -90,6 +92,12 @@ dist/
    └─ Hiyori/
       └─ Hiyori.model3.json
 ```
+
+搜索优先级从高到低是：
+- portable `.exe` 同级的 `live2d/`
+- 当前工作目录下的 `live2d/`
+- Electron `userData/live2d/`
+- 应用内置的 `src/renderer/live2d-models/`
 
 ## 喝水提醒
 
@@ -172,4 +180,4 @@ desktop-cat/
 - 这是 Windows 桌面宠物项目，其他系统没有作为主要目标验证。
 - 当前没有安装器，交付物是 portable `.exe`。
 - 好友同屏服务端是轻量 MVP，房间状态只保存在内存中。
-- Live2D 模型不内置在仓库中，需要按需放到 `live2d/` 目录。
+- Live2D 已内置 Haru、Hiyori、Mao；外置 `live2d/` 目录仍可用于替换或调试其他模型。

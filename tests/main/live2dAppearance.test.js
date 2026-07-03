@@ -8,6 +8,7 @@ const {
   LIVE2D_PROTOCOL,
   createLive2DModelUrl,
   discoverLive2DModel,
+  discoverLive2DModels,
   resolveLive2DProtocolPath,
   resolveLive2DSearchRoots
 } = require('../../src/main/live2dAppearance');
@@ -41,13 +42,15 @@ test('resolveLive2DSearchRoots prefers the packaged executable live2d folder', (
     isPackaged: true,
     execPath: 'C:\\Portable\\desktop-cat.exe',
     cwd: 'E:\\dev\\desktop-cat',
-    userDataDir: 'C:\\Users\\me\\AppData\\Roaming\\desktop-cat'
+    userDataDir: 'C:\\Users\\me\\AppData\\Roaming\\desktop-cat',
+    builtInModelsDir: 'E:\\dev\\desktop-cat\\src\\renderer\\live2d-models'
   });
 
   assert.deepEqual(roots, [
     path.join('C:\\Portable', 'live2d'),
     path.join('E:\\dev\\desktop-cat', 'live2d'),
-    path.join('C:\\Users\\me\\AppData\\Roaming\\desktop-cat', 'live2d')
+    path.join('C:\\Users\\me\\AppData\\Roaming\\desktop-cat', 'live2d'),
+    path.join('E:\\dev\\desktop-cat\\src\\renderer\\live2d-models')
   ]);
 });
 
@@ -57,14 +60,16 @@ test('resolveLive2DSearchRoots prefers portable executable directory for externa
     portableExecutableDir: 'D:\\Apps\\desktop-cat',
     execPath: 'C:\\Users\\me\\AppData\\Local\\Temp\\desktop-cat-portable\\desktop-cat.exe',
     cwd: 'E:\\dev\\desktop-cat',
-    userDataDir: 'C:\\Users\\me\\AppData\\Roaming\\desktop-cat'
+    userDataDir: 'C:\\Users\\me\\AppData\\Roaming\\desktop-cat',
+    builtInModelsDir: 'E:\\dev\\desktop-cat\\src\\renderer\\live2d-models'
   });
 
   assert.deepEqual(roots, [
     path.join('D:\\Apps\\desktop-cat', 'live2d'),
     path.join('C:\\Users\\me\\AppData\\Local\\Temp\\desktop-cat-portable', 'live2d'),
     path.join('E:\\dev\\desktop-cat', 'live2d'),
-    path.join('C:\\Users\\me\\AppData\\Roaming\\desktop-cat', 'live2d')
+    path.join('C:\\Users\\me\\AppData\\Roaming\\desktop-cat', 'live2d'),
+    path.join('E:\\dev\\desktop-cat\\src\\renderer\\live2d-models')
   ]);
 });
 
@@ -80,6 +85,23 @@ test('discoverLive2DModel finds the first model3.json in configured folders', (t
   assert.equal(model.rootDir, path.dirname(modelJsonPath));
   assert.equal(model.modelJsonPath, modelJsonPath);
   assert.equal(model.modelUrl, `${LIVE2D_PROTOCOL}://active/hiyori.model3.json`);
+});
+
+test('discoverLive2DModels lists multiple models while keeping external folders first', (t) => {
+  const root = makeTempRoot(t);
+  const externalRoot = path.join(root, 'live2d');
+  const builtInRoot = path.join(root, 'src', 'renderer', 'live2d-models');
+  const externalModelPath = writeModel(externalRoot, path.join('custom', 'custom.model3.json'), 'Custom');
+  const hiyoriModelPath = writeModel(builtInRoot, path.join('Hiyori', 'Hiyori.model3.json'), 'Hiyori');
+  const maoModelPath = writeModel(builtInRoot, path.join('Mao', 'Mao.model3.json'), 'Mao');
+
+  const models = discoverLive2DModels({ searchRoots: [externalRoot, builtInRoot] });
+
+  assert.deepEqual(models.map((model) => model.name), ['Custom', 'Hiyori', 'Mao']);
+  assert.equal(models[0].rootDir, path.dirname(externalModelPath));
+  assert.equal(models[1].rootDir, path.dirname(hiyoriModelPath));
+  assert.equal(models[2].rootDir, path.dirname(maoModelPath));
+  assert.equal(discoverLive2DModel({ searchRoots: [externalRoot, builtInRoot] }).name, 'Custom');
 });
 
 test('discoverLive2DModel reports unavailable when no model3.json exists', (t) => {

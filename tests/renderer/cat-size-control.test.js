@@ -54,6 +54,9 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   const renderer = readSource('src', 'renderer', 'renderer.js');
 
   assert.match(html, /id="catSizeBtn"/);
+  assert.match(html, /class="toolbar-primary"/);
+  assert.match(html, /class="toolbar-utility"/);
+  assert.match(html, /<div class="toolbar-primary"[\s\S]*id="waterCounter"[\s\S]*id="clipboardBtn"[\s\S]*id="roomBtn"[\s\S]*<\/div>\s*<div class="toolbar-utility"[\s\S]*id="catSizeBtn"/);
   assert.match(html, /class="cat-size-icon"/);
   assert.match(html, /<span class="cat-size-icon" aria-hidden="true">\s*<span>↖<\/span>\s*<span>↘<\/span>\s*<\/span>/);
   assert.doesNotMatch(html, /<span class="sketch-btn-icon">Aa<\/span>/);
@@ -66,15 +69,24 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(css, /--cat-scale:\s*1/);
   assert.match(css, /\.stage\s*\{[\s\S]*transform:\s*scale\(var\(--cat-scale\)\)/);
   const bottomBarCss = readCssBlock(css, '.bottom-bar');
-  assert.match(bottomBarCss, /left:\s*4px/);
-  assert.match(bottomBarCss, /right:\s*4px/);
-  assert.match(bottomBarCss, /display:\s*grid/);
-  assert.match(bottomBarCss, /grid-template-columns:\s*minmax\(58px,\s*0\.85fr\)\s+minmax\(68px,\s*1fr\)\s+minmax\(68px,\s*1fr\)\s+46px/);
+  assert.match(bottomBarCss, /left:\s*50%/);
+  assert.match(bottomBarCss, /transform:\s*translateX\(-50%\)/);
   assert.match(bottomBarCss, /overflow:\s*visible/);
+  assert.doesNotMatch(bottomBarCss, /right:\s*4px/);
+  assert.doesNotMatch(bottomBarCss, /display:\s*grid/);
+  assert.doesNotMatch(bottomBarCss, /grid-template-columns/);
   assert.doesNotMatch(bottomBarCss, /scale\(var\(--cat-scale\)\)/);
   assert.doesNotMatch(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s*\{[\s\S]*grid-template-columns/);
-  assert.match(css, /\.bottom-bar\s+\.sketch-btn\s*\{[\s\S]*width:\s*100%/);
-  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*width:\s*46px/);
+  assert.match(css, /\.toolbar-primary\s*\{[\s\S]*display:\s*flex/);
+  assert.match(css, /\.toolbar-primary\s*\{[\s\S]*justify-content:\s*center/);
+  assert.match(css, /\.toolbar-primary\s*\{[\s\S]*gap:\s*8px/);
+  assert.match(css, /\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*width:\s*68px/);
+  assert.match(css, /\.toolbar-primary\s+\.water-counter\s*\{[\s\S]*width:\s*58px/);
+  assert.match(css, /\.toolbar-utility\s*\{[\s\S]*position:\s*absolute/);
+  assert.match(css, /\.toolbar-utility\s*\{[\s\S]*left:\s*calc\(100%\s*\+\s*6px\)/);
+  assert.match(css, /\.toolbar-utility\s*\{[\s\S]*bottom:\s*3px/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*width:\s*34px/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*height:\s*34px/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*opacity:\s*0/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*pointer-events:\s*none/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*visibility:\s*hidden/);
@@ -84,12 +96,16 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*visibility:\s*visible/);
   assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*transform:\s*translateY\(0\)\s+scale\(1\)/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s+\.sketch-btn-text\s*\{[\s\S]*display:\s*none/);
-  assert.match(css, /\.bottom-bar\.is-compact[\s\S]*\.sketch-btn-text/);
+  assert.match(css, /\.bottom-bar\.is-compact\s+\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*width:\s*40px/);
+  assert.match(css, /\.bottom-bar\.is-compact\s+\.toolbar-primary[\s\S]*\.sketch-btn-text/);
   assert.match(css, /\.is-cat-resizing\s+\.stage\s*\{[\s\S]*transition:\s*none/);
   assert.match(css, /\.cat-size-btn\s*\{[\s\S]*cursor:\s*nwse-resize/);
   assert.match(css, /\.cat-size-btn\.is-resizing/);
   assert.match(css, /\.cat-size-icon\s*\{[\s\S]*background:\s*#050505/);
   assert.match(css, /\.cat-size-icon\s*\{[\s\S]*color:\s*#fff/);
+  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*width:\s*20px/);
+  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*height:\s*18px/);
+  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*font-size:\s*10px/);
   assert.match(css, /\.cat-size-icon\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*1fr\)/);
 
   assert.match(renderer, /CAT_SIZE_STORAGE_KEY/);
@@ -110,7 +126,9 @@ test('pet window leaves safe room for the maximum cat scale and bottom controls'
   const options = createPetWindowOptions({ preloadPath: 'preload.js' });
   const stageSize = 240;
   const minimumHorizontalBreathingRoom = 32;
-  const bottomControlsMinimumWidth = 58 + 68 + 68 + 46 + 4 * 3 + 4 * 2;
+  const primaryControlsWidth = 58 + 68 + 68 + 8 * 2;
+  const utilityControlsWidth = 6 + 34;
+  const bottomControlsMinimumWidth = (primaryControlsWidth / 2 + utilityControlsWidth) * 2 + 8 * 2;
 
   assert.ok(
     options.width >= stageSize * CAT_SCALE_MAX + minimumHorizontalBreathingRoom,

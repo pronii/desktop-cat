@@ -7,7 +7,8 @@
 - Windows 免安装包指可直接双击运行的 portable `.exe` 文件，不使用 zip 作为最终交付物。
 - 不要在用户测试前反复打包；只有用户明确要求“打包/重新打包/打免安装包”时才执行。
 - 打包前先运行 `npm test`，确认测试通过后再生成产物。
-- `dist` 目录最终保留一个免安装 `.exe`，以及可选的 `live2d/` 运行时资源目录。
+- `dist` 目录最终保留一个免安装 `.exe`，以及可选的 `live2d/` 外置覆盖资源目录。
+- Live2D 内置模型位于 `src/renderer/live2d-models/`，会随 `.exe` 打包；`dist/live2d/` 只用于用户替换或测试外部模型。
 - 不保留 `win-unpacked`、`builder-debug.yml`、`builder-effective-config.yaml`、旧 zip、旧 exe、临时启动脚本等中间产物；`live2d/` 不是中间产物，可以随 portable `.exe` 保留。
 
 ## 标准打包流程
@@ -27,7 +28,7 @@ desktop-cat 0.2.0.exe
 
 ## 打包后清理 `dist`
 
-打包完成后，只保留最新的 portable `.exe`，以及可选的 `dist/live2d/`。清理前必须确认删除目标都在当前项目的 `dist` 目录内：
+打包完成后，只保留最新的 portable `.exe`，以及可选的 `dist/live2d/` 外置覆盖目录。清理前必须确认删除目标都在当前项目的 `dist` 目录内：
 
 ```powershell
 $workspace = (Resolve-Path -LiteralPath '.').Path
@@ -72,4 +73,4 @@ foreach ($item in $items) {
 Get-ChildItem -Force -LiteralPath 'dist'
 ```
 
-检查结果应包含一个 `desktop-cat <version>.exe`；如果本次包需要内置或测试外部 Live2D 模型，也可以同时包含 `live2d/`。
+检查结果应包含一个 `desktop-cat <version>.exe`；内置 Live2D 模型已经在 `.exe` 中。如果本次包需要测试外部 Live2D 覆盖模型，也可以同时包含 `live2d/`。
