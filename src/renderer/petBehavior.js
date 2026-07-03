@@ -8,6 +8,13 @@ const CAT_SCALE_STEP = 0.1;
 const CAT_SCALE_DEFAULT = 1;
 const CAT_SCALE_DRAG_PIXELS = 300;
 const CAT_SCALE_COMPACT_MAX = 0.9;
+const ENCOURAGEMENT_MESSAGES = [
+  '辛苦啦，歇一小会儿吧',
+  '做得很好，继续加油',
+  '别忘了喝口水',
+  '今天也很努力呢',
+  '我在这里陪着你'
+];
 
 function normalizeCatScale(value) {
   const numeric = Number(value);
@@ -80,6 +87,7 @@ const petBehavior = {
   CAT_SCALE_COMPACT_MAX,
   CAT_SCALE_MIN,
   CAT_SCALE_STEP,
+  ENCOURAGEMENT_MESSAGES,
   formatCatScale,
   normalizeCatScale,
   scaleFromDragDelta,

@@ -10,6 +10,7 @@
     CAT_SCALE_DRAG_PIXELS,
     CAT_SCALE_MAX,
     CAT_SCALE_MIN,
+    ENCOURAGEMENT_MESSAGES,
     formatCatScale,
     normalizeCatScale,
     scaleFromDragDelta,
@@ -21,6 +22,7 @@
   const cat = document.querySelector('.cat');
   const waterBowl = document.querySelector('.water-bowl');
   const live2dCanvas = document.getElementById('live2dCanvas');
+  const happyBubble = document.querySelector('.happy-bubble');
   const waterBubble = cat.querySelector('.water-bubble');
   const waterCounter = document.getElementById('waterCounter');
   const bottomBar = document.querySelector('.bottom-bar');
@@ -35,6 +37,7 @@
   let drinkState = clearDrinkState();
   let drinkTimer = null;
   let catScale = CAT_SCALE_DEFAULT;
+  let encouragementIndex = 0;
   let catSizeDragState = null;
   let catSizeHideTimer = null;
   let catSizePointerOverStage = false;
@@ -128,8 +131,17 @@
   applyCatScale(readStoredCatScale());
 
   function setHappy() {
+    if (ENCOURAGEMENT_MESSAGES?.length) {
+      const message = ENCOURAGEMENT_MESSAGES[encouragementIndex % ENCOURAGEMENT_MESSAGES.length];
+      encouragementIndex += 1;
+      if (happyBubble) {
+        happyBubble.textContent = message;
+      }
+    }
+
     happyState = createHappyState({ duration: 900 });
     window.desktopCatDebug.happyCount += 1;
+    stage?.classList.add('is-happy');
     cat.classList.add('is-happy');
     window.__desktopCatLive2D?.playTap?.();
 
@@ -137,6 +149,7 @@
     happyTimer = window.setTimeout(() => {
       if (shouldClearHappyState(happyState)) {
         happyState = clearHappyState();
+        stage?.classList.remove('is-happy');
         cat.classList.remove('is-happy');
       }
     }, 1500);
@@ -187,6 +200,7 @@
   let pressActive = false;
   let isLongPress = false;
   let dragEntered = false;
+  let suppressNextCatClick = false;
 
   function clearPendingLongPress() {
     if (!longPressTimer) return;
@@ -194,19 +208,18 @@
     longPressTimer = null;
   }
 
-  function finishCatPress({ triggerHappy = false } = {}) {
+  function finishCatPress() {
     if (!pressActive && !isLongPress) return;
 
     clearPendingLongPress();
 
     if (isLongPress) {
+      suppressNextCatClick = true;
       cat.classList.remove('is-dragging');
       if (dragEntered && window.desktopCat?.dragMode) {
         window.desktopCat.dragMode.exit();
         dragEntered = false;
       }
-    } else if (triggerHappy) {
-      setHappy();
     }
 
     pressActive = false;
@@ -217,6 +230,7 @@
     if (event.button !== 0) return;
 
     finishCatPress();
+    suppressNextCatClick = false;
     pressActive = true;
     isLongPress = false;
     dragEntered = false;
@@ -235,7 +249,17 @@
   }
 
   function handleCatPressEnd() {
-    finishCatPress({ triggerHappy: true });
+    finishCatPress();
+  }
+
+  function handleCatClick(event) {
+    if (suppressNextCatClick) {
+      suppressNextCatClick = false;
+      event.preventDefault?.();
+      return;
+    }
+
+    setHappy();
   }
 
   function handleCatPressLeave() {
@@ -252,16 +276,17 @@
   for (const dragTarget of [cat, live2dCanvas].filter(Boolean)) {
     dragTarget.addEventListener('mousedown', handleCatPressStart);
     dragTarget.addEventListener('mouseup', handleCatPressEnd);
+    dragTarget.addEventListener('click', handleCatClick);
     dragTarget.addEventListener('mouseleave', handleCatPressLeave);
     dragTarget.addEventListener('dragstart', preventElementDrag);
   }
 
   window.addEventListener('mouseup', () => {
-    finishCatPress({ triggerHappy: false });
+    finishCatPress();
   });
 
   window.addEventListener('blur', () => {
-    finishCatPress({ triggerHappy: false });
+    finishCatPress();
   });
 
   stage?.addEventListener('pointerenter', () => {
@@ -291,6 +316,7 @@
     window.__closeWaterPanel?.();
     window.__closeClipboardPanel?.();
     window.__closeRoomPanel?.();
+    window.__closeLive2DPanel?.();
     catSizeDragState = {
       pointerId: event.pointerId,
       startX: event.clientX,

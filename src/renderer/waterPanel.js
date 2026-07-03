@@ -341,6 +341,7 @@
     window.__closeClipboardPanel?.();
     window.__closeRoomPanel?.();
     window.__closeCatSizePanel?.();
+    window.__closeLive2DPanel?.();
     closePanel();
     waterReminderDialog.classList.add('show');
   }
@@ -435,10 +436,11 @@
       closePanel();
       return;
     }
-    window.__closeClipboardPanel?.();
-    window.__closeRoomPanel?.();
-    window.__closeCatSizePanel?.();
-    openPanel();
+      window.__closeClipboardPanel?.();
+      window.__closeRoomPanel?.();
+      window.__closeCatSizePanel?.();
+      window.__closeLive2DPanel?.();
+      openPanel();
   });
 
   waterPanelClose?.addEventListener('click', (e) => {

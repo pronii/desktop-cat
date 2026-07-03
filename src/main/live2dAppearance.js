@@ -93,10 +93,13 @@ function readModelName(modelJsonPath) {
   }
 }
 
-function createLive2DModelUrl(modelRootDir, filePath) {
+function createLive2DModelUrl(modelRootDir, filePath, modelId = 'active') {
   const relative = path.relative(modelRootDir, filePath);
   const parts = relative.split(path.sep).filter(Boolean).map(encodeURIComponent);
-  return `${LIVE2D_PROTOCOL}://active/${parts.join('/')}`;
+  if (modelId === 'active') {
+    return `${LIVE2D_PROTOCOL}://active/${parts.join('/')}`;
+  }
+  return `${LIVE2D_PROTOCOL}://model/${encodeURIComponent(modelId)}/${parts.join('/')}`;
 }
 
 function createLive2DModelRecord(searchRoot, modelJsonPath) {
@@ -112,7 +115,7 @@ function createLive2DModelRecord(searchRoot, modelJsonPath) {
     name: readModelName(modelJsonPath),
     rootDir,
     modelJsonPath,
-    modelUrl: createLive2DModelUrl(rootDir, modelJsonPath)
+    modelUrl: createLive2DModelUrl(rootDir, modelJsonPath, id)
   };
 }
 
@@ -148,13 +151,14 @@ function isInsidePath(childPath, parentPath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function resolveLive2DProtocolPath(model, requestUrl) {
-  if (!model?.available || !model.rootDir) return null;
+function getProtocolModel(protocolState, requestUrl) {
+  if (protocolState?.available && protocolState.rootDir) {
+    return protocolState;
+  }
 
   const rawPath = String(requestUrl).split(`${LIVE2D_PROTOCOL}://active/`)[1] || '';
-  const decodedRawPath = decodeURIComponent(rawPath.split(/[?#]/)[0] || '');
-  if (decodedRawPath.split('/').some((part) => part === '..' || part.includes('\\'))) {
-    return null;
+  if (rawPath) {
+    return protocolState?.currentModel || null;
   }
 
   let parsed;
@@ -165,33 +169,80 @@ function resolveLive2DProtocolPath(model, requestUrl) {
   }
 
   if (parsed.protocol !== `${LIVE2D_PROTOCOL}:` || parsed.hostname !== 'active') {
+    if (parsed.protocol !== `${LIVE2D_PROTOCOL}:` || parsed.hostname !== 'model') {
+      return null;
+    }
+    const modelId = decodeURIComponent(parsed.pathname.split('/').filter(Boolean)[0] || '');
+    return (protocolState?.availableModels || []).find((model) => model.id === modelId) || null;
+  }
+
+  return protocolState?.currentModel || null;
+}
+
+function getProtocolRelativeParts(requestUrl) {
+  const activePrefix = `${LIVE2D_PROTOCOL}://active/`;
+  const rawActivePath = String(requestUrl).split(activePrefix)[1] || '';
+  if (rawActivePath) {
+    const decodedRawPath = decodeURIComponent(rawActivePath.split(/[?#]/)[0] || '');
+    if (decodedRawPath.split('/').some((part) => part === '..' || part.includes('\\'))) {
+      return null;
+    }
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(requestUrl);
+  } catch (_error) {
     return null;
   }
 
-  const relativePath = decodeURIComponent(parsed.pathname).replace(/^\/+/, '');
+  if (parsed.protocol !== `${LIVE2D_PROTOCOL}:`) return null;
+
+  let pathname = parsed.pathname.replace(/^\/+/, '');
+  if (parsed.hostname === 'model') {
+    const parts = pathname.split('/').filter(Boolean);
+    parts.shift();
+    pathname = parts.map((part) => decodeURIComponent(part)).join('/');
+  } else if (parsed.hostname !== 'active') {
+    return null;
+  } else {
+    pathname = decodeURIComponent(pathname);
+  }
+
+  const relativePath = pathname;
   const parts = relativePath.split('/').filter(Boolean);
   if (!parts.length || parts.some((part) => part === '..' || part.includes('\\'))) {
     return null;
   }
+  return parts;
+}
+
+function resolveLive2DProtocolPath(protocolState, requestUrl) {
+  const model = getProtocolModel(protocolState, requestUrl);
+  if (!model?.available || !model.rootDir) return null;
+
+  const parts = getProtocolRelativeParts(requestUrl);
+  if (!parts) return null;
 
   const resolved = path.resolve(model.rootDir, ...parts);
   return isInsidePath(resolved, model.rootDir) ? resolved : null;
 }
 
-function createLive2DAppearance({ app, protocol }) {
+function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRoots } = {}) {
   let currentModel = { available: false };
   let availableModels = [];
 
   function refresh() {
-    const searchRoots = resolveLive2DSearchRoots({
-      isPackaged: app.isPackaged,
-      portableExecutableDir: process.env.PORTABLE_EXECUTABLE_DIR,
-      execPath: process.execPath,
-      cwd: process.cwd(),
-      userDataDir: app.getPath('userData')
-    });
+    const searchRoots = configuredSearchRoots || resolveLive2DSearchRoots({
+        isPackaged: app.isPackaged,
+        portableExecutableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+        execPath: process.execPath,
+        cwd: process.cwd(),
+        userDataDir: app.getPath('userData')
+      });
     availableModels = discoverLive2DModels({ searchRoots });
-    currentModel = availableModels[0] || { available: false };
+    const currentId = currentModel.available ? currentModel.id : null;
+    currentModel = availableModels.find((model) => model.id === currentId) || availableModels[0] || { available: false };
     return currentModel;
   }
 
@@ -224,9 +275,29 @@ function createLive2DAppearance({ app, protocol }) {
     return availableModels.map(serializeModel);
   }
 
+  function setCurrentModel(modelId) {
+    if (!availableModels.length) {
+      refresh();
+    }
+
+    const nextModel = availableModels.find((model) => model.id === modelId);
+    if (!nextModel) {
+      return { available: false };
+    }
+
+    currentModel = nextModel;
+    return serializeModel(currentModel);
+  }
+
   function registerProtocol() {
     protocol.registerFileProtocol(LIVE2D_PROTOCOL, (request, callback) => {
-      const filePath = resolveLive2DProtocolPath(currentModel, request.url);
+      const filePath = resolveLive2DProtocolPath(
+        {
+          currentModel,
+          availableModels
+        },
+        request.url
+      );
       if (!filePath) {
         callback({ error: -6 });
         return;
@@ -239,7 +310,8 @@ function createLive2DAppearance({ app, protocol }) {
     getAvailableModels,
     getCurrentModel,
     refresh,
-    registerProtocol
+    registerProtocol,
+    setCurrentModel
   };
 }
 

@@ -6,6 +6,15 @@ const vm = require('node:vm');
 
 const petBehavior = require('../../src/renderer/petBehavior');
 
+function readSource(...parts) {
+  return fs.readFileSync(path.join(__dirname, '..', '..', ...parts), 'utf8');
+}
+
+function readCssBlock(css, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return css.match(new RegExp(`${escapedSelector}\\s*\\{[\\s\\S]*?\\}`))?.[0] || '';
+}
+
 class FakeClassList {
   constructor() {
     this.names = new Set();
@@ -38,6 +47,7 @@ class FakeElement {
     this.classList = new FakeClassList();
     this.listeners = new Map();
     this.attributes = new Map();
+    this.childrenBySelector = new Map();
     this.textContent = '';
   }
 
@@ -53,8 +63,8 @@ class FakeElement {
     }
   }
 
-  querySelector() {
-    return new FakeElement();
+  querySelector(selector) {
+    return this.childrenBySelector.get(selector) || new FakeElement();
   }
 
   setAttribute(name, value) {
@@ -67,14 +77,13 @@ class FakeElement {
 }
 
 function createRendererHarness() {
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'src', 'renderer', 'renderer.js'),
-    'utf8'
-  );
+  const source = readSource('src', 'renderer', 'renderer.js');
   const cat = new FakeElement();
   const stage = new FakeElement();
   const live2dCanvas = new FakeElement();
   const waterBowl = new FakeElement();
+  const happyBubble = new FakeElement();
+  const waterBubble = new FakeElement();
   const waterCounter = new FakeElement();
   const bottomBar = new FakeElement();
   const catSizeBtn = new FakeElement();
@@ -87,6 +96,9 @@ function createRendererHarness() {
   let nextTimerId = 1;
   let dragEnterCount = 0;
   let dragExitCount = 0;
+
+  cat.childrenBySelector.set('.happy-bubble', happyBubble);
+  cat.childrenBySelector.set('.water-bubble', waterBubble);
 
   const fakeWindow = {
     petBehavior,
@@ -143,6 +155,7 @@ function createRendererHarness() {
       if (selector === '.cat') return cat;
       if (selector === '.water-bowl') return waterBowl;
       if (selector === '.bottom-bar') return bottomBar;
+      if (selector === '.happy-bubble') return happyBubble;
       return null;
     },
     getElementById(id) {
@@ -161,6 +174,7 @@ function createRendererHarness() {
 
   return {
     cat,
+    happyBubble,
     stage,
     live2dCanvas,
     catSizeBtn,
@@ -201,6 +215,86 @@ test('cat drag mode survives leaving the cat element until mouseup', () => {
 
   assert.equal(harness.dragExitCount, 1);
   assert.equal(harness.cat.classList.contains('is-dragging'), false);
+});
+
+test('cat click cycles through five encouragement messages', () => {
+  const harness = createRendererHarness();
+  const messages = [
+    '辛苦啦，歇一小会儿吧',
+    '做得很好，继续加油',
+    '别忘了喝口水',
+    '今天也很努力呢',
+    '我在这里陪着你'
+  ];
+
+  assert.deepEqual(petBehavior.ENCOURAGEMENT_MESSAGES, messages);
+
+  for (let index = 0; index < messages.length + 1; index += 1) {
+    harness.cat.dispatch('click');
+
+    assert.equal(harness.happyBubble.textContent, messages[index % messages.length]);
+    assert.equal(harness.cat.classList.contains('is-happy'), true);
+    assert.equal(harness.stage.classList.contains('is-happy'), true);
+  }
+});
+
+test('encouragement bubble renders as a centered long info bar with at most two lines', () => {
+  const html = readSource('src', 'renderer', 'index.html');
+  const css = readSource('src', 'renderer', 'styles.css');
+  const bubbleCss = readCssBlock(css, '.happy-bubble');
+  const activeBubbleCss = readCssBlock(css, '.stage.is-happy .happy-bubble');
+
+  assert.match(html, /<\/button>\s*<span class="happy-bubble"><\/span>/);
+  assert.match(bubbleCss, /left:\s*50%/);
+  assert.doesNotMatch(bubbleCss, /left:\s*132px/);
+  assert.match(bubbleCss, /width:\s*max-content/);
+  assert.match(bubbleCss, /min-width:\s*168px/);
+  assert.match(bubbleCss, /max-width:\s*min\(280px,\s*calc\(100vw\s*-\s*32px\)\)/);
+  assert.match(bubbleCss, /display:\s*-webkit-box/);
+  assert.match(bubbleCss, /-webkit-line-clamp:\s*2/);
+  assert.match(bubbleCss, /-webkit-box-orient:\s*vertical/);
+  assert.match(bubbleCss, /overflow:\s*hidden/);
+  assert.match(bubbleCss, /text-align:\s*center/);
+  assert.match(bubbleCss, /transform:\s*translate\(-50%,\s*8px\)\s*scale\(0\.9\)/);
+  assert.match(activeBubbleCss, /opacity:\s*1\s*!important/);
+  assert.match(activeBubbleCss, /transform:\s*translate\(-50%,\s*0\)\s*scale\(1\)/);
+});
+
+test('cat mouse press without click does not show encouragement text', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    preventDefault() {}
+  });
+  harness.cat.dispatch('mouseup');
+
+  assert.equal(harness.happyBubble.textContent, '');
+  assert.equal(harness.window.desktopCatDebug.happyCount, 0);
+});
+
+test('cat long press drag suppresses the following click encouragement', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+  harness.window.dispatch('mouseup');
+  harness.cat.dispatch('click');
+
+  assert.equal(harness.happyBubble.textContent, '');
+  assert.equal(harness.window.desktopCatDebug.happyCount, 0);
+});
+
+test('live2d canvas click uses the same encouragement cycle as the default cat', () => {
+  const harness = createRendererHarness();
+
+  harness.live2dCanvas.dispatch('click');
+
+  assert.equal(harness.happyBubble.textContent, petBehavior.ENCOURAGEMENT_MESSAGES[0]);
+  assert.equal(harness.cat.classList.contains('is-happy'), true);
 });
 
 test('live2d canvas uses the same long press drag mode as the default cat', () => {

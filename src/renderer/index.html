@@ -32,9 +32,9 @@
           <span class="paw paw-right"></span>
         </span>
         <span class="tail"></span>
-        <span class="happy-bubble">nya</span>
         <span class="water-bubble">该喝水啦！</span>
       </button>
+      <span class="happy-bubble"></span>
       <span class="water-bowl" aria-hidden="true">
         <span class="water-surf"></span>
         <span class="water-ripple"></span>
@@ -80,6 +80,19 @@
         >
           <span class="sketch-btn-icon">👥</span>
           <span class="sketch-btn-text">好友</span>
+        </button>
+
+        <button
+          class="sketch-btn live2d-switcher-btn"
+          id="live2dSwitcherBtn"
+          type="button"
+          aria-label="切换 Live2D 形象"
+          aria-controls="live2dPanel"
+          aria-expanded="false"
+          title="切换 Live2D 形象"
+        >
+          <span class="sketch-btn-icon">🎭</span>
+          <span class="sketch-btn-text">形象</span>
         </button>
       </div>
 
@@ -233,11 +246,22 @@
       </div>
     </div>
 
+    <div class="live2d-panel sketch-panel" id="live2dPanel">
+      <div class="sketch-panel-header sketch-panel-header-live2d">
+        <h3>🎭 Live2D 形象</h3>
+        <button class="sketch-panel-close" id="live2dPanelClose" type="button" aria-label="关闭 Live2D 形象">×</button>
+      </div>
+      <div class="live2d-panel-body">
+        <div class="live2d-model-list" id="live2dModelList"></div>
+      </div>
+    </div>
+
     <script src="./vendor/live2d/live2dcubismcore.min.js"></script>
     <script src="./vendor/live2d/pixi.min.js"></script>
     <script src="./vendor/live2d/pixi-live2d-cubism4.min.js"></script>
     <script src="./live2dMotionController.js"></script>
     <script src="./live2dAppearance.js"></script>
+    <script src="./live2dPanel.js"></script>
     <script src="./petBehavior.js"></script>
     <script src="./renderer.js"></script>
     <script src="./clipboardPanel.js"></script>

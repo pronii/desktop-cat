@@ -614,6 +614,10 @@ ipcMain.handle('appearance:get-live2d-models', () => {
   return live2DAppearance.getAvailableModels();
 });
 
+ipcMain.handle('appearance:set-live2d-model', (_event, modelId) => {
+  return live2DAppearance.setCurrentModel(modelId);
+});
+
 /* --- 好友同屏 IPC --- */
 
 ipcMain.handle('room:get-state', () => {

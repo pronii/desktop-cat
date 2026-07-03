@@ -1,8 +1,8 @@
 function createPetWindowOptions({ preloadPath }) {
   return {
-    width: 340,
+    width: 380,
     height: 380,
-    minWidth: 320,
+    minWidth: 360,
     minHeight: 320,
     show: false,
     frame: false,

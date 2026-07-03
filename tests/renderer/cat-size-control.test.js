@@ -79,12 +79,16 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.doesNotMatch(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s*\{[\s\S]*grid-template-columns/);
   assert.match(css, /\.toolbar-primary\s*\{[\s\S]*display:\s*flex/);
   assert.match(css, /\.toolbar-primary\s*\{[\s\S]*justify-content:\s*center/);
-  assert.match(css, /\.toolbar-primary\s*\{[\s\S]*gap:\s*8px/);
-  assert.match(css, /\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*width:\s*68px/);
-  assert.match(css, /\.toolbar-primary\s+\.water-counter\s*\{[\s\S]*width:\s*58px/);
+  assert.match(css, /\.toolbar-primary\s*\{[\s\S]*gap:\s*6px/);
+  assert.match(css, /\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*width:\s*64px/);
+  assert.match(css, /\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*padding:\s*0\s+7px/);
+  assert.doesNotMatch(css, /\.toolbar-primary\s+\.water-counter\s*\{[\s\S]*width:\s*58px/);
   assert.match(css, /\.toolbar-utility\s*\{[\s\S]*position:\s*absolute/);
   assert.match(css, /\.toolbar-utility\s*\{[\s\S]*left:\s*calc\(100%\s*\+\s*6px\)/);
   assert.match(css, /\.toolbar-utility\s*\{[\s\S]*bottom:\s*3px/);
+  const catSizeButtonCss = readCssBlock(css, '.bottom-bar .cat-size-btn');
+  assert.match(catSizeButtonCss, /justify-content:\s*center/);
+  assert.match(catSizeButtonCss, /align-items:\s*center/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*width:\s*34px/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*height:\s*34px/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*opacity:\s*0/);
@@ -126,7 +130,7 @@ test('pet window leaves safe room for the maximum cat scale and bottom controls'
   const options = createPetWindowOptions({ preloadPath: 'preload.js' });
   const stageSize = 240;
   const minimumHorizontalBreathingRoom = 32;
-  const primaryControlsWidth = 58 + 68 + 68 + 8 * 2;
+  const primaryControlsWidth = 64 * 4 + 6 * 3;
   const utilityControlsWidth = 6 + 34;
   const bottomControlsMinimumWidth = (primaryControlsWidth / 2 + utilityControlsWidth) * 2 + 8 * 2;
 

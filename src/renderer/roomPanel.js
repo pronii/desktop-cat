@@ -128,6 +128,7 @@
     window.__closeWaterPanel?.();
     window.__closeClipboardPanel?.();
     window.__closeCatSizePanel?.();
+    window.__closeLive2DPanel?.();
     setPanelOpen(true);
     refreshState();
   }

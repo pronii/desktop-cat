@@ -6,6 +6,7 @@ const test = require('node:test');
 
 const {
   LIVE2D_PROTOCOL,
+  createLive2DAppearance,
   createLive2DModelUrl,
   discoverLive2DModel,
   discoverLive2DModels,
@@ -84,7 +85,7 @@ test('discoverLive2DModel finds the first model3.json in configured folders', (t
   assert.equal(model.name, 'Hiyori');
   assert.equal(model.rootDir, path.dirname(modelJsonPath));
   assert.equal(model.modelJsonPath, modelJsonPath);
-  assert.equal(model.modelUrl, `${LIVE2D_PROTOCOL}://active/hiyori.model3.json`);
+  assert.equal(model.modelUrl, `${LIVE2D_PROTOCOL}://model/hiyori/hiyori.model3.json`);
 });
 
 test('discoverLive2DModels lists multiple models while keeping external folders first', (t) => {
@@ -102,6 +103,44 @@ test('discoverLive2DModels lists multiple models while keeping external folders 
   assert.equal(models[1].rootDir, path.dirname(hiyoriModelPath));
   assert.equal(models[2].rootDir, path.dirname(maoModelPath));
   assert.equal(discoverLive2DModel({ searchRoots: [externalRoot, builtInRoot] }).name, 'Custom');
+});
+
+test('discoverLive2DModels gives every model an isolated protocol url for previews', (t) => {
+  const root = makeTempRoot(t);
+  const builtInRoot = path.join(root, 'src', 'renderer', 'live2d-models');
+  const hiyoriModelPath = writeModel(builtInRoot, path.join('Hiyori', 'Hiyori.model3.json'), 'Hiyori');
+  const maoModelPath = writeModel(builtInRoot, path.join('Mao', 'Mao.model3.json'), 'Mao');
+
+  const models = discoverLive2DModels({ searchRoots: [builtInRoot] });
+
+  assert.equal(models[0].modelUrl, `${LIVE2D_PROTOCOL}://model/Hiyori/Hiyori.model3.json`);
+  assert.equal(models[1].modelUrl, `${LIVE2D_PROTOCOL}://model/Mao/Mao.model3.json`);
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[0].modelUrl),
+    hiyoriModelPath
+  );
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[1].modelUrl),
+    maoModelPath
+  );
+});
+
+test('resolveLive2DProtocolPath keeps encoded nested model ids separate from asset paths', (t) => {
+  const root = makeTempRoot(t);
+  const live2dRoot = path.join(root, 'live2d');
+  const modelJsonPath = writeModel(
+    live2dRoot,
+    path.join('custom', 'nested', 'avatar.model3.json'),
+    'Nested Avatar'
+  );
+  const [model] = discoverLive2DModels({ searchRoots: [live2dRoot] });
+
+  assert.equal(model.id, 'custom/nested');
+  assert.equal(model.modelUrl, `${LIVE2D_PROTOCOL}://model/custom%2Fnested/avatar.model3.json`);
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: [model], currentModel: model }, model.modelUrl),
+    modelJsonPath
+  );
 });
 
 test('discoverLive2DModel reports unavailable when no model3.json exists', (t) => {
@@ -138,4 +177,31 @@ test('resolveLive2DProtocolPath only serves files inside the active model folder
     resolveLive2DProtocolPath({ available: false }, `${LIVE2D_PROTOCOL}://active/avatar.model3.json`),
     null
   );
+});
+
+test('createLive2DAppearance can switch the current Live2D model by id', (t) => {
+  const root = makeTempRoot(t);
+  const modelsRoot = path.join(root, 'live2d-models');
+  writeModel(modelsRoot, path.join('Hiyori', 'Hiyori.model3.json'), 'Hiyori');
+  writeModel(modelsRoot, path.join('Mao', 'Mao.model3.json'), 'Mao');
+  const registeredProtocols = [];
+  const appearance = createLive2DAppearance({
+    app: {
+      isPackaged: false,
+      getPath: () => path.join(root, 'userData')
+    },
+    protocol: {
+      registerFileProtocol: (scheme, handler) => registeredProtocols.push({ scheme, handler })
+    },
+    searchRoots: [modelsRoot]
+  });
+
+  assert.equal(appearance.getCurrentModel().id, 'Hiyori');
+  assert.deepEqual(appearance.getAvailableModels().map((model) => model.id), ['Hiyori', 'Mao']);
+  assert.equal(appearance.setCurrentModel('Mao').id, 'Mao');
+  assert.equal(appearance.getCurrentModel().id, 'Mao');
+  assert.equal(appearance.setCurrentModel('missing').available, false);
+  assert.equal(appearance.getCurrentModel().id, 'Mao');
+  appearance.registerProtocol();
+  assert.equal(registeredProtocols[0].scheme, LIVE2D_PROTOCOL);
 });

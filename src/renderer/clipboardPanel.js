@@ -179,6 +179,7 @@
       window.__closeWaterPanel?.();
       window.__closeRoomPanel?.();
       window.__closeCatSizePanel?.();
+      window.__closeLive2DPanel?.();
       openClipboardPanel();
     });
   }
