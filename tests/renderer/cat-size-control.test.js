@@ -70,22 +70,37 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(css, /\.stage\s*\{[\s\S]*transform:\s*scale\(var\(--cat-scale\)\)/);
   const bottomBarCss = readCssBlock(css, '.bottom-bar');
   assert.match(bottomBarCss, /left:\s*50%/);
-  assert.match(bottomBarCss, /transform:\s*translateX\(-50%\)/);
+  assert.match(bottomBarCss, /transform:\s*translateX\(-50%\)\s+scale\(var\(--cat-scale\)\)/);
+  assert.match(bottomBarCss, /display:\s*flex/);
+  assert.match(bottomBarCss, /align-items:\s*center/);
+  assert.match(bottomBarCss, /justify-content:\s*center/);
+  assert.match(bottomBarCss, /gap:\s*6px/);
   assert.match(bottomBarCss, /overflow:\s*visible/);
+  assert.match(bottomBarCss, /opacity:\s*0/);
+  assert.match(bottomBarCss, /pointer-events:\s*none/);
+  assert.match(bottomBarCss, /visibility:\s*hidden/);
   assert.doesNotMatch(bottomBarCss, /right:\s*4px/);
   assert.doesNotMatch(bottomBarCss, /display:\s*grid/);
   assert.doesNotMatch(bottomBarCss, /grid-template-columns/);
-  assert.doesNotMatch(bottomBarCss, /scale\(var\(--cat-scale\)\)/);
+  const visibleBottomBarCss = readCssBlock(css, '.is-bottom-controls-visible .bottom-bar');
+  assert.match(visibleBottomBarCss, /opacity:\s*1/);
+  assert.match(visibleBottomBarCss, /pointer-events:\s*auto/);
+  assert.match(visibleBottomBarCss, /visibility:\s*visible/);
   assert.doesNotMatch(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s*\{[\s\S]*grid-template-columns/);
   assert.match(css, /\.toolbar-primary\s*\{[\s\S]*display:\s*flex/);
   assert.match(css, /\.toolbar-primary\s*\{[\s\S]*justify-content:\s*center/);
   assert.match(css, /\.toolbar-primary\s*\{[\s\S]*gap:\s*6px/);
-  assert.match(css, /\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*width:\s*64px/);
-  assert.match(css, /\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*padding:\s*0\s+7px/);
+  const primaryToolbarButtonCss = readCssBlock(css, '.toolbar-primary .sketch-btn');
+  assert.match(primaryToolbarButtonCss, /width:\s*40px/);
+  assert.match(primaryToolbarButtonCss, /padding:\s*0/);
+  const primaryToolbarTextCss = readCssBlock(css, '.toolbar-primary .sketch-btn-text');
+  assert.match(primaryToolbarTextCss, /display:\s*none/);
   assert.doesNotMatch(css, /\.toolbar-primary\s+\.water-counter\s*\{[\s\S]*width:\s*58px/);
-  assert.match(css, /\.toolbar-utility\s*\{[\s\S]*position:\s*absolute/);
-  assert.match(css, /\.toolbar-utility\s*\{[\s\S]*left:\s*calc\(100%\s*\+\s*6px\)/);
-  assert.match(css, /\.toolbar-utility\s*\{[\s\S]*bottom:\s*3px/);
+  const utilityToolbarCss = readCssBlock(css, '.toolbar-utility');
+  assert.match(utilityToolbarCss, /display:\s*flex/);
+  assert.match(utilityToolbarCss, /gap:\s*6px/);
+  assert.doesNotMatch(utilityToolbarCss, /position:\s*absolute/);
+  assert.doesNotMatch(utilityToolbarCss, /left:\s*calc\(100%\s*\+\s*6px\)/);
   const catSizeButtonCss = readCssBlock(css, '.bottom-bar .cat-size-btn');
   assert.match(catSizeButtonCss, /justify-content:\s*center/);
   assert.match(catSizeButtonCss, /align-items:\s*center/);
@@ -100,8 +115,8 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*visibility:\s*visible/);
   assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*transform:\s*translateY\(0\)\s+scale\(1\)/);
   assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s+\.sketch-btn-text\s*\{[\s\S]*display:\s*none/);
-  assert.match(css, /\.bottom-bar\.is-compact\s+\.toolbar-primary\s+\.sketch-btn\s*\{[\s\S]*width:\s*40px/);
-  assert.match(css, /\.bottom-bar\.is-compact\s+\.toolbar-primary[\s\S]*\.sketch-btn-text/);
+  const compactToolbarButtonCss = readCssBlock(css, '.bottom-bar.is-compact .toolbar-primary .sketch-btn');
+  assert.doesNotMatch(compactToolbarButtonCss, /sketch-btn-text/);
   assert.match(css, /\.is-cat-resizing\s+\.stage\s*\{[\s\S]*transition:\s*none/);
   assert.match(css, /\.cat-size-btn\s*\{[\s\S]*cursor:\s*nwse-resize/);
   assert.match(css, /\.cat-size-btn\.is-resizing/);
@@ -118,9 +133,10 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(renderer, /window\.addEventListener\('pointermove'/);
   assert.match(renderer, /window\.addEventListener\('pointerup'/);
   assert.match(renderer, /localStorage\.setItem\(CAT_SIZE_STORAGE_KEY/);
+  assert.match(renderer, /is-bottom-controls-visible/);
   assert.match(renderer, /is-cat-size-control-visible/);
   assert.match(renderer, /stage\?\.addEventListener\('pointerenter'/);
-  assert.match(renderer, /catSizeBtn\?\.addEventListener\('pointerenter'/);
+  assert.match(renderer, /isPointOverPetVisible/);
   assert.match(renderer, /document\.documentElement\.classList\.add\('is-cat-resizing'\)/);
   assert.match(renderer, /document\.documentElement\.classList\.remove\('is-cat-resizing'\)/);
   assert.match(renderer, /--cat-scale/);
@@ -130,9 +146,14 @@ test('pet window leaves safe room for the maximum cat scale and bottom controls'
   const options = createPetWindowOptions({ preloadPath: 'preload.js' });
   const stageSize = 240;
   const minimumHorizontalBreathingRoom = 32;
-  const primaryControlsWidth = 64 * 4 + 6 * 3;
-  const utilityControlsWidth = 6 + 34;
-  const bottomControlsMinimumWidth = (primaryControlsWidth / 2 + utilityControlsWidth) * 2 + 8 * 2;
+  const primaryControlsWidth = 40 * 4 + 6 * 3;
+  const utilityControlsWidth = 34 * 2 + 6;
+  const bottomControlsMinimumWidth = (primaryControlsWidth + 6 + utilityControlsWidth) * CAT_SCALE_MAX + 8 * 2;
+
+  assert.ok(
+    options.width <= 340,
+    `window width ${options.width} should keep the transparent floating window compact`
+  );
 
   assert.ok(
     options.width >= stageSize * CAT_SCALE_MAX + minimumHorizontalBreathingRoom,

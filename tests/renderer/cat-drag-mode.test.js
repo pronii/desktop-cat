@@ -43,12 +43,14 @@ class FakeClassList {
 }
 
 class FakeElement {
-  constructor() {
+  constructor({ rect } = {}) {
     this.classList = new FakeClassList();
     this.listeners = new Map();
     this.attributes = new Map();
     this.childrenBySelector = new Map();
     this.textContent = '';
+    this.checked = false;
+    this.rect = rect || { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
   }
 
   addEventListener(type, listener) {
@@ -74,6 +76,10 @@ class FakeElement {
   setPointerCapture() {}
 
   releasePointerCapture() {}
+
+  getBoundingClientRect() {
+    return this.rect;
+  }
 }
 
 function createRendererHarness() {
@@ -87,6 +93,13 @@ function createRendererHarness() {
   const waterCounter = new FakeElement();
   const bottomBar = new FakeElement();
   const catSizeBtn = new FakeElement();
+  const settingsBtn = new FakeElement();
+  const settingsPanel = new FakeElement();
+  const settingsPanelClose = new FakeElement();
+  const randomSpeechToggle = new FakeElement();
+  const clipboardBtn = new FakeElement();
+  const roomBtn = new FakeElement();
+  const live2dSwitcherBtn = new FakeElement();
   const documentElement = {
     classList: new FakeClassList(),
     style: { setProperty() {} }
@@ -99,6 +112,11 @@ function createRendererHarness() {
 
   cat.childrenBySelector.set('.happy-bubble', happyBubble);
   cat.childrenBySelector.set('.water-bubble', waterBubble);
+  for (const selector of ['.ear-left', '.ear-right', '.head', '.body', '.tail', '.paw-left', '.paw-right']) {
+    cat.childrenBySelector.set(selector, new FakeElement({
+      rect: { left: 10, top: 10, right: 70, bottom: 80, width: 60, height: 70 }
+    }));
+  }
 
   const fakeWindow = {
     petBehavior,
@@ -112,6 +130,7 @@ function createRendererHarness() {
           dragExitCount += 1;
         }
       },
+      setClickThrough() {},
       waterReminder: {
         getConfig() {
           return Promise.resolve({ dailyCount: 0 });
@@ -127,14 +146,21 @@ function createRendererHarness() {
       },
       setItem() {}
     },
-    setTimeout(callback) {
+    setTimeout(callback, delay = 0) {
       const id = nextTimerId;
       nextTimerId += 1;
-      timers.set(id, callback);
+      timers.set(id, { callback, delay: Number(delay) || 0 });
       return id;
     },
     clearTimeout(id) {
       timers.delete(id);
+    },
+    setInterval() {
+      return 0;
+    },
+    clearInterval() {},
+    getComputedStyle() {
+      return { display: 'none' };
     },
     addEventListener(type, listener) {
       const listeners = windowListeners.get(type) || [];
@@ -148,42 +174,79 @@ function createRendererHarness() {
     }
   };
 
+  const documentListeners = new Map();
+
   const fakeDocument = {
     documentElement,
+    addEventListener(type, listener) {
+      const listeners = documentListeners.get(type) || [];
+      listeners.push(listener);
+      documentListeners.set(type, listeners);
+    },
+    dispatch(type, event = {}) {
+      for (const listener of documentListeners.get(type) || []) {
+        listener(event);
+      }
+    },
+    elementFromPoint() {
+      return null;
+    },
     querySelector(selector) {
       if (selector === '.stage') return stage;
       if (selector === '.cat') return cat;
       if (selector === '.water-bowl') return waterBowl;
       if (selector === '.bottom-bar') return bottomBar;
       if (selector === '.happy-bubble') return happyBubble;
+      if (selector === '.water-panel.show, .clipboard-panel.show, .room-panel.show, .live2d-panel.show, .settings-panel.show, .water-reminder-dialog.show') return null;
       return null;
     },
     getElementById(id) {
       if (id === 'live2dCanvas') return live2dCanvas;
       if (id === 'waterCounter') return waterCounter;
       if (id === 'catSizeBtn') return catSizeBtn;
+      if (id === 'settingsBtn') return settingsBtn;
+      if (id === 'settingsPanel') return settingsPanel;
+      if (id === 'settingsPanelClose') return settingsPanelClose;
+      if (id === 'randomSpeechToggle') return randomSpeechToggle;
+      if (id === 'clipboardBtn') return clipboardBtn;
+      if (id === 'roomBtn') return roomBtn;
+      if (id === 'live2dSwitcherBtn') return live2dSwitcherBtn;
       return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === '[data-bottom-button-toggle]') return [];
+      return [];
     }
   };
 
   vm.runInNewContext(source, {
     window: fakeWindow,
     document: fakeDocument,
-    console
+    console,
+    performance: { now: () => Date.now() }
   });
 
   return {
     cat,
+    document: fakeDocument,
     happyBubble,
     stage,
     live2dCanvas,
+    waterCounter,
+    clipboardBtn,
+    roomBtn,
+    live2dSwitcherBtn,
     catSizeBtn,
+    settingsBtn,
+    settingsPanel,
+    randomSpeechToggle,
     documentElement,
     window: fakeWindow,
-    flushTimers() {
-      for (const [id, callback] of Array.from(timers.entries())) {
+    flushTimers({ minDelay = 0, maxDelay = 1000 } = {}) {
+      for (const [id, timer] of Array.from(timers.entries())) {
+        if (timer.delay < minDelay || timer.delay > maxDelay) continue;
         timers.delete(id);
-        callback();
+        timer.callback();
       }
     },
     get dragEnterCount() {
@@ -217,14 +280,59 @@ test('cat drag mode survives leaving the cat element until mouseup', () => {
   assert.equal(harness.cat.classList.contains('is-dragging'), false);
 });
 
-test('cat click cycles through five encouragement messages', () => {
+test('cat drag mode exits on window pointerup when mouseup is missed', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  assert.equal(harness.dragEnterCount, 1);
+
+  harness.window.dispatch('pointerup', { pointerId: 7 });
+
+  assert.equal(harness.dragExitCount, 1);
+  assert.equal(harness.cat.classList.contains('is-dragging'), false);
+});
+
+test('cat drag mode exits on mousemove after the mouse button is released', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  assert.equal(harness.dragEnterCount, 1);
+
+  harness.document.dispatch('mousemove', {
+    buttons: 0,
+    clientX: 20,
+    clientY: 20
+  });
+
+  assert.equal(harness.dragExitCount, 1);
+  assert.equal(harness.cat.classList.contains('is-dragging'), false);
+});
+
+test('cat click cycles through encouragement messages', () => {
   const harness = createRendererHarness();
   const messages = [
     '辛苦啦，歇一小会儿吧',
     '做得很好，继续加油',
     '别忘了喝口水',
     '今天也很努力呢',
-    '我在这里陪着你'
+    '我在这里陪着你',
+    '先伸个懒腰再继续吧',
+    '眼睛也需要休息一下',
+    '这一步已经很棒了',
+    '慢慢来，我会等你',
+    '记得保存一下进度',
+    '呼吸一下，思路会更清楚',
+    '再坚持一点点就好'
   ];
 
   assert.deepEqual(petBehavior.ENCOURAGEMENT_MESSAGES, messages);
@@ -320,21 +428,15 @@ test('cat size button appears near the cat and stays visible while resizing', ()
 
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
 
-  harness.stage.dispatch('pointerenter');
+  harness.stage.dispatch('pointerenter', { clientX: 20, clientY: 20 });
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
 
   harness.stage.dispatch('pointerleave');
-  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
-
-  harness.catSizeBtn.dispatch('pointerenter');
-  harness.flushTimers();
-  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
-
-  harness.catSizeBtn.dispatch('pointerleave');
-  harness.flushTimers();
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), false);
 
-  harness.stage.dispatch('pointerenter');
+  harness.stage.dispatch('pointerenter', { clientX: 20, clientY: 20 });
   harness.catSizeBtn.dispatch('pointerdown', {
     button: 0,
     pointerId: 1,
@@ -347,6 +449,7 @@ test('cat size button appears near the cat and stays visible while resizing', ()
   harness.flushTimers();
 
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
   assert.equal(harness.documentElement.classList.contains('is-cat-resizing'), true);
 
   harness.window.dispatch('pointerup', { pointerId: 1 });
@@ -354,4 +457,73 @@ test('cat size button appears near the cat and stays visible while resizing', ()
 
   assert.equal(harness.documentElement.classList.contains('is-cat-resizing'), false);
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), false);
+});
+
+test('bottom controls hide immediately when the pointer is not over the pet shape', () => {
+  const harness = createRendererHarness();
+
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), false);
+
+  harness.document.dispatch('mousemove', { clientX: 20, clientY: 20 });
+
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
+  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
+
+  harness.document.dispatch('mousemove', { clientX: 120, clientY: 120 });
+
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), false);
+  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
+});
+
+test('random speech schedules a later encouragement and respects the settings toggle', () => {
+  const harness = createRendererHarness();
+
+  assert.equal(typeof petBehavior.createRandomSpeechDelay, 'function');
+  assert.equal(harness.window.desktopCatDebug.randomSpeechEnabled, true);
+
+  harness.flushTimers({ minDelay: petBehavior.RANDOM_SPEECH_MIN_MS, maxDelay: Infinity });
+
+  assert.equal(harness.happyBubble.textContent, petBehavior.ENCOURAGEMENT_MESSAGES[0]);
+  assert.equal(harness.window.desktopCatDebug.happyCount, 1);
+
+  harness.randomSpeechToggle.checked = false;
+  harness.randomSpeechToggle.dispatch('change');
+  const countAfterDisable = harness.window.desktopCatDebug.happyCount;
+
+  harness.flushTimers({ minDelay: petBehavior.RANDOM_SPEECH_MIN_MS, maxDelay: Infinity });
+
+  assert.equal(harness.window.desktopCatDebug.randomSpeechEnabled, false);
+  assert.equal(harness.window.desktopCatDebug.happyCount, countAfterDisable);
+});
+
+test('settings can hide and restore bottom toolbar buttons without hiding settings', () => {
+  const harness = createRendererHarness();
+
+  assert.equal(harness.waterCounter.classList.contains('is-hidden-by-settings'), false);
+  assert.equal(harness.settingsBtn.classList.contains('is-hidden-by-settings'), false);
+
+  const hiddenSettings = petBehavior.normalizePetSettings({
+    visibleButtons: {
+      water: false,
+      clipboard: false,
+      room: false,
+      live2d: false,
+      catSize: false
+    }
+  });
+
+  harness.window.__desktopCatApplySettings(hiddenSettings);
+
+  assert.equal(harness.waterCounter.classList.contains('is-hidden-by-settings'), true);
+  assert.equal(harness.clipboardBtn.classList.contains('is-hidden-by-settings'), true);
+  assert.equal(harness.roomBtn.classList.contains('is-hidden-by-settings'), true);
+  assert.equal(harness.live2dSwitcherBtn.classList.contains('is-hidden-by-settings'), true);
+  assert.equal(harness.catSizeBtn.classList.contains('is-hidden-by-settings'), true);
+  assert.equal(harness.settingsBtn.classList.contains('is-hidden-by-settings'), false);
+
+  harness.window.__desktopCatApplySettings(petBehavior.DEFAULT_PET_SETTINGS);
+
+  assert.equal(harness.waterCounter.classList.contains('is-hidden-by-settings'), false);
+  assert.equal(harness.catSizeBtn.classList.contains('is-hidden-by-settings'), false);
 });

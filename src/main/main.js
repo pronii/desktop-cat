@@ -672,6 +672,13 @@ ipcMain.on('drag-mode:exit', () => {
   }
 });
 
+/* --- 透明区域点击穿透 --- */
+
+ipcMain.on('window:set-click-through', (_event, enabled) => {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  petWindow.setIgnoreMouseEvents(enabled, { forward: true });
+});
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {

@@ -110,6 +110,19 @@
           </span>
           <span class="sketch-btn-text">大小</span>
         </button>
+
+        <button
+          class="sketch-btn settings-btn"
+          id="settingsBtn"
+          type="button"
+          aria-label="打开设置"
+          aria-controls="settingsPanel"
+          aria-expanded="false"
+          title="设置"
+        >
+          <span class="sketch-btn-icon">⚙</span>
+          <span class="sketch-btn-text">设置</span>
+        </button>
       </div>
     </div>
 
@@ -253,6 +266,63 @@
       </div>
       <div class="live2d-panel-body">
         <div class="live2d-model-list" id="live2dModelList"></div>
+      </div>
+    </div>
+
+    <div class="settings-panel sketch-panel" id="settingsPanel">
+      <div class="sketch-panel-header sketch-panel-header-settings">
+        <h3>⚙ 设置</h3>
+        <button class="sketch-panel-close" id="settingsPanelClose" type="button" aria-label="关闭设置">×</button>
+      </div>
+      <div class="settings-panel-body">
+        <div class="settings-section">
+          <div class="settings-section-title">陪伴</div>
+          <label class="settings-row">
+            <span class="settings-row-label">随机说话</span>
+            <span class="sketch-switch">
+              <input type="checkbox" id="randomSpeechToggle">
+              <span class="sketch-switch-slider"></span>
+            </span>
+          </label>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">底部按钮</div>
+          <label class="settings-row">
+            <span class="settings-row-label">喝水</span>
+            <span class="sketch-switch">
+              <input type="checkbox" data-bottom-button-toggle="water">
+              <span class="sketch-switch-slider"></span>
+            </span>
+          </label>
+          <label class="settings-row">
+            <span class="settings-row-label">剪贴板</span>
+            <span class="sketch-switch">
+              <input type="checkbox" data-bottom-button-toggle="clipboard">
+              <span class="sketch-switch-slider"></span>
+            </span>
+          </label>
+          <label class="settings-row">
+            <span class="settings-row-label">好友</span>
+            <span class="sketch-switch">
+              <input type="checkbox" data-bottom-button-toggle="room">
+              <span class="sketch-switch-slider"></span>
+            </span>
+          </label>
+          <label class="settings-row">
+            <span class="settings-row-label">形象</span>
+            <span class="sketch-switch">
+              <input type="checkbox" data-bottom-button-toggle="live2d">
+              <span class="sketch-switch-slider"></span>
+            </span>
+          </label>
+          <label class="settings-row">
+            <span class="settings-row-label">大小</span>
+            <span class="sketch-switch">
+              <input type="checkbox" data-bottom-button-toggle="catSize">
+              <span class="sketch-switch-slider"></span>
+            </span>
+          </label>
+        </div>
       </div>
     </div>
 

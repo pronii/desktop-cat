@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('desktopCat', {
     enter: () => ipcRenderer.send('drag-mode:enter'),
     exit: () => ipcRenderer.send('drag-mode:exit')
   },
+  setClickThrough: (enabled) => ipcRenderer.send('window:set-click-through', enabled),
   appearance: {
     getLive2DModel: () => ipcRenderer.invoke('appearance:get-live2d-model'),
     getLive2DModels: () => ipcRenderer.invoke('appearance:get-live2d-models'),

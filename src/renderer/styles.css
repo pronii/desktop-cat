@@ -21,6 +21,7 @@
   --sketch-clipboard-accent: #7b6ac7;
   --sketch-room-accent: #2f9a83;
   --sketch-live2d-accent: #bc6f9f;
+  --sketch-settings-accent: #4f7fbc;
   --cat-scale: 1;
 }
 
@@ -526,13 +527,27 @@ body {
   position: fixed;
   bottom: 14px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(var(--cat-scale));
   transform-origin: 50% 100%;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   overflow: visible;
   z-index: 1000;
-  transition: transform 180ms ease;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 120ms ease, transform 180ms ease, visibility 0s linear 120ms;
   -webkit-app-region: no-drag;
+}
+
+.is-bottom-controls-visible .bottom-bar {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 120ms ease, transform 180ms ease, visibility 0s;
 }
 
 .toolbar-primary {
@@ -543,29 +558,24 @@ body {
 }
 
 .toolbar-primary .sketch-btn {
-  width: 64px;
+  width: 40px;
   min-width: 0;
-  padding: 0 7px;
+  padding: 0;
   justify-content: center;
 }
 
 .toolbar-primary .water-counter {
-  width: 64px;
+  width: 40px;
 }
 
 .toolbar-primary .sketch-btn-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
+  display: none;
 }
 
 .toolbar-utility {
-  position: absolute;
-  left: calc(100% + 6px);
-  bottom: 3px;
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 
 .bottom-bar .cat-size-btn {
@@ -593,14 +603,28 @@ body {
   display: none;
 }
 
+.bottom-bar .settings-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  box-shadow: 0 3px 0 var(--sketch-border);
+}
+
+.bottom-bar .settings-btn .sketch-btn-text {
+  display: none;
+}
+
+.is-hidden-by-settings {
+  display: none !important;
+}
+
 .bottom-bar.is-compact .toolbar-primary .sketch-btn {
   width: 40px;
   padding: 0;
   justify-content: center;
-}
-
-.bottom-bar.is-compact .toolbar-primary .sketch-btn-text {
-  display: none;
 }
 
 /* --- 手绘风胶囊按钮（通用） --- */
@@ -1163,6 +1187,10 @@ body {
 
 .sketch-panel-header-live2d {
   background: var(--sketch-live2d-accent);
+}
+
+.sketch-panel-header-settings {
+  background: var(--sketch-settings-accent);
 }
 
 .sketch-panel-header h3 {
@@ -1911,6 +1939,57 @@ body {
   line-height: 1.35;
   padding: 18px 10px;
   text-align: center;
+}
+
+/* --- 设置面板 --- */
+.settings-panel {
+  height: 280px;
+}
+
+.settings-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: rgba(250, 253, 255, 0.98);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-section-title {
+  color: var(--sketch-settings-accent);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.settings-row {
+  min-height: 31px;
+  padding: 7px 8px;
+  border: 1.5px solid rgba(79, 127, 188, 0.22);
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.settings-row-label {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 @keyframes pulse-text {
