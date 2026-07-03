@@ -43,7 +43,7 @@
   const CAT_SIZE_DRAG_PIXELS = CAT_SCALE_DRAG_PIXELS;
   const PET_SETTINGS_STORAGE_KEY = 'desktopCat.petSettings';
   const HAPPY_BUBBLE_VISIBLE_MS = 1500;
-  const RANDOM_SPEECH_VISIBLE_MS = 6000;
+  const RANDOM_SPEECH_VISIBLE_MS = 3000;
   const bottomButtonControls = {
     water: waterCounter,
     clipboard: clipboardBtn,

@@ -607,7 +607,7 @@ test('random speech schedules a later encouragement and respects the settings to
   assert.equal(harness.window.desktopCatDebug.happyCount, countAfterDisable);
 });
 
-test('random speech bubble stays visible long enough to notice', () => {
+test('random speech bubble closes after three seconds', () => {
   const harness = createRendererHarness();
 
   harness.flushTimers({ minDelay: petBehavior.RANDOM_SPEECH_MIN_MS, maxDelay: Infinity });
@@ -620,7 +620,7 @@ test('random speech bubble stays visible long enough to notice', () => {
   assert.equal(harness.stage.classList.contains('is-happy'), true);
   assert.equal(harness.cat.classList.contains('is-happy'), true);
 
-  harness.flushTimers({ minDelay: 6000, maxDelay: 6000 });
+  harness.flushTimers({ minDelay: 3000, maxDelay: 3000 });
 
   assert.equal(harness.stage.classList.contains('is-happy'), false);
   assert.equal(harness.cat.classList.contains('is-happy'), false);
