@@ -123,8 +123,8 @@ function createHistoryWindow(preloadPath) {
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle('clipboard-history:get-items', () => {
-    return storage.getAll();
+  ipcMain.handle('clipboard-history:get-items', (_event, options = {}) => {
+    return storage.getAll(options);
   });
 
   ipcMain.handle('clipboard-history:clear', () => {

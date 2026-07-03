@@ -4,17 +4,29 @@ const fs = require('node:fs');
 const DEFAULT_MAX_ITEMS = 50;
 const SAVE_DEBOUNCE_MS = 300;
 
+function normalizeLimit(limit) {
+  const normalized = Number(limit);
+  return Number.isFinite(normalized) && normalized > 0 ? Math.floor(normalized) : null;
+}
+
 class ClipboardStorage {
   constructor({ dir, maxItems } = {}) {
     this.filePath = path.join(dir, 'clipboard-history.json');
     this.maxItems = maxItems ?? DEFAULT_MAX_ITEMS;
-    this._data = this._load();
     this._saveTimer = null;
     this._savePending = false;
+    this._data = this._load();
+    if (this._trim().length > 0) {
+      this.scheduleSave();
+    }
   }
 
-  getAll() {
-    return [...this._data.items];
+  getAll(options = {}) {
+    const limit = normalizeLimit(
+      options && typeof options === 'object' ? options.limit : null
+    );
+    const items = limit ? this._data.items.slice(0, limit) : this._data.items;
+    return [...items];
   }
 
   getMaxItems() {

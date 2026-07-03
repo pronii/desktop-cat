@@ -1,0 +1,124 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const {
+  CAT_SCALE_DRAG_PIXELS,
+  CAT_SCALE_MAX,
+  formatCatScale,
+  normalizeCatScale,
+  scaleFromDragDelta,
+  shouldUseCompactControls,
+  stepCatScale
+} = require('../../src/renderer/petBehavior');
+const { createPetWindowOptions } = require('../../src/main/windowOptions');
+
+function readSource(...parts) {
+  return fs.readFileSync(path.join(__dirname, '..', '..', ...parts), 'utf-8');
+}
+
+function readCssBlock(css, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return css.match(new RegExp(`${escapedSelector}\\s*\\{[\\s\\S]*?\\}`))?.[0] || '';
+}
+
+test('cat scale helpers normalize, drag, and clamp user size choices', () => {
+  assert.equal(normalizeCatScale(undefined), 1);
+  assert.equal(normalizeCatScale('not-a-number'), 1);
+  assert.equal(normalizeCatScale(0.2), 0.5);
+  assert.equal(normalizeCatScale(2), 1.25);
+  assert.equal(normalizeCatScale(1.04), 1.04);
+  assert.equal(normalizeCatScale(1.0664), 1.066);
+
+  assert.equal(stepCatScale(1, 1), 1.1);
+  assert.equal(stepCatScale(1, -1), 0.9);
+  assert.equal(stepCatScale(1.2, 1), 1.25);
+  assert.equal(stepCatScale(0.5, -1), 0.5);
+
+  assert.equal(scaleFromDragDelta(1, 1), 1.003);
+  assert.equal(scaleFromDragDelta(1, 30), 1.1);
+  assert.equal(scaleFromDragDelta(1, -30), 0.9);
+  assert.equal(scaleFromDragDelta(1.2, 60), 1.25);
+  assert.equal(scaleFromDragDelta(0.8, -60), 0.6);
+  assert.equal(scaleFromDragDelta(0.55, -60), 0.5);
+
+  assert.equal(shouldUseCompactControls(0.9), true);
+  assert.equal(shouldUseCompactControls(0.91), false);
+  assert.equal(formatCatScale(1.249), '125%');
+});
+
+test('renderer exposes a draggable cat size button without a floating panel', () => {
+  const html = readSource('src', 'renderer', 'index.html');
+  const css = readSource('src', 'renderer', 'styles.css');
+  const renderer = readSource('src', 'renderer', 'renderer.js');
+
+  assert.match(html, /id="catSizeBtn"/);
+  assert.match(html, /class="cat-size-icon"/);
+  assert.match(html, /<span class="cat-size-icon" aria-hidden="true">\s*<span>↖<\/span>\s*<span>↘<\/span>\s*<\/span>/);
+  assert.doesNotMatch(html, /<span class="sketch-btn-icon">Aa<\/span>/);
+  assert.doesNotMatch(html, /id="catSizePanel"/);
+  assert.doesNotMatch(html, /id="catSizeDecreaseBtn"/);
+  assert.doesNotMatch(html, /id="catSizeIncreaseBtn"/);
+  assert.doesNotMatch(html, /id="catSizeResetBtn"/);
+  assert.doesNotMatch(html, /id="catSizeValue"/);
+
+  assert.match(css, /--cat-scale:\s*1/);
+  assert.match(css, /\.stage\s*\{[\s\S]*transform:\s*scale\(var\(--cat-scale\)\)/);
+  const bottomBarCss = readCssBlock(css, '.bottom-bar');
+  assert.match(bottomBarCss, /left:\s*4px/);
+  assert.match(bottomBarCss, /right:\s*4px/);
+  assert.match(bottomBarCss, /display:\s*grid/);
+  assert.match(bottomBarCss, /grid-template-columns:\s*minmax\(58px,\s*0\.85fr\)\s+minmax\(68px,\s*1fr\)\s+minmax\(68px,\s*1fr\)\s+46px/);
+  assert.match(bottomBarCss, /overflow:\s*visible/);
+  assert.doesNotMatch(bottomBarCss, /scale\(var\(--cat-scale\)\)/);
+  assert.doesNotMatch(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s*\{[\s\S]*grid-template-columns/);
+  assert.match(css, /\.bottom-bar\s+\.sketch-btn\s*\{[\s\S]*width:\s*100%/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*width:\s*46px/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*opacity:\s*0/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*pointer-events:\s*none/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*visibility:\s*hidden/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*transform:\s*translateY\(6px\)\s+scale\(0\.92\)/);
+  assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*opacity:\s*1/);
+  assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*pointer-events:\s*auto/);
+  assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*visibility:\s*visible/);
+  assert.match(css, /\.is-cat-size-control-visible\s+\.bottom-bar\s+\.cat-size-btn\s*\{[\s\S]*transform:\s*translateY\(0\)\s+scale\(1\)/);
+  assert.match(css, /\.bottom-bar\s+\.cat-size-btn\s+\.sketch-btn-text\s*\{[\s\S]*display:\s*none/);
+  assert.match(css, /\.bottom-bar\.is-compact[\s\S]*\.sketch-btn-text/);
+  assert.match(css, /\.is-cat-resizing\s+\.stage\s*\{[\s\S]*transition:\s*none/);
+  assert.match(css, /\.cat-size-btn\s*\{[\s\S]*cursor:\s*nwse-resize/);
+  assert.match(css, /\.cat-size-btn\.is-resizing/);
+  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*background:\s*#050505/);
+  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*color:\s*#fff/);
+  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*1fr\)/);
+
+  assert.match(renderer, /CAT_SIZE_STORAGE_KEY/);
+  assert.match(renderer, /CAT_SIZE_DRAG_PIXELS/);
+  assert.match(renderer, /catSizeBtn\?\.addEventListener\('pointerdown'/);
+  assert.match(renderer, /window\.addEventListener\('pointermove'/);
+  assert.match(renderer, /window\.addEventListener\('pointerup'/);
+  assert.match(renderer, /localStorage\.setItem\(CAT_SIZE_STORAGE_KEY/);
+  assert.match(renderer, /is-cat-size-control-visible/);
+  assert.match(renderer, /stage\?\.addEventListener\('pointerenter'/);
+  assert.match(renderer, /catSizeBtn\?\.addEventListener\('pointerenter'/);
+  assert.match(renderer, /document\.documentElement\.classList\.add\('is-cat-resizing'\)/);
+  assert.match(renderer, /document\.documentElement\.classList\.remove\('is-cat-resizing'\)/);
+  assert.match(renderer, /--cat-scale/);
+});
+
+test('pet window leaves safe room for the maximum cat scale and bottom controls', () => {
+  const options = createPetWindowOptions({ preloadPath: 'preload.js' });
+  const stageSize = 240;
+  const minimumHorizontalBreathingRoom = 32;
+  const bottomControlsMinimumWidth = 58 + 68 + 68 + 46 + 4 * 3 + 4 * 2;
+
+  assert.ok(
+    options.width >= stageSize * CAT_SCALE_MAX + minimumHorizontalBreathingRoom,
+    `window width ${options.width} should fit max scaled stage without edge clipping`
+  );
+  assert.ok(
+    options.width >= bottomControlsMinimumWidth,
+    `window width ${options.width} should fit the bottom controls without squeezing text`
+  );
+  assert.equal(scaleFromDragDelta(1, 1, CAT_SCALE_DRAG_PIXELS), 1.003);
+});

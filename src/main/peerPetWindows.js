@@ -1,6 +1,13 @@
 const PEER_WINDOW_WIDTH = 160;
 const PEER_WINDOW_HEIGHT = 150;
-const PEER_WINDOW_GAP = 12;
+const PEER_WINDOW_GAP = 4;
+const LOCAL_STAGE_WIDTH = 240;
+const LOCAL_STAGE_HEIGHT = 240;
+const LOCAL_STAGE_BOTTOM_PADDING = 8;
+const LOCAL_CAT_WIDTH = 178;
+const LOCAL_CAT_HEIGHT = 190;
+const LOCAL_CAT_OFFSET_X_IN_STAGE = 31;
+const LOCAL_CAT_OFFSET_Y_IN_STAGE = 25;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -14,6 +21,19 @@ function getAnchorDisplay(screen, anchorBounds) {
     return screen.getDisplayNearestPoint({ x: anchorBounds.x, y: anchorBounds.y });
   }
   return screen.getPrimaryDisplay();
+}
+
+function resolveLocalPetAnchorBounds(windowBounds) {
+  if (!windowBounds) return null;
+  const stageX = windowBounds.x + Math.round((windowBounds.width - LOCAL_STAGE_WIDTH) / 2);
+  const stageY = windowBounds.y + windowBounds.height - LOCAL_STAGE_BOTTOM_PADDING - LOCAL_STAGE_HEIGHT;
+
+  return {
+    x: stageX + LOCAL_CAT_OFFSET_X_IN_STAGE,
+    y: stageY + LOCAL_CAT_OFFSET_Y_IN_STAGE,
+    width: LOCAL_CAT_WIDTH,
+    height: LOCAL_CAT_HEIGHT
+  };
 }
 
 function resolvePeerBounds(anchorBounds, screen, index, total) {
@@ -166,5 +186,6 @@ function createPeerPetWindowManager({
 
 module.exports = {
   createPeerPetWindowManager,
+  resolveLocalPetAnchorBounds,
   resolvePeerBounds
 };

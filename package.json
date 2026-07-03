@@ -9,7 +9,7 @@
     "start": "node scripts/start.js",
     "room:server": "node server/roomServer.js",
     "test": "node --test",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --win portable"
   },
   "keywords": [
     "electron",
@@ -36,7 +36,7 @@
     "win": {
       "signAndEditExecutable": false,
       "target": [
-        "dir"
+        "portable"
       ]
     }
   }

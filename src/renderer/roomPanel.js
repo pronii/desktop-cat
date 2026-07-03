@@ -127,6 +127,7 @@
   function openPanel() {
     window.__closeWaterPanel?.();
     window.__closeClipboardPanel?.();
+    window.__closeCatSizePanel?.();
     setPanelOpen(true);
     refreshState();
   }

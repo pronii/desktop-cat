@@ -8,6 +8,7 @@
   const clipboardClearBtn = document.getElementById('clipboardClearBtn');
 
   const api = window.desktopCat?.clipboardHistory;
+  const PANEL_ITEM_LIMIT = 50;
   let itemsCache = [];
   let isPaused = false;
   const videoPlaceholder = 'data:image/svg+xml,' + encodeURIComponent(
@@ -82,7 +83,7 @@
   }
 
   function renderClipboardItems(items) {
-    itemsCache = Array.isArray(items) ? items : [];
+    itemsCache = Array.isArray(items) ? items.slice(0, PANEL_ITEM_LIMIT) : [];
     clipboardPanelContent.replaceChildren();
 
     if (itemsCache.length === 0) {
@@ -137,9 +138,17 @@
     });
   }
 
+  function addClipboardItem(item) {
+    if (!item?.id) return;
+    renderClipboardItems([
+      item,
+      ...itemsCache.filter((cached) => cached.id !== item.id)
+    ]);
+  }
+
   function refreshItems() {
     if (api?.getAll) {
-      api.getAll().then((items) => {
+      api.getAll({ limit: PANEL_ITEM_LIMIT }).then((items) => {
         renderClipboardItems(items);
       });
     } else {
@@ -169,6 +178,7 @@
       // 如果喝水面板开着，先关掉
       window.__closeWaterPanel?.();
       window.__closeRoomPanel?.();
+      window.__closeCatSizePanel?.();
       openClipboardPanel();
     });
   }
@@ -206,9 +216,9 @@
   });
 
   if (api?.onNewItem) {
-    api.onNewItem(() => {
+    api.onNewItem((item) => {
       if (clipboardPanel.classList.contains('show')) {
-        refreshItems();
+        addClipboardItem(item);
       }
     });
   }

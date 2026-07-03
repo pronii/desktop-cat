@@ -20,6 +20,7 @@
   --sketch-ring-track: #ffe0a0;
   --sketch-clipboard-accent: #7b6ac7;
   --sketch-room-accent: #2f9a83;
+  --cat-scale: 1;
 }
 
 * {
@@ -51,6 +52,31 @@ body {
   display: grid;
   place-items: center;
   background: transparent;
+  transform: scale(var(--cat-scale));
+  transform-origin: 50% 100%;
+  transition: transform 180ms ease;
+}
+
+.is-cat-resizing .stage {
+  transition: none;
+}
+
+.live2d-canvas {
+  display: none;
+  width: 240px;
+  height: 240px;
+  background: transparent;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.stage.has-live2d .cat,
+.stage.has-live2d .water-bowl {
+  display: none;
+}
+
+.stage.has-live2d .live2d-canvas {
+  display: block;
 }
 
 .cat {
@@ -489,13 +515,71 @@ body {
 .bottom-bar {
   position: fixed;
   bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
+  left: 4px;
+  right: 4px;
+  transform-origin: 50% 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(58px, 0.85fr) minmax(68px, 1fr) minmax(68px, 1fr) 46px;
   align-items: center;
-  gap: 10px;
+  justify-content: stretch;
+  gap: 4px;
+  overflow: visible;
   z-index: 1000;
+  transition: transform 180ms ease;
   -webkit-app-region: no-drag;
+}
+
+.bottom-bar .sketch-btn {
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
+  justify-content: center;
+}
+
+.bottom-bar .sketch-btn-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.bottom-bar .cat-size-btn {
+  width: 46px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translateY(6px) scale(0.92);
+  transition: opacity 180ms ease, transform 180ms ease, background 160ms ease, box-shadow 160ms ease, border-color 160ms ease, visibility 0s linear 180ms;
+}
+
+.is-cat-size-control-visible .bottom-bar .cat-size-btn {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition: opacity 180ms ease, transform 180ms ease, background 160ms ease, box-shadow 160ms ease, border-color 160ms ease, visibility 0s;
+}
+
+.bottom-bar .cat-size-btn .sketch-btn-text {
+  display: none;
+}
+
+.bottom-bar.is-compact {
+  grid-template-columns: repeat(4, 40px);
+  justify-content: center;
+  gap: 8px;
+}
+
+.bottom-bar.is-compact .sketch-btn {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+
+.bottom-bar.is-compact .sketch-btn-text {
+  display: none;
 }
 
 /* --- 手绘风胶囊按钮（通用） --- */
@@ -543,12 +627,168 @@ body {
   line-height: 1;
 }
 
+.cat-size-btn {
+  border-radius: 12px;
+  touch-action: none;
+  cursor: nwse-resize;
+}
+
+.cat-size-btn.is-resizing {
+  background: var(--sketch-fill);
+  border-color: var(--sketch-accent);
+  box-shadow: 0 4px 0 var(--sketch-accent);
+  cursor: nwse-resize;
+}
+
+.cat-size-icon {
+  width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  background: #050505;
+  color: #fff;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 /* 喝水按钮专属 */
 .water-counter.just-drank {
   background: #c8e6c9;
   border-color: #4caf50;
   box-shadow: 0 4px 0 #4caf50;
   transform: scale(1.12);
+}
+
+.water-reminder-dialog {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: 78px;
+  min-height: 116px;
+  padding: 10px;
+  border: 2.5px solid var(--sketch-border);
+  border-radius: 12px;
+  background: #fffdf7;
+  box-shadow: 0 4px 0 var(--sketch-border), 0 12px 26px rgba(60, 43, 36, 0.18);
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 160ms ease, transform 160ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.water-reminder-dialog.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.water-reminder-main {
+  display: grid;
+  grid-template-columns: 34px 1fr 24px;
+  gap: 8px;
+  align-items: start;
+}
+
+.water-reminder-icon {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--sketch-accent);
+  border-radius: 10px;
+  background: #fff3d5;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.water-reminder-copy {
+  min-width: 0;
+}
+
+.water-reminder-copy h3 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.water-reminder-copy p {
+  margin: 0;
+  color: rgba(60, 43, 36, 0.7);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.water-reminder-close {
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid rgba(60, 43, 36, 0.18);
+  border-radius: 7px;
+  background: #fff;
+  color: rgba(60, 43, 36, 0.72);
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0;
+}
+
+.water-reminder-close:hover {
+  background: #fff3d5;
+  border-color: var(--sketch-accent);
+}
+
+.water-reminder-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.water-reminder-actions-task {
+  display: none;
+}
+
+.water-reminder-dialog.is-task-reminder .water-reminder-actions-water {
+  display: none;
+}
+
+.water-reminder-dialog.is-task-reminder .water-reminder-actions-task {
+  display: grid;
+}
+
+.water-reminder-dialog.is-task-reminder .water-reminder-icon {
+  border-color: var(--sketch-room-accent);
+  background: #e4f7f1;
+}
+
+.water-task-done-btn {
+  border-color: var(--sketch-room-accent);
+  background: #e4f7f1;
+  color: #236f62;
+}
+
+.water-task-done-btn:hover {
+  background: #cfefe5;
+}
+
+.water-task-later-btn {
+  background: #fff;
+  border-color: var(--sketch-border);
+  color: var(--sketch-text);
+}
+
+.water-task-later-btn:hover {
+  background: #f0ebe0;
 }
 
 @keyframes breathe {
@@ -933,16 +1173,24 @@ body {
 .water-panel-body {
   flex: 1;
   min-height: 0;
-  padding: 10px;
+  padding: 9px 10px 8px;
   display: flex;
-  gap: 10px;
+  gap: 9px;
   align-items: flex-start;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.water-panel-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .water-progress-ring {
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   position: relative;
   flex-shrink: 0;
@@ -986,7 +1234,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -1046,6 +1294,185 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+}
+
+.water-panel-section-label {
+  color: var(--sketch-accent);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.water-task-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+
+.water-task-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 6px;
+  margin-top: 2px;
+  border-top: 1px dashed rgba(47, 154, 131, 0.28);
+}
+
+.water-task-section-title {
+  color: var(--sketch-room-accent);
+}
+
+.water-task-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.water-task-add-btn {
+  flex: 0 0 auto;
+  min-width: 48px;
+  border-color: var(--sketch-room-accent);
+  background: #e4f7f1;
+  color: #236f62;
+}
+
+.water-task-add-btn:hover {
+  background: #cfefe5;
+}
+
+.water-task-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  border: 1.5px solid var(--sketch-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--sketch-text);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 7px;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.water-task-input:focus {
+  border-color: var(--sketch-accent);
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.18);
+}
+
+.water-task-intervals .sketch-interval.is-active {
+  background: var(--sketch-room-accent);
+  border-color: var(--sketch-room-accent);
+}
+
+.water-task-footer {
+  border-top-color: rgba(47, 154, 131, 0.2);
+}
+
+.water-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.water-task-empty {
+  border: 1px dashed rgba(47, 154, 131, 0.3);
+  border-radius: 7px;
+  padding: 7px;
+  color: rgba(60, 43, 36, 0.62);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.water-task-item {
+  border: 1.5px solid rgba(47, 154, 131, 0.35);
+  border-radius: 8px;
+  background: #fbfffd;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.water-task-item-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.water-task-item-name {
+  min-width: 0;
+  color: var(--sketch-text);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.water-task-remove {
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid rgba(60, 43, 36, 0.2);
+  border-radius: 7px;
+  background: #fff;
+  color: rgba(60, 43, 36, 0.72);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0;
+}
+
+.water-task-remove:hover {
+  border-color: var(--sketch-room-accent);
+  background: #e4f7f1;
+}
+
+.water-task-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: rgba(60, 43, 36, 0.68);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.water-task-item-meta .is-urgent {
+  color: #d84315;
+}
+
+.water-task-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.water-task-item-controls .water-panel-intervals {
+  flex: 1 1 112px;
+}
+
+.water-task-interval-input {
+  width: 50px;
+  height: 22px;
+  border: 1.5px solid var(--sketch-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--sketch-text);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 4px;
+  outline: none;
 }
 
 .water-panel-row-column {
@@ -1142,7 +1569,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding-top: 3px;
+  padding-top: 2px;
   border-top: 1px dashed rgba(139, 111, 71, 0.2);
   margin-top: 2px;
 }

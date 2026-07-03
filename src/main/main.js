@@ -6,6 +6,7 @@ const {
   Menu,
   Tray,
   nativeImage,
+  protocol,
   screen,
   ipcMain
 } = require('electron');
@@ -40,9 +41,28 @@ const {
 const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = require('../clipboard-history/main');
 const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
-const { createRoomClient, DEFAULT_ROOM_ENDPOINT } = require('./roomClient');
+const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
 const { SimpleWebSocket } = require('./simpleWebSocket');
-const { createPeerPetWindowManager } = require('./peerPetWindows');
+const {
+  LIVE2D_PROTOCOL,
+  createLive2DAppearance
+} = require('./live2dAppearance');
+const {
+  createPeerPetWindowManager,
+  resolveLocalPetAnchorBounds
+} = require('./peerPetWindows');
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: LIVE2D_PROTOCOL,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true
+    }
+  }
+]);
 
 const TOPMOST_FAST_INTERVAL = 500;
 const TOPMOST_CALM_INTERVAL = 3000;
@@ -66,6 +86,7 @@ let roomStateTeardown = null;
 let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let peerPetWindowManager = null;
+const live2DAppearance = createLive2DAppearance({ app, protocol });
 
 function centerWindowOnScreen(window) {
   const bounds = window.getBounds();
@@ -419,11 +440,12 @@ function sendRoomStateToRenderer(state) {
 
 function syncPeerPetsBesideLocal(peers, localBounds) {
   if (!peerPetWindowManager) return;
-  if (!localBounds) {
+  const localPetAnchorBounds = resolveLocalPetAnchorBounds(localBounds);
+  if (!localPetAnchorBounds) {
     peerPetWindowManager.destroyAll();
     return;
   }
-  peerPetWindowManager.syncPeers(peers || [], localBounds);
+  peerPetWindowManager.syncPeers(peers || [], localPetAnchorBounds);
 }
 
 function handleRoomStateChanged(state) {
@@ -500,7 +522,7 @@ function setupRoomClient() {
   }
   roomClient = createRoomClient({
     WebSocket: globalThis.WebSocket || SimpleWebSocket,
-    endpoint: DEFAULT_ROOM_ENDPOINT,
+    endpoint: resolveRoomEndpoint(),
     userId: roomUserId
   });
   roomStateTeardown = roomClient.onStateChanged(handleRoomStateChanged);
@@ -538,8 +560,28 @@ ipcMain.handle('water-reminder:toggle', () => {
   return enabled;
 });
 
+ipcMain.handle('water-reminder:add-task', (_event, task) => {
+  return waterReminder.addTaskReminder(task);
+});
+
+ipcMain.handle('water-reminder:remove-task', (_event, taskId) => {
+  return waterReminder.removeTaskReminder(taskId);
+});
+
+ipcMain.handle('water-reminder:toggle-task', (_event, taskId) => {
+  return waterReminder.toggleTaskEnabled(taskId);
+});
+
 ipcMain.handle('water-reminder:set-interval', (_event, minutes) => {
   return waterReminder.setIntervalMinutes(minutes);
+});
+
+ipcMain.handle('water-reminder:set-task-interval', (_event, taskId, minutes) => {
+  return waterReminder.setTaskIntervalMinutes(taskId, minutes);
+});
+
+ipcMain.handle('water-reminder:set-task-name', (_event, taskId, taskName) => {
+  return waterReminder.setTaskName(taskId, taskName);
 });
 
 ipcMain.handle('water-reminder:record-drink', () => waterReminder.recordDrink());
@@ -549,9 +591,23 @@ ipcMain.handle('water-reminder:snooze', () => {
   return waterReminder.snooze();
 });
 
+ipcMain.handle('water-reminder:snooze-task', (_event, taskId) => {
+  return waterReminder.snoozeTask(taskId);
+});
+
+ipcMain.handle('water-reminder:complete-task', (_event, taskId) => {
+  return waterReminder.completeTask(taskId);
+});
+
 ipcMain.handle('water-reminder:test-trigger', () => {
   waterReminder.fire();
   return true;
+});
+
+/* --- Live2D appearance IPC --- */
+
+ipcMain.handle('appearance:get-live2d-model', () => {
+  return live2DAppearance.getCurrentModel();
 });
 
 /* --- 好友同屏 IPC --- */
@@ -621,6 +677,7 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    live2DAppearance.registerProtocol();
     getForegroundProbeWorker().start();
     initClipboardHistory({
       preloadPath: path.join(__dirname, '..', 'clipboard-history', 'preload.js')

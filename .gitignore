@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+/live2d/
 *.log
 .DS_Store
 .workbuddy/

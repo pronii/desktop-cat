@@ -1,7 +1,11 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { createRoomClient } = require('../../src/main/roomClient');
+const {
+  createRoomClient,
+  DEFAULT_ROOM_ENDPOINT,
+  resolveRoomEndpoint
+} = require('../../src/main/roomClient');
 
 class FakeWebSocket {
   static instances = [];
@@ -11,6 +15,7 @@ class FakeWebSocket {
     this.readyState = FakeWebSocket.CONNECTING;
     this.sent = [];
     this.listeners = new Map();
+    this.deferClose = false;
     FakeWebSocket.instances.push(this);
   }
 
@@ -26,6 +31,7 @@ class FakeWebSocket {
 
   close() {
     this.readyState = FakeWebSocket.CLOSED;
+    if (this.deferClose) return;
     this.emit('close');
   }
 
@@ -59,6 +65,19 @@ function createClient() {
     now: () => 1234
   });
 }
+
+test('room endpoint can be configured through environment', () => {
+  assert.equal(
+    resolveRoomEndpoint({
+      DESKTOP_CAT_ROOM_ENDPOINT: ' ws://127.0.0.1:3001/room '
+    }),
+    'ws://127.0.0.1:3001/room'
+  );
+  assert.equal(
+    resolveRoomEndpoint({ DESKTOP_CAT_ROOM_ENDPOINT: '' }),
+    DEFAULT_ROOM_ENDPOINT
+  );
+});
 
 test('room client sends a join message when the socket opens', () => {
   const client = createClient();
@@ -188,6 +207,41 @@ test('room client leaves the room and clears peer state', () => {
   assert.equal(client.getState().status, 'disconnected');
   assert.equal(client.getState().roomCode, null);
   assert.deepEqual(client.getState().peers, []);
+});
+
+test('room client ignores stale close events after reconnecting', () => {
+  const client = createClient();
+
+  client.join({ roomCode: '123456', nickname: 'Alice' });
+  const firstSocket = FakeWebSocket.instances[0];
+  firstSocket.open();
+  firstSocket.message({
+    type: 'room:joined',
+    roomCode: '123456',
+    selfId: 'local-user',
+    peers: []
+  });
+  firstSocket.deferClose = true;
+
+  client.join({ roomCode: '654321', nickname: 'Alice' });
+  const secondSocket = FakeWebSocket.instances[1];
+  secondSocket.open();
+  secondSocket.message({
+    type: 'room:joined',
+    roomCode: '654321',
+    selfId: 'local-user',
+    peers: []
+  });
+
+  firstSocket.emit('close');
+
+  assert.equal(client.getState().status, 'connected');
+  assert.equal(client.getState().roomCode, '654321');
+  assert.equal(client.sendPetState({ action: 'idle' }), true);
+  assert.deepEqual(secondSocket.sent.at(-1), {
+    type: 'pet:update',
+    pet: { action: 'idle' }
+  });
 });
 
 test('room client only sends pet state while connected', () => {

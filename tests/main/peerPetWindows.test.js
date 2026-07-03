@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { createPeerPetWindowManager } = require('../../src/main/peerPetWindows');
+const {
+  createPeerPetWindowManager,
+  resolveLocalPetAnchorBounds
+} = require('../../src/main/peerPetWindows');
 
 class FakeBrowserWindow {
   static instances = [];
@@ -59,6 +62,20 @@ function createManager() {
   });
 }
 
+test('local pet anchor resolves to the visible cat area inside the main window', () => {
+  assert.deepEqual(resolveLocalPetAnchorBounds({
+    x: 700,
+    y: 80,
+    width: 300,
+    height: 360
+  }), {
+    x: 761,
+    y: 217,
+    width: 178,
+    height: 190
+  });
+});
+
 test('peer pet manager creates a transparent window for each peer', () => {
   const manager = createManager();
 
@@ -73,7 +90,7 @@ test('peer pet manager creates a transparent window for each peer', () => {
   assert.equal(FakeBrowserWindow.instances[0].options.frame, false);
   assert.equal(FakeBrowserWindow.instances[0].loadedFile, 'peer.html');
   assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
-    x: 352,
+    x: 344,
     y: 215,
     width: 160,
     height: 150
@@ -104,7 +121,7 @@ test('peer pet manager reuses existing windows when peers update', () => {
 
   assert.equal(FakeBrowserWindow.instances.length, 1);
   assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
-    x: 372,
+    x: 364,
     y: 235,
     width: 160,
     height: 150
@@ -137,8 +154,8 @@ test('peer pet manager lays out multiple peers beside the local pet', () => {
   ], { x: 100, y: 200, width: 240, height: 180 });
 
   assert.deepEqual(FakeBrowserWindow.instances.map((window) => window.bounds), [
-    { x: 352, y: 215, width: 160, height: 150 },
-    { x: 524, y: 215, width: 160, height: 150 }
+    { x: 344, y: 215, width: 160, height: 150 },
+    { x: 508, y: 215, width: 160, height: 150 }
   ]);
 });
 
@@ -151,9 +168,30 @@ test('peer pet manager keeps peer windows inside the local display work area', (
   ], { x: 900, y: 700, width: 240, height: 180 });
 
   assert.deepEqual(FakeBrowserWindow.instances.map((window) => window.bounds), [
-    { x: 728, y: 650, width: 160, height: 150 },
-    { x: 556, y: 650, width: 160, height: 150 }
+    { x: 736, y: 650, width: 160, height: 150 },
+    { x: 572, y: 650, width: 160, height: 150 }
   ]);
+});
+
+test('peer pet manager aligns peers beside the visible local cat area', () => {
+  const manager = createManager();
+  const localCatBounds = resolveLocalPetAnchorBounds({
+    x: 700,
+    y: 80,
+    width: 300,
+    height: 360
+  });
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } }
+  ], localCatBounds);
+
+  assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
+    x: 597,
+    y: 237,
+    width: 160,
+    height: 150
+  });
 });
 
 test('peer pet manager closes windows for peers that leave', () => {

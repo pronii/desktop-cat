@@ -1,3 +1,11 @@
+function validateRoomCode(roomCode) {
+  const normalized = String(roomCode || '').trim();
+  if (!/^\d{6}$/.test(normalized)) {
+    throw new Error('Room code must be 6 digits');
+  }
+  return normalized;
+}
+
 function createRoomManager(options = {}) {
   const now = typeof options.now === 'function' ? options.now : Date.now;
   const maxClientsPerRoom = options.maxClientsPerRoom || 8;
@@ -26,9 +34,7 @@ function createRoomManager(options = {}) {
   }
 
   function joinRoom(roomCode, client, profile = {}) {
-    if (!roomCode || typeof roomCode !== 'string') {
-      throw new Error('roomCode is required');
-    }
+    const normalizedRoomCode = validateRoomCode(roomCode);
     if (!client?.id || typeof client.send !== 'function') {
       throw new Error('client id and send function are required');
     }
@@ -37,7 +43,7 @@ function createRoomManager(options = {}) {
       leaveClient(client);
     }
 
-    const room = getOrCreateRoom(roomCode);
+    const room = getOrCreateRoom(normalizedRoomCode);
     if (room.clients.size >= maxClientsPerRoom) {
       throw new Error('room is full');
     }
@@ -55,11 +61,11 @@ function createRoomManager(options = {}) {
       pet: profile.pet || null,
       updatedAt: now()
     });
-    clientRooms.set(client, roomCode);
+    clientRooms.set(client, normalizedRoomCode);
 
     send(client, {
       type: 'room:joined',
-      roomCode,
+      roomCode: normalizedRoomCode,
       selfId: client.id,
       peers: peerList
     });

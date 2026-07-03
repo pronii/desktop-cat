@@ -8,6 +8,7 @@
   </head>
   <body>
     <main class="stage" aria-label="Desktop cat pet">
+      <canvas class="live2d-canvas" id="live2dCanvas" width="240" height="240" aria-hidden="true"></canvas>
       <button class="cat" type="button" aria-label="Pet the cat">
         <span class="ear ear-left"></span>
         <span class="ear ear-right"></span>
@@ -79,6 +80,39 @@
         <span class="sketch-btn-icon">👥</span>
         <span class="sketch-btn-text">好友</span>
       </button>
+
+      <button
+        class="sketch-btn cat-size-btn"
+        id="catSizeBtn"
+        type="button"
+        aria-label="拖动调整小猫大小"
+        title="拖动调整小猫大小"
+      >
+        <span class="cat-size-icon" aria-hidden="true">
+          <span>↖</span>
+          <span>↘</span>
+        </span>
+        <span class="sketch-btn-text">大小</span>
+      </button>
+    </div>
+
+    <div class="water-reminder-dialog" id="waterReminderDialog" role="dialog" aria-modal="false" aria-labelledby="waterReminderTitle">
+      <div class="water-reminder-main">
+        <div class="water-reminder-icon" aria-hidden="true">💧</div>
+        <div class="water-reminder-copy">
+          <h3 id="waterReminderTitle">该喝水啦！</h3>
+          <p id="waterReminderText">起来活动一下，顺手补一杯水。</p>
+        </div>
+        <button class="water-reminder-close" id="waterReminderClose" type="button" aria-label="关闭喝水提醒">×</button>
+      </div>
+      <div class="water-reminder-actions water-reminder-actions-water" id="waterReminderWaterActions">
+        <button class="sketch-action-btn" id="waterReminderDrinkBtn" type="button">记录一杯</button>
+        <button class="sketch-action-btn sketch-action-btn-snooze" id="waterReminderSnoozeBtn" type="button">稍后提醒</button>
+      </div>
+      <div class="water-reminder-actions water-reminder-actions-task" id="waterReminderTaskActions">
+        <button class="sketch-action-btn water-task-done-btn" id="waterReminderDoneBtn" type="button">完成</button>
+        <button class="sketch-action-btn water-task-later-btn" id="waterReminderLaterBtn" type="button">稍后处理</button>
+      </div>
     </div>
 
     <div class="water-panel sketch-panel" id="waterPanel">
@@ -95,6 +129,7 @@
           </div>
         </div>
         <div class="water-panel-actions">
+          <div class="water-panel-section-label">喝水提醒</div>
           <div class="water-panel-btns">
             <button class="sketch-action-btn" id="waterPanelDrinkBtn" type="button">
               <span>🥤</span> 记录
@@ -104,14 +139,14 @@
             </button>
           </div>
           <div class="water-panel-row">
-            <span class="water-panel-row-label">提醒</span>
+            <span class="water-panel-row-label">喝水提醒</span>
             <label class="sketch-switch">
               <input type="checkbox" id="waterPanelToggle">
               <span class="sketch-switch-slider"></span>
             </label>
           </div>
           <div class="water-panel-row water-panel-row-column">
-            <span class="water-panel-row-label">提醒间隔</span>
+            <span class="water-panel-row-label">喝水间隔</span>
             <div class="water-panel-intervals" id="waterPanelIntervals">
               <button class="sketch-interval" data-minutes="0.083" type="button">5秒</button>
               <button class="sketch-interval" data-minutes="15" type="button">15m</button>
@@ -123,6 +158,26 @@
           <div class="water-panel-footer">
             <div class="water-panel-last" id="waterPanelLast">尚未提醒</div>
             <div class="water-panel-next" id="waterPanelNext">⏰ 等待提醒</div>
+          </div>
+          <div class="water-task-section">
+            <div class="water-panel-section-label water-task-section-title">事项提醒</div>
+            <div class="water-task-add">
+              <label class="water-task-field">
+                <span class="water-panel-row-label">事项</span>
+                <input id="waterTaskNameInput" class="water-task-input" type="text" maxlength="24" autocomplete="off" placeholder="站起来活动">
+              </label>
+              <button class="sketch-action-btn water-task-add-btn" id="waterTaskAddBtn" type="button">新增</button>
+            </div>
+            <div class="water-panel-row water-panel-row-column">
+              <span class="water-panel-row-label">默认间隔</span>
+              <div class="water-panel-intervals water-task-intervals" id="waterTaskNewIntervals">
+                <button class="sketch-interval" data-minutes="15" type="button">15m</button>
+                <button class="sketch-interval" data-minutes="30" type="button">30m</button>
+                <button class="sketch-interval" data-minutes="60" type="button">1h</button>
+                <button class="sketch-interval" data-minutes="120" type="button">2h</button>
+              </div>
+            </div>
+            <div class="water-task-list" id="waterTaskList"></div>
           </div>
         </div>
       </div>
@@ -174,6 +229,11 @@
       </div>
     </div>
 
+    <script src="./vendor/live2d/live2dcubismcore.min.js"></script>
+    <script src="./vendor/live2d/pixi.min.js"></script>
+    <script src="./vendor/live2d/pixi-live2d-cubism4.min.js"></script>
+    <script src="./live2dMotionController.js"></script>
+    <script src="./live2dAppearance.js"></script>
     <script src="./petBehavior.js"></script>
     <script src="./renderer.js"></script>
     <script src="./clipboardPanel.js"></script>

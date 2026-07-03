@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('clipboardHistoryAPI', {
-  getItems: () => ipcRenderer.invoke('clipboard-history:get-items'),
+  getItems: (options) => ipcRenderer.invoke('clipboard-history:get-items', options),
   clearHistory: () => ipcRenderer.invoke('clipboard-history:clear'),
   removeItem: (id) => ipcRenderer.invoke('clipboard-history:removeById', id),
   copyItem: (id) => ipcRenderer.invoke('clipboard-history:copy', id),

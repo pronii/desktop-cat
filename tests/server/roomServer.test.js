@@ -233,3 +233,53 @@ test('room server relays pet state between WebSocket room clients', async () => 
     await roomServer.close();
   }
 });
+
+test('room server rejects invalid room codes from WebSocket clients', async () => {
+  const roomServer = createRoomServer({ port: 0 });
+  await roomServer.listen();
+
+  const port = roomServer.address().port;
+  const alice = await connectWebSocket(port);
+
+  try {
+    alice.sendJson({
+      type: 'room:join',
+      roomCode: 'abc',
+      userId: 'alice',
+      nickname: 'Alice'
+    });
+
+    const message = await alice.nextJson();
+
+    assert.equal(message.type, 'error');
+    assert.match(message.message, /room code/i);
+  } finally {
+    alice.close();
+    await roomServer.close();
+  }
+});
+
+test('room server rejects oversized WebSocket messages', async () => {
+  const roomServer = createRoomServer({ port: 0, maxPayloadBytes: 64 });
+  await roomServer.listen();
+
+  const port = roomServer.address().port;
+  const alice = await connectWebSocket(port);
+
+  try {
+    alice.sendJson({
+      type: 'room:join',
+      roomCode: '123456',
+      userId: 'alice',
+      nickname: 'A'.repeat(80)
+    });
+
+    const message = await alice.nextJson();
+
+    assert.equal(message.type, 'error');
+    assert.match(message.message, /too large/i);
+  } finally {
+    alice.close();
+    await roomServer.close();
+  }
+});

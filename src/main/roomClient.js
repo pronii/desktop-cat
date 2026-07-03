@@ -1,5 +1,10 @@
 const DEFAULT_ROOM_ENDPOINT = 'ws://45.136.28.241:3001/room';
 
+function resolveRoomEndpoint(env = process.env) {
+  const configured = String(env.DESKTOP_CAT_ROOM_ENDPOINT || '').trim();
+  return configured || DEFAULT_ROOM_ENDPOINT;
+}
+
 function clonePet(pet) {
   return pet && typeof pet === 'object' ? { ...pet } : null;
 }
@@ -81,7 +86,7 @@ function validateRoomCode(roomCode) {
 
 function createRoomClient({
   WebSocket,
-  endpoint = DEFAULT_ROOM_ENDPOINT,
+  endpoint = resolveRoomEndpoint(),
   userId,
   now = () => Date.now()
 } = {}) {
@@ -206,8 +211,10 @@ function createRoomClient({
     };
     notify();
 
-    socket = new WebSocket(endpoint);
-    addSocketListener(socket, 'open', () => {
+    const activeSocket = new WebSocket(endpoint);
+    socket = activeSocket;
+    addSocketListener(activeSocket, 'open', () => {
+      if (socket !== activeSocket) return;
       sendJson({
         type: 'room:join',
         roomCode: normalizedRoomCode,
@@ -215,15 +222,18 @@ function createRoomClient({
         nickname: state.nickname
       });
     });
-    addSocketListener(socket, 'message', handleMessage);
-    addSocketListener(socket, 'error', () => {
+    addSocketListener(activeSocket, 'message', (event) => {
+      if (socket !== activeSocket) return;
+      handleMessage(event);
+    });
+    addSocketListener(activeSocket, 'error', () => {
+      if (socket !== activeSocket) return;
       setState({ status: 'error', error: '房间连接失败' });
     });
-    addSocketListener(socket, 'close', () => {
-      if (socket) {
-        resetDisconnected();
-        socket = null;
-      }
+    addSocketListener(activeSocket, 'close', () => {
+      if (socket !== activeSocket) return;
+      resetDisconnected();
+      socket = null;
     });
 
     return cloneState(state);
@@ -260,5 +270,6 @@ function createRoomClient({
 
 module.exports = {
   DEFAULT_ROOM_ENDPOINT,
+  resolveRoomEndpoint,
   createRoomClient
 };

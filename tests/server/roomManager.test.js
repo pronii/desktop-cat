@@ -36,6 +36,16 @@ test('joinRoom sends existing peer states to the joining client', () => {
   ]);
 });
 
+test('joinRoom rejects non-six-digit room codes', () => {
+  const manager = createRoomManager({ now: () => 1000 });
+  const alice = makeClient('alice');
+
+  assert.throws(
+    () => manager.joinRoom('abc', alice, { nickname: 'Alice' }),
+    /room code must be 6 digits/i
+  );
+});
+
 test('updateState broadcasts pet state to other clients in the same room', () => {
   const manager = createRoomManager({ now: () => 2000 });
   const alice = makeClient('alice');
