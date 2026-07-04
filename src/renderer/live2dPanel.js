@@ -40,6 +40,8 @@
       loadModels().catch((error) => {
         console.warn('Live2D model list failed to load.', error);
       });
+    } else {
+      disposePreviewApps();
     }
   }
 
@@ -53,6 +55,18 @@
       card.classList.toggle('is-active', isActive);
       card.setAttribute('aria-pressed', String(isActive));
     });
+  }
+
+  function hasRenderedModelList() {
+    return Boolean(live2dModelList?.querySelector('.live2d-model-card, .live2d-panel-empty'));
+  }
+
+  function disposePreviewApps() {
+    for (const previewApp of previewApps.values()) {
+      previewApp?.destroy?.(true, { children: true, texture: false, baseTexture: false });
+    }
+    previewApps.clear();
+    live2dModelList?.replaceChildren();
   }
 
   function fitPreviewModel(model, canvas) {
@@ -81,14 +95,26 @@
       transparent: true,
       backgroundAlpha: 0,
       antialias: true,
-      autoStart: true
+      autoStart: false
     });
     previewApps.set(modelConfig.id, previewApp);
 
-    const previewModel = await window.PIXI.live2d.Live2DModel.from(modelConfig.modelUrl);
-    previewModel.interactive = false;
-    fitPreviewModel(previewModel, canvas);
-    previewApp.stage.addChild(previewModel);
+    try {
+      const previewModel = await window.PIXI.live2d.Live2DModel.from(modelConfig.modelUrl);
+      if (previewApps.get(modelConfig.id) !== previewApp) {
+        previewModel.destroy?.({ children: true, texture: false, baseTexture: false });
+        return;
+      }
+      previewModel.interactive = false;
+      previewModel.autoUpdate = false;
+      fitPreviewModel(previewModel, canvas);
+      previewApp.stage.addChild(previewModel);
+      previewApp.render();
+    } catch (error) {
+      previewApps.delete(modelConfig.id);
+      previewApp.destroy(true, { children: true, texture: false, baseTexture: false });
+      throw error;
+    }
   }
 
   async function selectModel(modelId) {
@@ -98,7 +124,37 @@
     activeModelId = selected.id;
     persistModelId(selected.id);
     updateActiveCards();
-    await window.__desktopCatLive2DAppearance.loadModel(selected);
+    const live2dAppearance = window.__desktopCatLive2DAppearance;
+    const isSameModel = live2dAppearance?.getCurrentModel?.()?.id === selected.id;
+    if (isSameModel && live2dAppearance?.isCurrentModelVisible?.()) {
+      return;
+    }
+    if (isSameModel && live2dAppearance?.ensureCurrentModelVisible) {
+      await live2dAppearance.ensureCurrentModelVisible();
+      return;
+    }
+    await live2dAppearance?.loadModel?.(selected);
+  }
+
+  async function restoreVisibleModel(modelConfig) {
+    activeModelId = modelConfig.id;
+    updateActiveCards();
+
+    const live2dAppearance = window.__desktopCatLive2DAppearance;
+    const isSameModel = live2dAppearance?.getCurrentModel?.()?.id === modelConfig.id;
+    if (!isSameModel) {
+      await selectModel(modelConfig.id);
+      return;
+    }
+
+    if (live2dAppearance?.isCurrentModelVisible?.()) {
+      return;
+    }
+    if (live2dAppearance?.ensureCurrentModelVisible) {
+      await live2dAppearance.ensureCurrentModelVisible();
+      return;
+    }
+    await live2dAppearance?.loadModel?.(modelConfig);
   }
 
   function createModelCard(modelConfig) {
@@ -134,6 +190,7 @@
 
   function renderModels() {
     if (!live2dModelList) return;
+    disposePreviewApps();
     live2dModelList.replaceChildren();
 
     if (!models.length) {
@@ -154,7 +211,10 @@
 
   async function loadModels() {
     if (modelsLoaded) {
-      renderModels();
+      if (!hasRenderedModelList()) {
+        renderModels();
+      }
+      updateActiveCards();
       return;
     }
     if (!api?.getLive2DModels) return;
@@ -173,7 +233,7 @@
     const storedModelId = readStoredModelId();
     const storedModel = models.find((model) => model.id === storedModelId);
     if (storedModel) {
-      await selectModel(storedModel.id);
+      await restoreVisibleModel(storedModel);
     } else {
       activeModelId = window.__desktopCatLive2DAppearance?.getCurrentModel?.()?.id || models[0]?.id || null;
     }

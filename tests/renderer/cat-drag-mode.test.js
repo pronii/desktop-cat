@@ -94,11 +94,18 @@ class FakeElement {
   }
 }
 
-function createRendererHarness({ supportsPointerEvents = false, bottomBarRect } = {}) {
+function createRendererHarness({
+  supportsPointerEvents = false,
+  bottomBarRect,
+  live2dCanvasRect,
+  live2dDisplay = 'none',
+  live2dAppearance,
+  elementFromPoint
+} = {}) {
   const source = readSource('src', 'renderer', 'renderer.js');
   const cat = new FakeElement();
   const stage = new FakeElement();
-  const live2dCanvas = new FakeElement();
+  const live2dCanvas = new FakeElement({ rect: live2dCanvasRect });
   const waterBowl = new FakeElement();
   const happyBubble = new FakeElement();
   const waterBubble = new FakeElement();
@@ -164,6 +171,7 @@ function createRendererHarness({ supportsPointerEvents = false, bottomBarRect } 
   const fakeWindow = {
     petBehavior: contextualPetBehavior,
     desktopCatDebug: {},
+    __desktopCatLive2DAppearance: live2dAppearance,
     desktopCat: {
       dragMode: {
         enter() {
@@ -202,8 +210,8 @@ function createRendererHarness({ supportsPointerEvents = false, bottomBarRect } 
       return 0;
     },
     clearInterval() {},
-    getComputedStyle() {
-      return { display: 'none' };
+    getComputedStyle(element) {
+      return { display: element === live2dCanvas ? live2dDisplay : 'block' };
     },
     addEventListener(type, listener) {
       const listeners = windowListeners.get(type) || [];
@@ -231,7 +239,10 @@ function createRendererHarness({ supportsPointerEvents = false, bottomBarRect } 
         listener(event);
       }
     },
-    elementFromPoint() {
+    elementFromPoint(x, y) {
+      if (typeof elementFromPoint === 'function') {
+        return elementFromPoint({ x, y, cat, live2dCanvas, stage, bottomBar });
+      }
       return null;
     },
     querySelector(selector) {
@@ -559,6 +570,27 @@ test('bottom controls hide immediately when the pointer is not over the pet shap
 
   harness.document.dispatch('mousemove', { clientX: 120, clientY: 120 });
 
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), false);
+  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
+});
+
+test('live2d transparent pixels do not reveal bottom controls', () => {
+  const hitTests = [];
+  const harness = createRendererHarness({
+    live2dDisplay: 'block',
+    live2dCanvasRect: { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 },
+    live2dAppearance: {
+      isPointOverVisible(x, y) {
+        hitTests.push([x, y]);
+        return false;
+      }
+    },
+    elementFromPoint: ({ live2dCanvas }) => live2dCanvas
+  });
+
+  harness.document.dispatch('mousemove', { clientX: 120, clientY: 120 });
+
+  assert.deepEqual(hitTests, [[120, 120]]);
   assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), false);
   assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), false);
 });

@@ -253,6 +253,7 @@ function startTopmostWatch(window) {
     refreshTopmost(window);
   });
   window.on('blur', () => {
+    stopDragMode();
     refreshTopmost(window);
   });
   window.on('restore', () => {
@@ -405,6 +406,7 @@ function createPetWindow() {
   });
 
   petWindow.on('closed', () => {
+    stopDragMode();
     clearInterval(topmostTimer);
     clearTimeout(hideTimer);
     if (displayRecoveryTimer) {
@@ -644,19 +646,27 @@ let dragModeActive = false;
 let dragOffset = { x: 0, y: 0 };
 let dragTick = null;
 
+function stopDragMode() {
+  dragModeActive = false;
+  if (dragTick) {
+    clearInterval(dragTick);
+    dragTick = null;
+  }
+}
+
 ipcMain.on('drag-mode:enter', () => {
   if (!petWindow || petWindow.isDestroyed()) return;
+  stopDragMode();
+
   const cursor = screen.getCursorScreenPoint();
   const winBounds = petWindow.getBounds();
   dragOffset = { x: cursor.x - winBounds.x, y: cursor.y - winBounds.y };
   dragModeActive = true;
 
-  if (dragTick) clearInterval(dragTick);
   // 每 16ms（约 60fps）跟随鼠标移动窗口
   dragTick = setInterval(() => {
     if (!dragModeActive || !petWindow || petWindow.isDestroyed()) {
-      if (dragTick) clearInterval(dragTick);
-      dragTick = null;
+      stopDragMode();
       return;
     }
     const cur = screen.getCursorScreenPoint();
@@ -664,13 +674,7 @@ ipcMain.on('drag-mode:enter', () => {
   }, 16);
 });
 
-ipcMain.on('drag-mode:exit', () => {
-  dragModeActive = false;
-  if (dragTick) {
-    clearInterval(dragTick);
-    dragTick = null;
-  }
-});
+ipcMain.on('drag-mode:exit', stopDragMode);
 
 /* --- 透明区域点击穿透 --- */
 

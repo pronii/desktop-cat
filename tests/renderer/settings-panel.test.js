@@ -45,4 +45,5 @@ test('settings panel controls random speech and bottom button visibility', () =>
   assert.match(renderer, /bottomButtonControls/);
   assert.match(renderer, /scheduleRandomSpeech/);
   assert.match(renderer, /__desktopCatApplySettings/);
+  assert.match(renderer, /ensureCurrentModelVisible/);
 });

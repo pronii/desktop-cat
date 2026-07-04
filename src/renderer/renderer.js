@@ -93,6 +93,12 @@
     randomSpeechTimer = null;
   }
 
+  function restoreLive2DIfNeeded() {
+    window.__desktopCatLive2DAppearance?.ensureCurrentModelVisible?.().catch((error) => {
+      console.warn('Live2D model failed to restore after settings changed.', error);
+    });
+  }
+
   function applySettings(nextSettings, { persist = false } = {}) {
     petSettings = normalizePetSettings(nextSettings);
     window.desktopCatDebug.randomSpeechEnabled = petSettings.randomSpeechEnabled;
@@ -114,6 +120,8 @@
     if (persist) {
       persistPetSettings();
     }
+
+    restoreLive2DIfNeeded();
   }
 
   window.__desktopCatApplySettings = (nextSettings) => applySettings(nextSettings);
@@ -450,13 +458,7 @@
     if (!live2dCanvas || window.getComputedStyle?.(live2dCanvas).display === 'none') return false;
     const rect = live2dCanvas.getBoundingClientRect();
     if (!isPointInRect(x, y, rect)) return false;
-    try {
-      const ctx = live2dCanvas.getContext('2d');
-      const pixel = ctx.getImageData(Math.round(x - rect.left), Math.round(y - rect.top), 1, 1).data;
-      return pixel[3] > 10;
-    } catch (_e) {
-      return true;
-    }
+    return Boolean(window.__desktopCatLive2DAppearance?.isPointOverVisible?.(x, y));
   }
 
   function isPointOverPetVisible(x, y) {
@@ -613,6 +615,8 @@
       window.__closeLive2DPanel?.();
       showCatSizeControl();
       applyClickThrough(false);
+    } else {
+      restoreLive2DIfNeeded();
     }
   }
 

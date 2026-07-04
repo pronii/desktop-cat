@@ -710,9 +710,9 @@ body {
 
 .water-reminder-dialog {
   position: fixed;
-  left: 14px;
-  right: 14px;
+  left: 50%;
   bottom: 78px;
+  width: min(292px, calc(100vw - 28px));
   min-height: 116px;
   padding: 10px;
   border: 2.5px solid var(--sketch-border);
@@ -725,7 +725,7 @@ body {
   gap: 9px;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(8px) scale(0.98);
+  transform: translateX(-50%) translateY(8px) scale(0.98);
   transition: opacity 160ms ease, transform 160ms ease;
   -webkit-app-region: no-drag;
 }
@@ -733,7 +733,7 @@ body {
 .water-reminder-dialog.show {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
 }
 
 .water-reminder-main {
@@ -1137,9 +1137,9 @@ body {
 /* --- 手绘风面板（通用） --- */
 .sketch-panel {
   position: fixed;
-  left: 14px;
-  right: 14px;
+  left: 50%;
   bottom: 80px;
+  width: min(292px, calc(100vw - 28px));
   height: 280px;
   background: var(--sketch-bg);
   border: 2.5px solid var(--sketch-border);
@@ -1151,7 +1151,7 @@ body {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(8px) scale(0.98);
+  transform: translateX(-50%) translateY(8px) scale(0.98);
   transform-origin: 50% 100%;
   transition: opacity 160ms ease, transform 160ms ease;
 }
@@ -1159,7 +1159,7 @@ body {
 .sketch-panel.show {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
 }
 
 .sketch-panel-header {

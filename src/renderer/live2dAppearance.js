@@ -46,26 +46,97 @@
     return controller;
   }
 
+  function ensurePixiApp() {
+    if (pixiApp) return pixiApp;
+    const canvas = document.getElementById('live2dCanvas');
+    if (!canvas) return null;
+
+    canvas.width = CANVAS_SIZE;
+    canvas.height = CANVAS_SIZE;
+    pixiApp = new window.PIXI.Application({
+      view: canvas,
+      width: CANVAS_SIZE,
+      height: CANVAS_SIZE,
+      transparent: true,
+      backgroundAlpha: 0,
+      antialias: true,
+      autoStart: true
+    });
+    return pixiApp;
+  }
+
   function disposeCurrentModel() {
     motionController?.dispose?.();
     motionController = null;
+
+    if (currentModel && pixiApp) {
+      pixiApp.stage.removeChild(currentModel);
+    }
+    currentModel?.destroy?.({ children: true, texture: false, baseTexture: false });
     currentModel = null;
     currentModelConfig = null;
 
-    if (pixiApp) {
-      pixiApp.destroy(true, { children: true, texture: false, baseTexture: false });
-      pixiApp = null;
-    }
-
     const canvas = document.getElementById('live2dCanvas');
     if (canvas) {
-      canvas.width = CANVAS_SIZE;
-      canvas.height = CANVAS_SIZE;
       canvas.setAttribute('aria-hidden', 'true');
     }
 
     document.querySelector('.stage')?.classList.remove('has-live2d');
     window.__desktopCatLive2D = null;
+  }
+
+  function isCurrentModelVisible() {
+    const stage = document.querySelector('.stage');
+    const canvas = document.getElementById('live2dCanvas');
+    const isAttached = Boolean(currentModel && pixiApp?.stage?.children?.includes?.(currentModel));
+    return Boolean(
+      currentModelConfig?.available &&
+      isAttached &&
+      stage?.classList.contains('has-live2d') &&
+      canvas?.getAttribute?.('aria-hidden') === 'false'
+    );
+  }
+
+  function readWebGLAlphaAt(canvas, pixelX, pixelY) {
+    const gl = pixiApp?.renderer?.gl || pixiApp?.renderer?.context?.gl;
+    if (!gl?.readPixels) return null;
+
+    const pixel = new Uint8Array(4);
+    const bufferHeight = gl.drawingBufferHeight || canvas.height;
+    gl.readPixels(pixelX, bufferHeight - pixelY - 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    return pixel[3];
+  }
+
+  function isPointOverVisible(clientX, clientY) {
+    const canvas = document.getElementById('live2dCanvas');
+    if (!canvas || !isCurrentModelVisible()) return false;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = Number(clientX);
+    const y = Number(clientY);
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      x < rect.left ||
+      x > rect.right ||
+      y < rect.top ||
+      y > rect.bottom ||
+      rect.width <= 0 ||
+      rect.height <= 0
+    ) {
+      return false;
+    }
+
+    const pixelX = Math.min(canvas.width - 1, Math.max(0, Math.round((x - rect.left) * (canvas.width / rect.width))));
+    const pixelY = Math.min(canvas.height - 1, Math.max(0, Math.round((y - rect.top) * (canvas.height / rect.height))));
+
+    try {
+      pixiApp?.render?.();
+      const alpha = readWebGLAlphaAt(canvas, pixelX, pixelY);
+      return alpha !== null && alpha > 10;
+    } catch (_error) {
+      return false;
+    }
   }
 
   async function loadModel(modelConfig) {
@@ -86,30 +157,21 @@
       throw new Error('Live2D runtime is not available.');
     }
 
-    canvas.width = CANVAS_SIZE;
-    canvas.height = CANVAS_SIZE;
-
     const requestId = ++loadRequestId;
-    disposeCurrentModel();
-
-    pixiApp = new window.PIXI.Application({
-      view: canvas,
-      width: CANVAS_SIZE,
-      height: CANVAS_SIZE,
-      transparent: true,
-      backgroundAlpha: 0,
-      antialias: true,
-      autoStart: true
-    });
+    const app = ensurePixiApp();
+    if (!app) {
+      throw new Error('Failed to create PIXI application.');
+    }
 
     const loadedModel = await window.PIXI.live2d.Live2DModel.from(modelConfig.modelUrl);
     if (requestId !== loadRequestId) {
-      loadedModel.destroy?.();
+      loadedModel.destroy?.({ children: true, texture: false, baseTexture: false });
       return;
     }
 
+    disposeCurrentModel();
     currentModel = loadedModel;
-    pixiApp.stage.addChild(currentModel);
+    app.stage.addChild(currentModel);
     fitModelToCanvas(currentModel, canvas);
     motionController = bindMotionController(currentModel);
     currentModelConfig = modelConfig;
@@ -134,10 +196,27 @@
     await loadModel(await api.getLive2DModel());
   }
 
+  async function ensureCurrentModelVisible() {
+    if (isCurrentModelVisible()) {
+      return currentModelConfig;
+    }
+
+    if (currentModelConfig?.available) {
+      await loadModel(currentModelConfig);
+      return currentModelConfig;
+    }
+
+    await loadConfiguredModel();
+    return currentModelConfig;
+  }
+
   window.__desktopCatLive2DAppearance = {
+    ensureCurrentModelVisible,
     loadModel,
     loadConfiguredModel,
-    getCurrentModel: () => currentModelConfig
+    getCurrentModel: () => currentModelConfig,
+    isCurrentModelVisible,
+    isPointOverVisible
   };
 
   loadConfiguredModel().catch((error) => {

@@ -7,6 +7,11 @@ function readSource(...parts) {
   return fs.readFileSync(path.join(__dirname, '..', '..', ...parts), 'utf-8');
 }
 
+function readCssBlock(css, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return css.match(new RegExp(`${escapedSelector}\\s*\\{[\\s\\S]*?\\}`))?.[0] || '';
+}
+
 test('renderer shows a water reminder dialog when reminder triggers', () => {
   const html = readSource('src', 'renderer', 'index.html');
   const css = readSource('src', 'renderer', 'styles.css');
@@ -60,4 +65,24 @@ test('renderer shows a water reminder dialog when reminder triggers', () => {
   assert.match(script, /payload\?\.type/);
   assert.match(script, /waterPanelToggle[\s\S]*?refreshConfig\(\)/);
   assert.match(script, /waterReminderDialog\.classList\.add\('show'\)/);
+});
+
+test('water reminder dialog and floating panels keep a compact fixed width', () => {
+  const css = readSource('src', 'renderer', 'styles.css');
+  const reminderCss = readCssBlock(css, '.water-reminder-dialog');
+  const reminderShownCss = readCssBlock(css, '.water-reminder-dialog.show');
+  const panelCss = readCssBlock(css, '.sketch-panel');
+  const panelShownCss = readCssBlock(css, '.sketch-panel.show');
+
+  assert.match(reminderCss, /left:\s*50%/);
+  assert.doesNotMatch(reminderCss, /right:\s*14px/);
+  assert.match(reminderCss, /width:\s*min\(292px,\s*calc\(100vw\s*-\s*28px\)\)/);
+  assert.match(reminderCss, /transform:\s*translateX\(-50%\)\s+translateY\(8px\)\s+scale\(0\.98\)/);
+  assert.match(reminderShownCss, /transform:\s*translateX\(-50%\)\s+translateY\(0\)\s+scale\(1\)/);
+
+  assert.match(panelCss, /left:\s*50%/);
+  assert.doesNotMatch(panelCss, /right:\s*14px/);
+  assert.match(panelCss, /width:\s*min\(292px,\s*calc\(100vw\s*-\s*28px\)\)/);
+  assert.match(panelCss, /transform:\s*translateX\(-50%\)\s+translateY\(8px\)\s+scale\(0\.98\)/);
+  assert.match(panelShownCss, /transform:\s*translateX\(-50%\)\s+translateY\(0\)\s+scale\(1\)/);
 });
