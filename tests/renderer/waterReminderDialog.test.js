@@ -29,6 +29,8 @@ test('renderer shows a water reminder dialog when reminder triggers', () => {
   assert.match(html, /id="waterReminderLaterBtn"/);
   assert.match(html, /id="waterReminderClose"/);
   assert.match(html, /id="waterTaskNameInput"/);
+  assert.match(html, /id="waterTaskScheduledAtInput"/);
+  assert.match(html, /type="datetime-local"/);
   assert.match(html, /id="waterTaskAddBtn"/);
   assert.match(html, /id="waterTaskNewIntervals"/);
   assert.match(html, /id="waterTaskList"/);
@@ -36,7 +38,8 @@ test('renderer shows a water reminder dialog when reminder triggers', () => {
   assert.match(css, /\.water-reminder-dialog\s*\{/);
   assert.match(css, /\.water-reminder-dialog\.show\s*\{/);
   assert.match(css, /\.water-reminder-dialog\.is-task-reminder\s+\.water-reminder-actions-task\s*\{/);
-  assert.match(css, /\.water-task-input\s*\{/);
+  assert.match(css, /\.water-task-input,\s*\.water-task-time-input\s*\{/);
+  assert.match(css, /\.water-task-time-input\s*\{/);
   assert.match(css, /\.water-task-section\s*\{/);
   assert.match(css, /\.water-task-list\s*\{/);
   assert.match(css, /\.water-task-item\s*\{/);
@@ -48,6 +51,7 @@ test('renderer shows a water reminder dialog when reminder triggers', () => {
   assert.match(preload, /removeTaskReminder:\s*\(taskId\)\s*=>\s*ipcRenderer\.invoke\('water-reminder:remove-task', taskId\)/);
   assert.match(preload, /toggleTask:\s*\(taskId\)\s*=>\s*ipcRenderer\.invoke\('water-reminder:toggle-task', taskId\)/);
   assert.match(preload, /setTaskInterval:\s*\(taskId,\s*minutes\)\s*=>\s*ipcRenderer\.invoke\('water-reminder:set-task-interval', taskId, minutes\)/);
+  assert.match(preload, /setTaskScheduledAt:\s*\(taskId,\s*scheduledAt\)\s*=>\s*ipcRenderer\.invoke\('water-reminder:set-task-scheduled-at', taskId, scheduledAt\)/);
   assert.match(preload, /completeTask:\s*\(taskId\)\s*=>\s*ipcRenderer\.invoke\('water-reminder:complete-task', taskId\)/);
 
   assert.match(script, /onTrigger/);
@@ -58,6 +62,7 @@ test('renderer shows a water reminder dialog when reminder triggers', () => {
   assert.match(script, /removeTaskReminder/);
   assert.match(script, /toggleTask/);
   assert.match(script, /setTaskInterval/);
+  assert.match(script, /scheduledAt/);
   assert.match(script, /waterReminderTitle\.textContent/);
   assert.match(script, /classList\.toggle\('is-task-reminder'/);
   assert.match(script, /completeTaskReminder/);
@@ -85,4 +90,25 @@ test('water reminder dialog and floating panels keep a compact fixed width', () 
   assert.match(panelCss, /width:\s*min\(292px,\s*calc\(100vw\s*-\s*28px\)\)/);
   assert.match(panelCss, /transform:\s*translateX\(-50%\)\s+translateY\(8px\)\s+scale\(0\.98\)/);
   assert.match(panelShownCss, /transform:\s*translateX\(-50%\)\s+translateY\(0\)\s+scale\(1\)/);
+});
+
+test('water panel detail rows reclaim the empty progress rail space', () => {
+  const css = readSource('src', 'renderer', 'styles.css');
+  const actionsCss = readCssBlock(css, '.water-panel-actions');
+
+  assert.match(actionsCss, /--water-progress-rail:\s*65px/);
+  assert.match(
+    css,
+    /\.water-panel-actions\s*>\s*\.water-panel-row-column,\s*\.water-panel-actions\s*>\s*\.water-panel-footer,\s*\.water-task-section\s*\{[\s\S]*?margin-left:\s*calc\(-1\s*\*\s*var\(--water-progress-rail\)\);[\s\S]*?width:\s*calc\(100%\s*\+\s*var\(--water-progress-rail\)\);/
+  );
+});
+
+test('added task reminder rows do not render a date time editor', () => {
+  const css = readSource('src', 'renderer', 'styles.css');
+  const script = readSource('src', 'renderer', 'waterPanel.js');
+
+  assert.match(script, /formatScheduledAt\(task\.scheduledAt\)/);
+  assert.doesNotMatch(script, /water-task-item-time-input/);
+  assert.doesNotMatch(script, /set-task-scheduled-at/);
+  assert.doesNotMatch(css, /\.water-task-item-time-input/);
 });

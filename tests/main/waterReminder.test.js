@@ -8,7 +8,10 @@ const test = require('node:test');
 function installFakeIntervals(t) {
   const originalSetInterval = global.setInterval;
   const originalClearInterval = global.clearInterval;
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
   const intervals = [];
+  const timeouts = [];
   const cleared = [];
   let nextId = 1;
 
@@ -27,16 +30,37 @@ function installFakeIntervals(t) {
     return handle;
   };
 
+  global.setTimeout = (callback, delay) => {
+    const handle = {
+      id: nextId,
+      delay,
+      callback,
+      unrefCalled: false,
+      unref() {
+        this.unrefCalled = true;
+      }
+    };
+    nextId += 1;
+    timeouts.push(handle);
+    return handle;
+  };
+
   global.clearInterval = (handle) => {
+    cleared.push(handle);
+  };
+
+  global.clearTimeout = (handle) => {
     cleared.push(handle);
   };
 
   t.after(() => {
     global.setInterval = originalSetInterval;
     global.clearInterval = originalClearInterval;
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
   });
 
-  return { intervals, cleared };
+  return { intervals, timeouts, cleared };
 }
 
 function loadWaterReminderWithFakeElectron(t) {
@@ -198,5 +222,39 @@ test('custom task reminders support multiple independent items and intervals', (
   assert.ok(config.taskReminders[0].lastTriggerAt);
   assert.ok(config.taskReminders[1].lastTriggerAt);
   assert.equal(config.dailyCount, 0);
+  assert.ok(timers.intervals.some((handle) => handle.delay === 45 * 60 * 1000));
+});
+
+test('custom task reminders can target a specific date time', (t) => {
+  const timers = installFakeIntervals(t);
+  const { createWaterReminder } = loadWaterReminderWithFakeElectron(t);
+  const reminder = createWaterReminder();
+
+  reminder.start();
+  const task = reminder.addTaskReminder({ name: 'Pay rent', interval: 30 });
+  const scheduledAt = new Date(Date.now() + 90 * 1000).toISOString();
+
+  assert.equal(reminder.setTaskScheduledAt(task.id, scheduledAt), true);
+
+  let config = reminder.getConfig();
+  assert.equal(config.taskReminders[0].scheduledAt, scheduledAt);
+  assert.equal(config.taskReminders[0].enabled, true);
+  assert.equal(timers.timeouts.length, 1);
+  assert.ok(timers.timeouts[0].delay > 0);
+  assert.ok(timers.timeouts[0].delay <= 90 * 1000);
+
+  timers.timeouts[0].callback();
+
+  config = reminder.getConfig();
+  assert.equal(config.taskReminders[0].enabled, false);
+  assert.equal(config.taskReminders[0].scheduledAt, scheduledAt);
+  assert.ok(config.taskReminders[0].lastTriggerAt);
+
+  assert.equal(reminder.setTaskIntervalMinutes(task.id, 45), true);
+  config = reminder.getConfig();
+  assert.equal(config.taskReminders[0].scheduledAt, null);
+  assert.equal(config.taskReminders[0].interval, 45);
+  assert.equal(config.taskReminders[0].enabled, false);
+  assert.equal(reminder.toggleTaskEnabled(task.id), true);
   assert.ok(timers.intervals.some((handle) => handle.delay === 45 * 60 * 1000));
 });

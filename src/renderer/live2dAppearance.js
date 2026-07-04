@@ -6,6 +6,25 @@
   let currentModelConfig = null;
   let loadRequestId = 0;
 
+  function logLive2D(message, details = {}) {
+    try {
+      window.desktopCatDebug = window.desktopCatDebug || {};
+      const events = window.desktopCatDebug.live2dEvents || [];
+      const entry = {
+        source: 'appearance',
+        message,
+        time: new Date().toISOString(),
+        ...details
+      };
+      events.push(entry);
+      window.desktopCatDebug.live2dEvents = events.slice(-200);
+      console.info?.('[desktop-cat:live2d]', message, details);
+      window.desktopCat?.diagnostics?.logLive2D?.(entry);
+    } catch (_error) {
+      // Diagnostics must never affect rendering.
+    }
+  }
+
   function setDebugState(state) {
     window.desktopCatDebug = window.desktopCatDebug || {};
     window.desktopCatDebug.live2d = state;
@@ -28,22 +47,55 @@
     model.y = canvas.height;
   }
 
-  function bindMotionController(model) {
+  function createMotionController(model) {
     const factory = window.live2dMotionController?.createLive2DMotionController;
     if (!factory) return null;
 
     const controller = factory({ model });
-    window.__desktopCatLive2D = {
-      playTap: () => controller.playTap(),
-      playDrink: () => controller.playDrink(),
-      dispose: () => controller.dispose()
-    };
 
     model.on?.('hit', () => {
       controller.playTap();
     });
 
     return controller;
+  }
+
+  function exposeMotionController(controller) {
+    window.__desktopCatLive2D = controller
+      ? {
+        playTap: () => controller.playTap(),
+        playDrink: () => controller.playDrink(),
+        dispose: () => controller.dispose()
+      }
+      : null;
+  }
+
+  function getDebugSnapshot() {
+    const stage = document.querySelector('.stage');
+    const canvas = document.getElementById('live2dCanvas');
+    const stageChildren = pixiApp?.stage?.children || [];
+    const isAttached = Boolean(currentModel && stageChildren.includes?.(currentModel));
+    const gl = pixiApp?.renderer?.gl || pixiApp?.renderer?.context?.gl;
+    let contextLost = null;
+    try {
+      contextLost = Boolean(gl?.isContextLost?.());
+    } catch (_error) {
+      contextLost = 'unknown';
+    }
+
+    return {
+      currentModelId: currentModelConfig?.id || null,
+      currentModelAvailable: Boolean(currentModelConfig?.available),
+      hasCurrentModel: Boolean(currentModel),
+      hasPixiApp: Boolean(pixiApp),
+      isAttached,
+      stageChildren: stageChildren.length || 0,
+      stageHasLive2D: Boolean(stage?.classList.contains('has-live2d')),
+      canvasHidden: canvas?.getAttribute?.('aria-hidden') || null,
+      canvasWidth: canvas?.width || 0,
+      canvasHeight: canvas?.height || 0,
+      contextLost
+    };
   }
 
   function ensurePixiApp() {
@@ -62,10 +114,31 @@
       antialias: true,
       autoStart: true
     });
+    canvas.dataset = canvas.dataset || {};
+    if (!canvas.dataset.live2dContextDiagnosticsBound) {
+      canvas.dataset.live2dContextDiagnosticsBound = 'true';
+      canvas.addEventListener?.('webglcontextlost', (event) => {
+        logLive2D('webglcontextlost', {
+          defaultPrevented: Boolean(event.defaultPrevented),
+          snapshot: getDebugSnapshot()
+        });
+      });
+      canvas.addEventListener?.('webglcontextrestored', () => {
+        logLive2D('webglcontextrestored', {
+          snapshot: getDebugSnapshot()
+        });
+      });
+    }
+    logLive2D('pixi app created', { snapshot: getDebugSnapshot() });
     return pixiApp;
   }
 
   function disposeCurrentModel() {
+    const reason = arguments[0] || 'unknown';
+    logLive2D('dispose current model requested', {
+      reason,
+      before: getDebugSnapshot()
+    });
     motionController?.dispose?.();
     motionController = null;
 
@@ -83,6 +156,10 @@
 
     document.querySelector('.stage')?.classList.remove('has-live2d');
     window.__desktopCatLive2D = null;
+    logLive2D('dispose current model complete', {
+      reason,
+      after: getDebugSnapshot()
+    });
   }
 
   function isCurrentModelVisible() {
@@ -142,18 +219,31 @@
   async function loadModel(modelConfig) {
     const stage = document.querySelector('.stage');
     const canvas = document.getElementById('live2dCanvas');
+    const modelId = modelConfig?.id || null;
+    logLive2D('load model requested', {
+      modelId,
+      available: Boolean(modelConfig?.available),
+      hasModelUrl: Boolean(modelConfig?.modelUrl),
+      before: getDebugSnapshot()
+    });
 
     if (!stage || !canvas) {
+      logLive2D('load model skipped: missing stage or canvas', {
+        modelId,
+        hasStage: Boolean(stage),
+        hasCanvas: Boolean(canvas)
+      });
       return;
     }
 
     if (!modelConfig?.available || !modelConfig.modelUrl) {
-      disposeCurrentModel();
+      disposeCurrentModel('model unavailable');
       setDebugState({ available: false });
       return;
     }
 
     if (!hasRuntime()) {
+      logLive2D('load model failed: runtime unavailable', { modelId });
       throw new Error('Live2D runtime is not available.');
     }
 
@@ -165,24 +255,63 @@
 
     const loadedModel = await window.PIXI.live2d.Live2DModel.from(modelConfig.modelUrl);
     if (requestId !== loadRequestId) {
+      logLive2D('load model abandoned after async load', { modelId, requestId, loadRequestId });
       loadedModel.destroy?.({ children: true, texture: false, baseTexture: false });
       return;
     }
 
-    disposeCurrentModel();
+    let nextMotionController = null;
+    try {
+      fitModelToCanvas(loadedModel, canvas);
+      nextMotionController = createMotionController(loadedModel);
+    } catch (error) {
+      nextMotionController?.dispose?.();
+      loadedModel.destroy?.({ children: true, texture: false, baseTexture: false });
+      logLive2D('load model setup failed', {
+        modelId,
+        error: error?.message || String(error),
+        snapshot: getDebugSnapshot()
+      });
+      throw error;
+    }
+
+    if (requestId !== loadRequestId) {
+      logLive2D('load model abandoned after setup', { modelId, requestId, loadRequestId });
+      nextMotionController?.dispose?.();
+      loadedModel.destroy?.({ children: true, texture: false, baseTexture: false });
+      return;
+    }
+
+    try {
+      app.stage.addChild(loadedModel);
+    } catch (error) {
+      nextMotionController?.dispose?.();
+      loadedModel.destroy?.({ children: true, texture: false, baseTexture: false });
+      logLive2D('load model addChild failed', {
+        modelId,
+        error: error?.message || String(error),
+        snapshot: getDebugSnapshot()
+      });
+      throw error;
+    }
+
+    disposeCurrentModel(`replace with ${modelId}`);
     currentModel = loadedModel;
-    app.stage.addChild(currentModel);
-    fitModelToCanvas(currentModel, canvas);
-    motionController = bindMotionController(currentModel);
+    motionController = nextMotionController;
     currentModelConfig = modelConfig;
 
     stage.classList.add('has-live2d');
     canvas.setAttribute('aria-hidden', 'false');
+    exposeMotionController(motionController);
     setDebugState({
       available: true,
       name: modelConfig.name,
       modelUrl: modelConfig.modelUrl,
       motionController: Boolean(motionController)
+    });
+    logLive2D('load model complete', {
+      modelId,
+      after: getDebugSnapshot()
     });
   }
 
@@ -197,7 +326,13 @@
   }
 
   async function ensureCurrentModelVisible() {
+    logLive2D('ensure current model visible requested', {
+      before: getDebugSnapshot()
+    });
     if (isCurrentModelVisible()) {
+      logLive2D('ensure current model visible skipped: already visible', {
+        after: getDebugSnapshot()
+      });
       return currentModelConfig;
     }
 
@@ -216,7 +351,8 @@
     loadConfiguredModel,
     getCurrentModel: () => currentModelConfig,
     isCurrentModelVisible,
-    isPointOverVisible
+    isPointOverVisible,
+    getDebugSnapshot
   };
 
   loadConfiguredModel().catch((error) => {

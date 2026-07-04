@@ -9,8 +9,8 @@
 - 透明、无边框的桌面宠物窗口，默认置顶显示。
 - 支持右键菜单和系统托盘菜单，可显示、隐藏、回到屏幕中央、切换置顶和退出。
 - 检测到全屏前台窗口时会临时取消置顶，避免遮挡游戏或视频。
-- 小猫支持点击反馈、随机说话、喝水动画、长按拖动窗口、拖动按钮调整大小。
-- 设置面板可控制随机说话是否启用，也可控制底部喝水、剪贴板、好友、形象和大小按钮是否显示。
+- 小猫支持点击反馈、话痨模式、喝水动画、长按拖动窗口、拖动按钮调整大小。
+- 设置面板可控制话痨模式是否启用，也可控制底部喝水、剪贴板、好友、形象和大小按钮是否显示。
 - 喝水提醒支持今日杯数、提醒间隔、稍后提醒和提醒开关。
 - 剪贴板历史支持文本、图片和视频文件路径，支持暂停记录、删除、清空和复制回剪贴板。
 - Live2D 内置 Haru、Hiyori、Mao 三套样例形象，也支持用本地 `live2d/` 目录替换。
@@ -114,18 +114,18 @@ dist/
 
 配置会持久化到 Electron `userData` 下的 `water-reminder.json`。
 
-## 设置与随机说话
+## 设置与话痨模式
 
 底部工具栏中的设置按钮会打开设置面板。设置面板支持：
 
-- 开启或关闭随机说话。
+- 开启或关闭话痨模式。
 - 显示或隐藏底部喝水按钮。
 - 显示或隐藏底部剪贴板按钮。
 - 显示或隐藏底部好友同屏按钮。
 - 显示或隐藏底部 Live2D 形象按钮。
 - 显示或隐藏底部大小调整按钮。
 
-随机说话默认开启。开启后，小猫会每隔一段随机时间显示一句陪伴文案；拖拽、喝水动画或面板打开时不会主动打断当前操作。设置会保存在浏览器本地存储中。
+话痨模式默认开启。开启后，小猫会每隔一段随机时间显示一句陪伴文案；拖拽、喝水动画或面板打开时不会主动打断当前操作。设置会保存在浏览器本地存储中。
 
 ## 剪贴板历史
 
@@ -195,3 +195,49 @@ desktop-cat/
 - 当前没有安装器，交付物是 portable `.exe`。
 - 好友同屏服务端是轻量 MVP，房间状态只保存在内存中。
 - Live2D 已内置 Haru、Hiyori、Mao；外置 `live2d/` 目录仍可用于替换或调试其他模型。
+
+## 远程更新推送
+
+远程更新使用“服务端清单 + 可选 WebSocket 推送提醒”的方式。客户端不会直接信任推送消息，收到提醒后仍会重新拉取 `latest.json`，并校验下载文件的 `sha256`。
+
+服务端环境变量：
+
+```powershell
+$env:DESKTOP_CAT_UPDATE_MANIFEST_PATH = "D:\releases\desktop-cat\latest.json"
+$env:DESKTOP_CAT_UPDATE_PUBLISH_TOKEN = "change-me"
+$env:DESKTOP_CAT_UPDATE_MANIFEST_URL = "/updates/latest.json"
+npm run room:server
+```
+
+客户端环境变量：
+
+```powershell
+$env:DESKTOP_CAT_UPDATE_MANIFEST_URL = "http://127.0.0.1:3001/updates/latest.json"
+$env:DESKTOP_CAT_UPDATE_STREAM_URL = "ws://127.0.0.1:3001/updates/stream"
+npm start
+```
+
+`latest.json` 示例：
+
+```json
+{
+  "version": "0.3.1",
+  "url": "https://example.com/releases/desktop-cat-0.3.1.exe",
+  "sha256": "64位十六进制 sha256",
+  "notes": "新增远程更新提示。",
+  "mandatory": false
+}
+```
+
+发布新版本后，调用发布接口通知在线客户端立即检查：
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:3001/updates/publish" `
+  -Headers @{ Authorization = "Bearer change-me" } `
+  -ContentType "application/json" `
+  -Body "{}"
+```
+
+即使 WebSocket 不可用，客户端也会在启动后和后台轮询时检查更新。

@@ -61,3 +61,26 @@ test('suspends topmost when the foreground window is fullscreen', () => {
     true
   );
 });
+
+test('suspends topmost when the foreground window is Windows screen clipping', () => {
+  const foreground = {
+    hwnd: 'screen-clip',
+    title: '',
+    className: 'Windows.UI.Core.CoreWindow',
+    processName: 'ScreenClippingHost',
+    x: 0,
+    y: 0,
+    width: 1920,
+    height: 1080
+  };
+
+  assert.equal(
+    shouldSuspendTopmost({
+      foreground,
+      windows: [foreground],
+      display,
+      petWindowId: 'pet'
+    }),
+    true
+  );
+});

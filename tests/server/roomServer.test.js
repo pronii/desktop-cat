@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 
 const { createRoomServer } = require('../../server/roomServer');
@@ -21,6 +24,38 @@ function httpGetJson(url) {
         });
       });
     }).on('error', reject);
+  });
+}
+
+function httpPostJson(url, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const payload = JSON.stringify(body);
+    const request = http.request({
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+        ...headers
+      }
+    }, (response) => {
+      let responseBody = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        responseBody += chunk;
+      });
+      response.on('end', () => {
+        resolve({
+          statusCode: response.statusCode,
+          body: JSON.parse(responseBody)
+        });
+      });
+    });
+    request.on('error', reject);
+    request.end(payload);
   });
 }
 
@@ -73,7 +108,7 @@ function decodeServerFrame(buffer) {
   };
 }
 
-function connectWebSocket(port) {
+function connectWebSocket(port, path = '/room') {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ port, host: '127.0.0.1' });
     const key = crypto.randomBytes(16).toString('base64');
@@ -81,6 +116,15 @@ function connectWebSocket(port) {
     let frameBuffer = Buffer.alloc(0);
     const messages = [];
     const waiters = [];
+    let readyCheck = null;
+
+    function rejectConnection(error) {
+      if (readyCheck) {
+        clearInterval(readyCheck);
+        readyCheck = null;
+      }
+      reject(error);
+    }
 
     function emitMessage(message) {
       const waiter = waiters.shift();
@@ -100,7 +144,11 @@ function connectWebSocket(port) {
         }
 
         const responseHeader = handshakeBuffer.subarray(0, headerEnd).toString('utf8');
-        assert.match(responseHeader, /^HTTP\/1\.1 101 /);
+        if (!/^HTTP\/1\.1 101 /.test(responseHeader)) {
+          rejectConnection(new Error(`WebSocket handshake failed: ${responseHeader.split('\r\n')[0]}`));
+          socket.destroy();
+          return;
+        }
         frameBuffer = handshakeBuffer.subarray(headerEnd + 4);
         handshakeBuffer = null;
       } else {
@@ -117,10 +165,15 @@ function connectWebSocket(port) {
     }
 
     socket.on('data', onData);
-    socket.on('error', reject);
+    socket.on('error', rejectConnection);
+    socket.on('close', () => {
+      if (handshakeBuffer !== null) {
+        rejectConnection(new Error('WebSocket closed before handshake completed'));
+      }
+    });
     socket.on('connect', () => {
       socket.write([
-        'GET /room HTTP/1.1',
+        `GET ${path} HTTP/1.1`,
         'Host: 127.0.0.1',
         'Upgrade: websocket',
         'Connection: Upgrade',
@@ -131,9 +184,10 @@ function connectWebSocket(port) {
       ].join('\r\n'));
     });
 
-    const readyCheck = setInterval(() => {
+    readyCheck = setInterval(() => {
       if (handshakeBuffer === null) {
         clearInterval(readyCheck);
+        readyCheck = null;
         resolve({
           sendJson(message) {
             socket.write(encodeClientFrame(JSON.stringify(message)));
@@ -163,6 +217,99 @@ function connectWebSocket(port) {
     }, 5);
   });
 }
+
+test('room server exposes the latest update manifest', async () => {
+  const manifest = {
+    version: '0.3.1',
+    url: 'https://example.test/releases/desktop-cat-0.3.1.exe',
+    sha256: 'a'.repeat(64),
+    notes: 'Remote update prompt',
+    mandatory: false
+  };
+  const roomServer = createRoomServer({ port: 0, updateManifest: manifest });
+  await roomServer.listen();
+
+  try {
+    const response = await httpGetJson(`http://127.0.0.1:${roomServer.address().port}/updates/latest.json`);
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, manifest);
+  } finally {
+    await roomServer.close();
+  }
+});
+
+test('room server accepts update manifest files with a UTF-8 BOM', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-cat-update-manifest-'));
+  const manifestPath = path.join(tempDir, 'latest.json');
+  const manifest = {
+    version: '0.3.1',
+    url: 'https://example.test/releases/desktop-cat-0.3.1.exe',
+    sha256: 'a'.repeat(64),
+    notes: 'PowerShell generated manifest',
+    mandatory: false
+  };
+  fs.writeFileSync(
+    manifestPath,
+    Buffer.concat([
+      Buffer.from([0xef, 0xbb, 0xbf]),
+      Buffer.from(JSON.stringify(manifest), 'utf8')
+    ])
+  );
+  const roomServer = createRoomServer({ port: 0, updateManifestPath: manifestPath });
+  await roomServer.listen();
+
+  try {
+    const response = await httpGetJson(`http://127.0.0.1:${roomServer.address().port}/updates/latest.json`);
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, manifest);
+  } finally {
+    await roomServer.close();
+  }
+});
+
+test('room server broadcasts update notifications to update stream clients', async () => {
+  const manifest = {
+    version: '0.3.1',
+    url: 'https://example.test/releases/desktop-cat-0.3.1.exe',
+    sha256: 'b'.repeat(64),
+    mandatory: true
+  };
+  const roomServer = createRoomServer({
+    port: 0,
+    updateManifest: manifest,
+    updatePublishToken: 'secret-token'
+  });
+  await roomServer.listen();
+
+  const port = roomServer.address().port;
+  let streamClient;
+
+  try {
+    streamClient = await connectWebSocket(port, '/updates/stream?version=0.3.0');
+    const response = await httpPostJson(
+      `http://127.0.0.1:${port}/updates/publish`,
+      { version: manifest.version },
+      { Authorization: 'Bearer secret-token' }
+    );
+    const message = await streamClient.nextJson();
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.ok, true);
+    assert.deepEqual(message, {
+      type: 'update:available',
+      version: '0.3.1',
+      manifestUrl: '/updates/latest.json',
+      mandatory: true
+    });
+  } finally {
+    if (streamClient) {
+      streamClient.close();
+    }
+    await roomServer.close();
+  }
+});
 
 test('room server exposes a health check endpoint', async () => {
   const roomServer = createRoomServer({ port: 0 });

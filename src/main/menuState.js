@@ -39,6 +39,10 @@ function createPetContextMenuTemplate({ state, waterReminderConfig = {}, actions
       click: actions.openRoomPanel || noop
     },
     {
+      label: '检查更新',
+      click: actions.checkForUpdates || noop
+    },
+    {
       type: 'separator'
     },
     {

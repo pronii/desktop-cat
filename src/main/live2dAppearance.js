@@ -82,15 +82,52 @@ function findModelJsons(rootDir, depth = 0) {
   return found;
 }
 
-function readModelName(modelJsonPath) {
+function readModelJson(modelJsonPath) {
   try {
-    const json = JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
-    return typeof json.Name === 'string' && json.Name.trim()
-      ? json.Name.trim()
-      : path.basename(path.dirname(modelJsonPath));
+    return JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
   } catch (_error) {
-    return path.basename(path.dirname(modelJsonPath));
+    return null;
   }
+}
+
+function readModelName(modelJsonPath, modelJson) {
+  return typeof modelJson?.Name === 'string' && modelJson.Name.trim()
+    ? modelJson.Name.trim()
+    : path.basename(path.dirname(modelJsonPath));
+}
+
+function readFirstTexturePath(modelJson) {
+  const textures = modelJson?.FileReferences?.Textures;
+  if (!Array.isArray(textures)) return null;
+
+  const texturePath = textures.find((texture) => typeof texture === 'string' && texture.trim());
+  return texturePath ? texturePath.trim() : null;
+}
+
+function findDedicatedPreviewImagePath(modelRootDir) {
+  const names = ['preview', 'thumbnail', 'thumb', 'cover'];
+  const extensions = ['.png', '.jpg', '.jpeg', '.webp'];
+
+  for (const name of names) {
+    for (const extension of extensions) {
+      const filePath = path.join(modelRootDir, `${name}${extension}`);
+      if (fs.existsSync(filePath)) {
+        return filePath;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveModelAssetPath(modelRootDir, assetPath) {
+  if (typeof assetPath !== 'string' || !assetPath.trim()) return null;
+
+  const relativeAssetPath = assetPath.trim();
+  if (path.isAbsolute(relativeAssetPath)) return null;
+
+  const resolved = path.resolve(modelRootDir, relativeAssetPath);
+  return isInsidePath(resolved, modelRootDir) ? resolved : null;
 }
 
 function createLive2DModelUrl(modelRootDir, filePath, modelId = 'active') {
@@ -108,15 +145,24 @@ function createLive2DModelRecord(searchRoot, modelJsonPath) {
   const id = relativeRoot && !relativeRoot.startsWith('..')
     ? relativeRoot.split(path.sep).filter(Boolean).join('/')
     : path.basename(rootDir);
-
-  return {
+  const modelJson = readModelJson(modelJsonPath);
+  const previewImagePath = findDedicatedPreviewImagePath(rootDir)
+    || resolveModelAssetPath(rootDir, readFirstTexturePath(modelJson));
+  const model = {
     available: true,
     id,
-    name: readModelName(modelJsonPath),
+    name: readModelName(modelJsonPath, modelJson),
     rootDir,
     modelJsonPath,
     modelUrl: createLive2DModelUrl(rootDir, modelJsonPath, id)
   };
+
+  if (previewImagePath) {
+    model.previewImagePath = previewImagePath;
+    model.previewImageUrl = createLive2DModelUrl(rootDir, previewImagePath, id);
+  }
+
+  return model;
 }
 
 function discoverLive2DModels({ searchRoots = [] } = {}) {
@@ -247,12 +293,18 @@ function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRo
   }
 
   function serializeModel(model) {
-    return {
+    const serialized = {
       available: true,
       id: model.id,
       name: model.name,
       modelUrl: model.modelUrl
     };
+
+    if (model.previewImageUrl) {
+      serialized.previewImageUrl = model.previewImageUrl;
+    }
+
+    return serialized;
   }
 
   function getCurrentModel() {

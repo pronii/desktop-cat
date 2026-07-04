@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('desktopCat', {
     toggleTask: (taskId) => ipcRenderer.invoke('water-reminder:toggle-task', taskId),
     setInterval: (minutes) => ipcRenderer.invoke('water-reminder:set-interval', minutes),
     setTaskInterval: (taskId, minutes) => ipcRenderer.invoke('water-reminder:set-task-interval', taskId, minutes),
+    setTaskScheduledAt: (taskId, scheduledAt) => ipcRenderer.invoke('water-reminder:set-task-scheduled-at', taskId, scheduledAt),
     setTaskName: (taskId, taskName) => ipcRenderer.invoke('water-reminder:set-task-name', taskId, taskName),
     recordDrink: () => ipcRenderer.invoke('water-reminder:record-drink'),
     snooze: () => ipcRenderer.invoke('water-reminder:snooze'),
@@ -62,5 +63,16 @@ contextBridge.exposeInMainWorld('desktopCat', {
       ipcRenderer.on('room:open-panel', handler);
       return () => ipcRenderer.removeListener('room:open-panel', handler);
     }
+  },
+  updates: {
+    respond: (id, response) => ipcRenderer.invoke('update:respond', { id, response }),
+    onPrompt: (callback) => {
+      const handler = (_event, payload) => callback(payload);
+      ipcRenderer.on('update:prompt', handler);
+      return () => ipcRenderer.removeListener('update:prompt', handler);
+    }
+  },
+  diagnostics: {
+    logLive2D: (entry) => ipcRenderer.send('diagnostics:live2d-log', entry)
   }
 });

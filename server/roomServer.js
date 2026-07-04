@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const http = require('node:http');
 
 const { createRoomManager } = require('./roomManager');
@@ -18,6 +19,7 @@ const PET_NUMBER_FIELDS = new Set([
   'relativeY'
 ]);
 const PET_STRING_FIELDS = new Set(['action', 'facing']);
+const DEFAULT_UPDATE_MANIFEST_URL = '/updates/latest.json';
 
 function createFatalError(message) {
   const error = new Error(message);
@@ -124,6 +126,79 @@ function isPlainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function sendJsonResponse(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
+  response.end(JSON.stringify(body));
+}
+
+function readJsonBody(request, { maxBytes = 64 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk) => {
+      body += chunk;
+      if (Buffer.byteLength(body) > maxBytes) {
+        reject(new Error('Request body is too large'));
+        request.destroy();
+      }
+    });
+    request.on('end', () => {
+      if (!body.trim()) {
+        resolve({});
+        return;
+      }
+      try {
+        const parsed = JSON.parse(body);
+        if (!isPlainObject(parsed)) {
+          reject(new Error('Request body must be a JSON object'));
+          return;
+        }
+        resolve(parsed);
+      } catch (_error) {
+        reject(new Error('Invalid JSON request body'));
+      }
+    });
+    request.on('error', reject);
+  });
+}
+
+function normalizeUpdateManifest(manifest) {
+  if (!isPlainObject(manifest)) {
+    throw new Error('Update manifest must be an object');
+  }
+  if (typeof manifest.version !== 'string' || !manifest.version.trim()) {
+    throw new Error('Update manifest requires a version');
+  }
+  if (typeof manifest.url !== 'string' || !manifest.url.trim()) {
+    throw new Error('Update manifest requires a download url');
+  }
+  if (
+    typeof manifest.sha256 !== 'string' ||
+    !/^[a-fA-F0-9]{64}$/.test(manifest.sha256)
+  ) {
+    throw new Error('Update manifest requires a sha256 hash');
+  }
+
+  return {
+    ...manifest,
+    version: manifest.version.trim(),
+    url: manifest.url.trim(),
+    sha256: manifest.sha256.toLowerCase(),
+    mandatory: manifest.mandatory === true
+  };
+}
+
+function parseJsonFile(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const normalized = content.charCodeAt(0) === 0xfeff
+    ? content.slice(1)
+    : content;
+  return JSON.parse(normalized);
+}
+
 function parseClientMessage(message) {
   let data;
   try {
@@ -214,16 +289,90 @@ function createRoomServer(options = {}) {
     maxPayloadBytes + MAX_WEBSOCKET_HEADER_BYTES
   );
   const sockets = new Set();
+  const updateStreamSockets = new Set();
+  const updatePublishToken =
+    options.updatePublishToken || process.env.DESKTOP_CAT_UPDATE_PUBLISH_TOKEN;
+  const updateManifestPath =
+    options.updateManifestPath || process.env.DESKTOP_CAT_UPDATE_MANIFEST_PATH;
+  const updateManifestUrl =
+    options.updateManifestUrl || process.env.DESKTOP_CAT_UPDATE_MANIFEST_URL || DEFAULT_UPDATE_MANIFEST_URL;
 
-  const server = http.createServer((request, response) => {
+  function getUpdateManifest() {
+    if (options.updateManifest) {
+      return normalizeUpdateManifest(options.updateManifest);
+    }
+    if (!updateManifestPath) {
+      return null;
+    }
+    return normalizeUpdateManifest(parseJsonFile(updateManifestPath));
+  }
+
+  function broadcastUpdate(manifest) {
+    const payload = JSON.stringify({
+      type: 'update:available',
+      version: manifest.version,
+      manifestUrl: updateManifestUrl,
+      mandatory: manifest.mandatory === true
+    });
+
+    for (const socket of updateStreamSockets) {
+      if (!socket.destroyed) {
+        socket.write(encodeServerFrame(payload));
+      }
+    }
+  }
+
+  const server = http.createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/health') {
-      response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      response.end(JSON.stringify({ ok: true }));
+      sendJsonResponse(response, 200, { ok: true });
       return;
     }
 
-    response.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-    response.end(JSON.stringify({ error: 'not_found' }));
+    const requestUrl = new URL(request.url, 'http://127.0.0.1');
+    if (request.method === 'GET' && requestUrl.pathname === DEFAULT_UPDATE_MANIFEST_URL) {
+      try {
+        const manifest = getUpdateManifest();
+        if (!manifest) {
+          sendJsonResponse(response, 404, { error: 'update_manifest_not_configured' });
+          return;
+        }
+        sendJsonResponse(response, 200, manifest);
+      } catch (error) {
+        sendJsonResponse(response, 500, { error: 'invalid_update_manifest', message: error.message });
+      }
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/updates/publish') {
+      if (!updatePublishToken) {
+        sendJsonResponse(response, 403, { error: 'update_publish_token_not_configured' });
+        return;
+      }
+      if (request.headers.authorization !== `Bearer ${updatePublishToken}`) {
+        sendJsonResponse(response, 401, { error: 'unauthorized' });
+        return;
+      }
+
+      try {
+        await readJsonBody(request);
+        const manifest = getUpdateManifest();
+        if (!manifest) {
+          sendJsonResponse(response, 404, { error: 'update_manifest_not_configured' });
+          return;
+        }
+        broadcastUpdate(manifest);
+        sendJsonResponse(response, 200, {
+          ok: true,
+          version: manifest.version,
+          clients: updateStreamSockets.size
+        });
+      } catch (error) {
+        sendJsonResponse(response, 400, { error: 'invalid_request', message: error.message });
+      }
+      return;
+    }
+
+    sendJsonResponse(response, 404, { error: 'not_found' });
   });
 
   function sendError(client, message) {
@@ -261,17 +410,11 @@ function createRoomServer(options = {}) {
     throw new Error('Unsupported message type');
   }
 
-  server.on('upgrade', (request, socket) => {
-    const path = new URL(request.url, 'http://127.0.0.1').pathname;
-    if (path !== '/room') {
-      socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
-      return;
-    }
-
+  function acceptWebSocket(request, socket) {
     const key = request.headers['sec-websocket-key'];
     if (!key || request.headers.upgrade?.toLowerCase() !== 'websocket') {
       socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
-      return;
+      return false;
     }
 
     socket.write([
@@ -282,6 +425,39 @@ function createRoomServer(options = {}) {
       '',
       ''
     ].join('\r\n'));
+    return true;
+  }
+
+  server.on('upgrade', (request, socket) => {
+    const path = new URL(request.url, 'http://127.0.0.1').pathname;
+    if (path === '/updates/stream') {
+      if (!acceptWebSocket(request, socket)) {
+        return;
+      }
+
+      sockets.add(socket);
+      updateStreamSockets.add(socket);
+
+      socket.on('data', () => {});
+      socket.on('close', () => {
+        sockets.delete(socket);
+        updateStreamSockets.delete(socket);
+      });
+      socket.on('error', () => {
+        sockets.delete(socket);
+        updateStreamSockets.delete(socket);
+      });
+      return;
+    }
+
+    if (path !== '/room') {
+      socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
+      return;
+    }
+
+    if (!acceptWebSocket(request, socket)) {
+      return;
+    }
 
     sockets.add(socket);
 

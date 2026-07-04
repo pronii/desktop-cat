@@ -38,6 +38,12 @@
   const settingsPanelClose = document.getElementById('settingsPanelClose');
   const randomSpeechToggle = document.getElementById('randomSpeechToggle');
   const bottomButtonToggles = Array.from(document.querySelectorAll?.('[data-bottom-button-toggle]') || []);
+  const updatePrompt = document.getElementById('updatePrompt');
+  const updatePromptTitle = document.getElementById('updatePromptTitle');
+  const updatePromptText = document.getElementById('updatePromptText');
+  const updatePromptClose = document.getElementById('updatePromptClose');
+  const updatePromptPrimary = document.getElementById('updatePromptPrimary');
+  const updatePromptSecondary = document.getElementById('updatePromptSecondary');
 
   const CAT_SIZE_STORAGE_KEY = 'desktopCat.catScale';
   const CAT_SIZE_DRAG_PIXELS = CAT_SCALE_DRAG_PIXELS;
@@ -486,7 +492,7 @@
 
   function isAnyOverlayOpen() {
     return Boolean(document.querySelector(
-      '.water-panel.show, .clipboard-panel.show, .room-panel.show, .live2d-panel.show, .settings-panel.show, .water-reminder-dialog.show'
+      '.water-panel.show, .clipboard-panel.show, .room-panel.show, .live2d-panel.show, .settings-panel.show, .water-reminder-dialog.show, .update-prompt.show'
     ));
   }
 
@@ -621,6 +627,65 @@
   }
 
   window.__closeSettingsPanel = () => setSettingsPanelOpen(false);
+
+  let currentUpdatePrompt = null;
+
+  function setUpdatePromptOpen(isOpen) {
+    updatePrompt?.classList.toggle('show', isOpen);
+    if (isOpen) {
+      window.__closeWaterPanel?.();
+      window.__closeClipboardPanel?.();
+      window.__closeRoomPanel?.();
+      window.__closeLive2DPanel?.();
+      setSettingsPanelOpen(false);
+      showCatSizeControl();
+      applyClickThrough(false);
+    }
+  }
+
+  function respondToUpdatePrompt(response) {
+    const prompt = currentUpdatePrompt;
+    currentUpdatePrompt = null;
+    setUpdatePromptOpen(false);
+    if (prompt?.id) {
+      window.desktopCat?.updates?.respond?.(prompt.id, response);
+    }
+  }
+
+  function showUpdatePrompt(prompt) {
+    currentUpdatePrompt = prompt || null;
+    const version = prompt?.version || '';
+    if (prompt?.kind === 'ready') {
+      if (updatePromptTitle) updatePromptTitle.textContent = '更新已准备好';
+      if (updatePromptText) {
+        updatePromptText.textContent = version
+          ? `desktop-cat ${version} 已下载完成。`
+          : '更新已下载完成。';
+      }
+      if (updatePromptPrimary) updatePromptPrimary.textContent = '重启更新';
+      if (updatePromptSecondary) updatePromptSecondary.textContent = '稍后';
+    } else {
+      if (updatePromptTitle) {
+        updatePromptTitle.textContent = version
+          ? `发现新版本 ${version}`
+          : '发现新版本';
+      }
+      if (updatePromptText) {
+        updatePromptText.textContent = prompt?.notes || 'desktop-cat 有新版本可用。';
+      }
+      if (updatePromptPrimary) updatePromptPrimary.textContent = '下载更新';
+      if (updatePromptSecondary) updatePromptSecondary.textContent = '稍后';
+    }
+    setUpdatePromptOpen(true);
+  }
+
+  window.__closeUpdatePrompt = () => respondToUpdatePrompt('secondary');
+
+  updatePromptPrimary?.addEventListener('click', () => respondToUpdatePrompt('primary'));
+  updatePromptSecondary?.addEventListener('click', () => respondToUpdatePrompt('secondary'));
+  updatePromptClose?.addEventListener('click', () => respondToUpdatePrompt('secondary'));
+
+  window.desktopCat?.updates?.onPrompt?.(showUpdatePrompt);
 
   settingsBtn?.addEventListener('click', (event) => {
     event.preventDefault();

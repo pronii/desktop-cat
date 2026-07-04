@@ -1,8 +1,10 @@
 const path = require('node:path');
+const fs = require('node:fs');
 const crypto = require('node:crypto');
 const {
   app,
   BrowserWindow,
+  dialog,
   Menu,
   Tray,
   nativeImage,
@@ -43,6 +45,10 @@ const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
 const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
 const { SimpleWebSocket } = require('./simpleWebSocket');
+const {
+  createUpdateManager,
+  resolveUpdateConfig
+} = require('./updateManager');
 const {
   LIVE2D_PROTOCOL,
   createLive2DAppearance
@@ -86,7 +92,23 @@ let roomStateTeardown = null;
 let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let peerPetWindowManager = null;
+let updateManager = null;
+const pendingUpdatePrompts = new Map();
 const live2DAppearance = createLive2DAppearance({ app, protocol });
+
+function appendLive2DDiagnostic(entry = {}) {
+  try {
+    const logPath = path.join(app.getPath('userData'), 'live2d-diagnostics.log');
+    const payload = {
+      time: new Date().toISOString(),
+      ...entry
+    };
+    const line = `${JSON.stringify(payload).slice(0, 12000)}\n`;
+    fs.appendFile(logPath, line, () => {});
+  } catch (_error) {
+    // Diagnostics must never affect app behavior.
+  }
+}
 
 function centerWindowOnScreen(window) {
   const bounds = window.getBounds();
@@ -328,7 +350,8 @@ function createPetContextMenu(window) {
           updateTrayMenu(window);
           return enabled;
         },
-        testWaterReminder: () => waterReminder.fire()
+        testWaterReminder: () => waterReminder.fire(),
+        checkForUpdates
       }
     })
   );
@@ -355,7 +378,8 @@ function createTrayContextMenu(window) {
           updateTrayMenu(window);
           return enabled;
         },
-        testWaterReminder: () => waterReminder.fire()
+        testWaterReminder: () => waterReminder.fire(),
+        checkForUpdates
       }
     })
   );
@@ -364,6 +388,43 @@ function createTrayContextMenu(window) {
 function updateTrayMenu(window) {
   if (!tray || !window || window.isDestroyed()) return;
   tray.setContextMenu(createTrayContextMenu(window));
+}
+
+function checkForUpdates() {
+  if (!updateManager) return;
+  updateManager.checkNow({ userInitiated: true }).catch(() => {});
+}
+
+function requestUpdatePrompt(kind, payload = {}) {
+  if (!petWindow || petWindow.isDestroyed()) {
+    return Promise.resolve(false);
+  }
+
+  showPetWindow(petWindow, { center: false });
+
+  const id = crypto.randomUUID();
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingUpdatePrompts.delete(id);
+      resolve(false);
+    }, 5 * 60 * 1000);
+    if (typeof timeout.unref === 'function') {
+      timeout.unref();
+    }
+
+    pendingUpdatePrompts.set(id, {
+      resolve(value) {
+        clearTimeout(timeout);
+        resolve(value);
+      }
+    });
+
+    petWindow.webContents.send('update:prompt', {
+      id,
+      kind,
+      ...payload
+    });
+  });
 }
 
 function createApplicationTray(window) {
@@ -582,6 +643,10 @@ ipcMain.handle('water-reminder:set-task-interval', (_event, taskId, minutes) => 
   return waterReminder.setTaskIntervalMinutes(taskId, minutes);
 });
 
+ipcMain.handle('water-reminder:set-task-scheduled-at', (_event, taskId, scheduledAt) => {
+  return waterReminder.setTaskScheduledAt(taskId, scheduledAt);
+});
+
 ipcMain.handle('water-reminder:set-task-name', (_event, taskId, taskName) => {
   return waterReminder.setTaskName(taskId, taskName);
 });
@@ -618,6 +683,22 @@ ipcMain.handle('appearance:get-live2d-models', () => {
 
 ipcMain.handle('appearance:set-live2d-model', (_event, modelId) => {
   return live2DAppearance.setCurrentModel(modelId);
+});
+
+ipcMain.on('diagnostics:live2d-log', (_event, entry = {}) => {
+  appendLive2DDiagnostic(entry);
+});
+
+/* --- Update prompt IPC --- */
+
+ipcMain.handle('update:respond', (_event, payload = {}) => {
+  const prompt = pendingUpdatePrompts.get(payload.id);
+  if (!prompt) {
+    return false;
+  }
+  pendingUpdatePrompts.delete(payload.id);
+  prompt.resolve(payload.response === 'primary');
+  return true;
 });
 
 /* --- 好友同屏 IPC --- */
@@ -703,6 +784,21 @@ if (!gotTheLock) {
     });
     waterReminder.start();
     setupRoomClient();
+    updateManager = createUpdateManager({
+      app,
+      dialog,
+      fetch: globalThis.fetch,
+      WebSocket: globalThis.WebSocket || SimpleWebSocket,
+      promptForUpdate: (manifest) => requestUpdatePrompt('available', {
+        version: manifest.version,
+        notes: manifest.notes
+      }),
+      promptForRestart: (manifest) => requestUpdatePrompt('ready', {
+        version: manifest.version
+      }),
+      ...resolveUpdateConfig()
+    });
+    updateManager.start();
     createPetWindow();
 
     app.on('activate', () => {
@@ -715,6 +811,10 @@ if (!gotTheLock) {
 
 app.on('before-quit', () => {
   waterReminder.stop();
+  if (updateManager) {
+    updateManager.stop();
+    updateManager = null;
+  }
   teardownRoomClient();
   teardownClipboardHistory();
   getForegroundProbeWorker().stop();

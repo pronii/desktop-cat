@@ -17,6 +17,7 @@
   const waterPanelLast = document.getElementById('waterPanelLast');
   const waterPanelNext = document.getElementById('waterPanelNext');
   const waterTaskNameInput = document.getElementById('waterTaskNameInput');
+  const waterTaskScheduledAtInput = document.getElementById('waterTaskScheduledAtInput');
   const waterTaskAddBtn = document.getElementById('waterTaskAddBtn');
   const waterTaskNewIntervals = document.getElementById('waterTaskNewIntervals');
   const waterTaskList = document.getElementById('waterTaskList');
@@ -63,7 +64,44 @@
     return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   }
 
+  function formatScheduledAt(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function fromDateTimeLocalValue(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  function formatRemaining(remaining) {
+    const totalSec = Math.max(0, Math.floor(remaining / 1000));
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+
+    if (min >= 60) {
+      const hr = Math.floor(min / 60);
+      const remainMin = min % 60;
+      return `⏰ ${hr}时${remainMin}分后提醒`;
+    }
+    if (min > 0) {
+      return `⏰ ${min}分${String(sec).padStart(2, '0')}秒后提醒`;
+    }
+    return `⏰ ${sec}秒后提醒`;
+  }
+
   function formatNextTrigger(config, taskName = DEFAULT_WATER_NAME) {
+    if (config?.scheduledAt) {
+      if (!config.enabled) return '⏰ 提醒已关闭';
+      const scheduledTime = new Date(config.scheduledAt).getTime();
+      if (isNaN(scheduledTime)) return '⏰ 等待提醒';
+      const remaining = scheduledTime - Date.now();
+      if (remaining <= 0) return `🚨 请${taskName}吧！`;
+      return formatRemaining(remaining);
+    }
     if (!config) return '⏰ 等待提醒';
     if (!config.enabled) return '⏰ 提醒已关闭';
     if (!config.lastTriggerAt) return '⏰ 等待第一次提醒';
@@ -93,6 +131,10 @@
   }
 
   function isUrgent(config) {
+    if (config?.scheduledAt) {
+      const scheduledTime = new Date(config.scheduledAt).getTime();
+      return Boolean(config.enabled) && !isNaN(scheduledTime) && scheduledTime <= Date.now();
+    }
     if (!config || !config.enabled || !config.lastTriggerAt) return false;
     const lastTime = new Date(config.lastTriggerAt).getTime();
     if (isNaN(lastTime)) return false;
@@ -119,6 +161,7 @@
           name: config.taskName,
           enabled: Boolean(config.taskEnabled),
           interval: config.taskInterval || DEFAULT_TASK_INTERVAL,
+          scheduledAt: config.taskScheduledAt || null,
           lastTriggerAt: config.taskLastTriggerAt
         }
       ];
@@ -152,7 +195,11 @@
       if (!row) return;
       const lastEl = row.querySelector('[data-task-last]');
       const nextEl = row.querySelector('[data-task-next]');
-      if (lastEl) lastEl.textContent = formatLastTrigger(task.lastTriggerAt);
+      if (lastEl) {
+        lastEl.textContent = task.scheduledAt
+          ? `指定 ${formatScheduledAt(task.scheduledAt)}`
+          : formatLastTrigger(task.lastTriggerAt);
+      }
       if (nextEl) {
         nextEl.textContent = formatNextTrigger(task, normalizeTaskName(task.name));
         nextEl.classList.toggle('is-urgent', isUrgent(task));
@@ -234,7 +281,9 @@
       meta.className = 'water-task-item-meta';
       const last = document.createElement('span');
       last.dataset.taskLast = 'true';
-      last.textContent = formatLastTrigger(task.lastTriggerAt);
+      last.textContent = task.scheduledAt
+        ? `指定 ${formatScheduledAt(task.scheduledAt)}`
+        : formatLastTrigger(task.lastTriggerAt);
       const next = document.createElement('span');
       next.dataset.taskNext = 'true';
       next.textContent = formatNextTrigger(task, normalizeTaskName(task.name));
@@ -251,7 +300,7 @@
         btn.type = 'button';
         btn.dataset.action = 'set-task-interval';
         btn.dataset.minutes = String(minutes);
-        btn.classList.toggle('is-active', Number(task.interval) === minutes);
+        btn.classList.toggle('is-active', !task.scheduledAt && Number(task.interval) === minutes);
         btn.textContent = minutes >= 60 ? `${minutes / 60}h` : `${minutes}m`;
         intervals.appendChild(btn);
       });
@@ -416,13 +465,16 @@
   async function addTaskReminder() {
     if (!api?.addTaskReminder) return;
     const name = normalizeTaskName(waterTaskNameInput?.value);
+    const scheduledAt = fromDateTimeLocalValue(waterTaskScheduledAtInput?.value);
     try {
       await api.addTaskReminder({
         name,
         interval: selectedNewTaskInterval,
-        enabled: false
+        scheduledAt,
+        enabled: Boolean(scheduledAt)
       });
       if (waterTaskNameInput) waterTaskNameInput.value = '';
+      if (waterTaskScheduledAtInput) waterTaskScheduledAtInput.value = '';
       refreshConfig();
     } catch (_e) {
       // Non-critical.
@@ -486,6 +538,13 @@
 
   waterTaskAddBtn?.addEventListener('click', () => addTaskReminder());
   waterTaskNameInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTaskReminder();
+    }
+  });
+
+  waterTaskScheduledAtInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addTaskReminder();

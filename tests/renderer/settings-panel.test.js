@@ -23,6 +23,8 @@ test('settings panel controls random speech and bottom button visibility', () =>
   assert.match(html, /id="settingsPanel"/);
   assert.match(html, /id="settingsPanelClose"/);
   assert.match(html, /id="randomSpeechToggle"/);
+  assert.match(html, /话痨模式/);
+  assert.doesNotMatch(html, /随机说话/);
   assert.match(html, /data-bottom-button-toggle="water"/);
   assert.match(html, /data-bottom-button-toggle="clipboard"/);
   assert.match(html, /data-bottom-button-toggle="room"/);

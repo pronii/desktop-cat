@@ -7,6 +7,7 @@ const DEFAULT_INTERVAL = 30;
 const DEFAULT_TASK_NAME = '站起来活动';
 const DEFAULT_TASK_INTERVAL = 60;
 const MAX_TASK_NAME_LENGTH = 24;
+const MAX_TIMER_DELAY = 2147483647;
 
 function getConfigPath() {
   return path.join(app.getPath('userData'), 'water-reminder.json');
@@ -54,6 +55,12 @@ function normalizeInterval(value, fallback = DEFAULT_TASK_INTERVAL) {
   return Number.isFinite(interval) && interval > 0 ? interval : fallback;
 }
 
+function normalizeScheduledAt(value) {
+  if (value === null || typeof value === 'undefined' || value === '') return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function createTaskReminder(task = {}) {
   return {
     id: typeof task.id === 'string' && task.id.trim()
@@ -62,6 +69,7 @@ function createTaskReminder(task = {}) {
     name: normalizeTaskName(task.name),
     enabled: Boolean(task.enabled),
     interval: normalizeInterval(task.interval),
+    scheduledAt: normalizeScheduledAt(task.scheduledAt),
     lastTriggerAt: typeof task.lastTriggerAt === 'string' ? task.lastTriggerAt : null
   };
 }
@@ -77,6 +85,7 @@ function normalizeTaskReminders(saved) {
       saved.taskName ||
       saved.taskEnabled ||
       saved.taskInterval ||
+      saved.taskScheduledAt ||
       saved.taskLastTriggerAt
     )
   ) {
@@ -85,6 +94,7 @@ function normalizeTaskReminders(saved) {
         name: saved.taskName,
         enabled: saved.taskEnabled,
         interval: saved.taskInterval,
+        scheduledAt: saved.taskScheduledAt,
         lastTriggerAt: saved.taskLastTriggerAt
       })
     ];
@@ -123,6 +133,7 @@ function getPrimaryTask(config) {
     name: DEFAULT_TASK_NAME,
     enabled: false,
     interval: DEFAULT_TASK_INTERVAL,
+    scheduledAt: null,
     lastTriggerAt: null
   };
 }
@@ -133,6 +144,7 @@ function cloneTask(task) {
     name: task.name,
     enabled: task.enabled,
     interval: task.interval,
+    scheduledAt: task.scheduledAt || null,
     lastTriggerAt: task.lastTriggerAt
   };
 }
@@ -160,6 +172,7 @@ function createWaterReminder() {
       taskName: primaryTask.name,
       taskEnabled: primaryTask.enabled,
       taskInterval: primaryTask.interval,
+      taskScheduledAt: primaryTask.scheduledAt || null,
       taskLastTriggerAt: primaryTask.lastTriggerAt,
       dailyCount: config.dailyCount,
       lastTriggerAt: config.lastTriggerAt
@@ -183,7 +196,11 @@ function createWaterReminder() {
   function clearTaskTimer(taskId) {
     const timer = taskTimers.get(taskId);
     if (timer) {
-      clearInterval(timer);
+      if (timer.type === 'timeout') {
+        clearTimeout(timer.handle);
+      } else {
+        clearInterval(timer.handle);
+      }
       taskTimers.delete(taskId);
     }
   }
@@ -192,11 +209,32 @@ function createWaterReminder() {
     clearTaskTimer(task.id);
     if (!task.enabled) return;
 
+    if (task.scheduledAt) {
+      const scheduledTime = new Date(task.scheduledAt).getTime();
+      if (Number.isNaN(scheduledTime)) return;
+      const remaining = scheduledTime - Date.now();
+      const shouldRefresh = remaining > MAX_TIMER_DELAY;
+      const delay = Math.max(0, Math.min(remaining, MAX_TIMER_DELAY));
+      const timer = setTimeout(() => {
+        taskTimers.delete(task.id);
+        if (shouldRefresh) {
+          scheduleTask(task);
+          return;
+        }
+        fire('task', task.id);
+      }, delay);
+      if (typeof timer.unref === 'function') {
+        timer.unref();
+      }
+      taskTimers.set(task.id, { handle: timer, type: 'timeout' });
+      return;
+    }
+
     const timer = setInterval(() => fire('task', task.id), task.interval * 60 * 1000);
     if (typeof timer.unref === 'function') {
       timer.unref();
     }
-    taskTimers.set(task.id, timer);
+    taskTimers.set(task.id, { handle: timer, type: 'interval' });
   }
 
   function scheduleTasks() {
@@ -244,7 +282,7 @@ function createWaterReminder() {
       persistConfig(config);
     }
     for (const task of config.taskReminders) {
-      if (task.enabled && !task.lastTriggerAt) {
+      if (task.enabled && !task.scheduledAt && !task.lastTriggerAt) {
         task.lastTriggerAt = new Date().toISOString();
         persistConfig(config);
       }
@@ -269,6 +307,9 @@ function createWaterReminder() {
       const task = findTask(taskId);
       if (!task) return false;
       task.lastTriggerAt = new Date().toISOString();
+      if (task.scheduledAt) {
+        task.enabled = false;
+      }
       persistConfig(config);
       notifyRenderer('task', task.id);
       return true;
@@ -291,7 +332,8 @@ function createWaterReminder() {
     const newTask = createTaskReminder({
       name: task.name,
       enabled: Boolean(task.enabled),
-      interval: task.interval
+      interval: task.interval,
+      scheduledAt: task.scheduledAt
     });
     config.taskReminders.push(newTask);
     persistConfig(config);
@@ -335,7 +377,23 @@ function createWaterReminder() {
     const minutes = hasTaskId ? maybeMinutes : taskIdOrMinutes;
     if (!task || typeof minutes !== 'number' || minutes <= 0) return false;
     task.interval = minutes;
+    task.scheduledAt = null;
     task.lastTriggerAt = new Date().toISOString();
+    persistConfig(config);
+    scheduleTask(task);
+    return true;
+  }
+
+  function setTaskScheduledAt(taskId, scheduledAtValue) {
+    const task = findTask(taskId);
+    if (!task) return false;
+    const scheduledAt = normalizeScheduledAt(scheduledAtValue);
+    if (scheduledAtValue && !scheduledAt) return false;
+    task.scheduledAt = scheduledAt;
+    if (scheduledAt) {
+      task.enabled = true;
+      task.lastTriggerAt = null;
+    }
     persistConfig(config);
     scheduleTask(task);
     return true;
@@ -370,7 +428,12 @@ function createWaterReminder() {
   function snoozeTask(taskId = null) {
     const task = findTask(taskId);
     if (!task) return false;
-    task.lastTriggerAt = new Date().toISOString();
+    const now = new Date();
+    task.lastTriggerAt = now.toISOString();
+    if (task.scheduledAt) {
+      task.scheduledAt = new Date(now.getTime() + task.interval * 60 * 1000).toISOString();
+      task.enabled = true;
+    }
     persistConfig(config);
     scheduleTask(task);
     return true;
@@ -380,6 +443,9 @@ function createWaterReminder() {
     const task = findTask(taskId);
     if (!task) return false;
     task.lastTriggerAt = new Date().toISOString();
+    if (task.scheduledAt) {
+      task.enabled = false;
+    }
     persistConfig(config);
     scheduleTask(task);
     return true;
@@ -395,6 +461,7 @@ function createWaterReminder() {
     toggleTaskEnabled,
     setIntervalMinutes,
     setTaskIntervalMinutes,
+    setTaskScheduledAt,
     setTaskName,
     recordDrink,
     snooze,

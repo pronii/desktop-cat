@@ -37,6 +37,10 @@ function createTrayMenuTemplate({ state, waterReminderConfig = {}, actions = {} 
       label: '好友同屏',
       click: actions.openRoomPanel || noop
     },
+    {
+      label: '检查更新',
+      click: actions.checkForUpdates || noop
+    },
     ...(dailyInfo
       ? [{
         label: dailyInfo,

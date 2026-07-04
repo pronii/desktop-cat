@@ -145,6 +145,21 @@
       </div>
     </div>
 
+    <div class="update-prompt" id="updatePrompt" role="dialog" aria-modal="false" aria-labelledby="updatePromptTitle">
+      <div class="update-prompt-main">
+        <div class="update-prompt-icon" aria-hidden="true">↑</div>
+        <div class="update-prompt-copy">
+          <h3 id="updatePromptTitle">发现新版本</h3>
+          <p id="updatePromptText">desktop-cat 有新版本可用。</p>
+        </div>
+        <button class="update-prompt-close" id="updatePromptClose" type="button" aria-label="关闭更新提示">×</button>
+      </div>
+      <div class="update-prompt-actions">
+        <button class="sketch-action-btn update-prompt-primary" id="updatePromptPrimary" type="button">下载更新</button>
+        <button class="sketch-action-btn sketch-action-btn-snooze" id="updatePromptSecondary" type="button">稍后</button>
+      </div>
+    </div>
+
     <div class="water-panel sketch-panel" id="waterPanel">
       <div class="sketch-panel-header sketch-panel-header-water">
         <h3>💧 喝水记录</h3>
@@ -198,6 +213,10 @@
               </label>
               <button class="sketch-action-btn water-task-add-btn" id="waterTaskAddBtn" type="button">新增</button>
             </div>
+            <label class="water-task-field water-task-time-field">
+              <span class="water-panel-row-label">指定时间</span>
+              <input id="waterTaskScheduledAtInput" class="water-task-time-input" type="datetime-local" autocomplete="off">
+            </label>
             <div class="water-panel-row water-panel-row-column">
               <span class="water-panel-row-label">默认间隔</span>
               <div class="water-panel-intervals water-task-intervals" id="waterTaskNewIntervals">
@@ -278,7 +297,7 @@
         <div class="settings-section">
           <div class="settings-section-title">陪伴</div>
           <label class="settings-row">
-            <span class="settings-row-label">随机说话</span>
+            <span class="settings-row-label">话痨模式</span>
             <span class="sketch-switch">
               <input type="checkbox" id="randomSpeechToggle">
               <span class="sketch-switch-slider"></span>

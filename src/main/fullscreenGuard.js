@@ -3,6 +3,16 @@ const { getForegroundProbeWorker } = require('./foregroundWorker');
 
 const DEFAULT_FULLSCREEN_THRESHOLD = 0.97;
 const DEFAULT_SUSPEND_HOLD_MS = 3000;
+const SCREENSHOT_PROCESS_NAMES = new Set([
+  'screenclippinghost',
+  'snippingtool',
+  'screensketch',
+  'greenshot',
+  'sharex',
+  'lightshot',
+  'picpick',
+  'flameshot'
+]);
 
 const foregroundProbeScript = String.raw`
 Add-Type @"
@@ -208,6 +218,20 @@ function isIgnoredSystemWindow(windowSnapshot) {
   return false;
 }
 
+function normalizeProcessName(processName) {
+  return String(processName || '').trim().toLowerCase().replace(/\.exe$/, '');
+}
+
+function isScreenshotWindow(windowSnapshot) {
+  const processName = normalizeProcessName(windowSnapshot?.processName);
+
+  if (SCREENSHOT_PROCESS_NAMES.has(processName)) {
+    return true;
+  }
+
+  return false;
+}
+
 function shouldSuspendTopmost({
   foreground,
   windows,
@@ -218,6 +242,9 @@ function shouldSuspendTopmost({
   if (foreground) {
     if (petWindowId && String(foreground.hwnd) === String(petWindowId)) {
       return false;
+    }
+    if (isScreenshotWindow(foreground)) {
+      return true;
     }
     if (isIgnoredSystemWindow(foreground)) {
       return false;
@@ -232,6 +259,9 @@ function shouldSuspendTopmost({
     return windows.some((windowSnapshot) => {
       if (petWindowId && String(windowSnapshot.hwnd) === String(petWindowId)) {
         return false;
+      }
+      if (isScreenshotWindow(windowSnapshot)) {
+        return true;
       }
       if (isIgnoredSystemWindow(windowSnapshot)) {
         return false;
@@ -367,6 +397,7 @@ module.exports = {
   createTopmostSuspendState,
   isFullscreenForeground,
   isIgnoredSystemWindow,
+  isScreenshotWindow,
   normalizeWindowSnapshot,
   normalizeDisplaySnapshot,
   probeForegroundWindow,

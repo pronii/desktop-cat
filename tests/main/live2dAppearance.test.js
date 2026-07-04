@@ -86,6 +86,20 @@ test('discoverLive2DModel finds the first model3.json in configured folders', (t
   assert.equal(model.rootDir, path.dirname(modelJsonPath));
   assert.equal(model.modelJsonPath, modelJsonPath);
   assert.equal(model.modelUrl, `${LIVE2D_PROTOCOL}://model/hiyori/hiyori.model3.json`);
+  assert.equal(model.previewImageUrl, `${LIVE2D_PROTOCOL}://model/hiyori/textures/texture_00.png`);
+});
+
+test('discoverLive2DModel prefers a dedicated preview image over texture atlases', (t) => {
+  const root = makeTempRoot(t);
+  const live2dRoot = path.join(root, 'live2d');
+  const modelJsonPath = writeModel(live2dRoot, path.join('hiyori', 'hiyori.model3.json'), 'Hiyori');
+  const previewPath = path.join(path.dirname(modelJsonPath), 'preview.png');
+  fs.writeFileSync(previewPath, 'preview');
+
+  const model = discoverLive2DModel({ searchRoots: [live2dRoot] });
+
+  assert.equal(model.previewImagePath, previewPath);
+  assert.equal(model.previewImageUrl, `${LIVE2D_PROTOCOL}://model/hiyori/preview.png`);
 });
 
 test('discoverLive2DModels lists multiple models while keeping external folders first', (t) => {
@@ -115,6 +129,8 @@ test('discoverLive2DModels gives every model an isolated protocol url for previe
 
   assert.equal(models[0].modelUrl, `${LIVE2D_PROTOCOL}://model/Hiyori/Hiyori.model3.json`);
   assert.equal(models[1].modelUrl, `${LIVE2D_PROTOCOL}://model/Mao/Mao.model3.json`);
+  assert.equal(models[0].previewImageUrl, `${LIVE2D_PROTOCOL}://model/Hiyori/textures/texture_00.png`);
+  assert.equal(models[1].previewImageUrl, `${LIVE2D_PROTOCOL}://model/Mao/textures/texture_00.png`);
   assert.equal(
     resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[0].modelUrl),
     hiyoriModelPath
@@ -122,6 +138,21 @@ test('discoverLive2DModels gives every model an isolated protocol url for previe
   assert.equal(
     resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[1].modelUrl),
     maoModelPath
+  );
+  assert.equal(
+    resolveLive2DProtocolPath(
+      { availableModels: models, currentModel: models[0] },
+      `${models[0].modelUrl}?desktopCatPreview=1`
+    ),
+    hiyoriModelPath
+  );
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[0].previewImageUrl),
+    path.join(path.dirname(hiyoriModelPath), 'textures', 'texture_00.png')
+  );
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[1].previewImageUrl),
+    path.join(path.dirname(maoModelPath), 'textures', 'texture_00.png')
   );
 });
 
@@ -197,7 +228,15 @@ test('createLive2DAppearance can switch the current Live2D model by id', (t) => 
   });
 
   assert.equal(appearance.getCurrentModel().id, 'Hiyori');
+  assert.equal(appearance.getCurrentModel().previewImageUrl, `${LIVE2D_PROTOCOL}://model/Hiyori/textures/texture_00.png`);
   assert.deepEqual(appearance.getAvailableModels().map((model) => model.id), ['Hiyori', 'Mao']);
+  assert.deepEqual(
+    appearance.getAvailableModels().map((model) => model.previewImageUrl),
+    [
+      `${LIVE2D_PROTOCOL}://model/Hiyori/textures/texture_00.png`,
+      `${LIVE2D_PROTOCOL}://model/Mao/textures/texture_00.png`
+    ]
+  );
   assert.equal(appearance.setCurrentModel('Mao').id, 'Mao');
   assert.equal(appearance.getCurrentModel().id, 'Mao');
   assert.equal(appearance.setCurrentModel('missing').available, false);

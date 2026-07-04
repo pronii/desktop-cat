@@ -78,7 +78,11 @@ test('live2d switcher panel renders model previews and selects a model', () => {
 
   assert.match(script, /getLive2DModels/);
   assert.match(script, /setLive2DModel/);
-  assert.match(script, /Live2DModel\.from/);
+  assert.match(script, /previewImageUrl/);
+  assert.match(script, /document\.createElement\('img'\)/);
+  assert.doesNotMatch(script, /Live2DModel\.from/);
+  assert.doesNotMatch(script, /new\s+window\.PIXI\.Application/);
+  assert.doesNotMatch(script, /document\.createElement\('canvas'\)/);
   assert.match(script, /live2dModelList/);
   assert.match(script, /live2d-model-card/);
   assert.match(script, /loadModel\?\.\(selected\)/);
@@ -96,11 +100,14 @@ test('bundled live2d models do not include audio assets or sound motion bindings
   assert.deepEqual(soundReferences, []);
 });
 
-test('live2d switcher keeps preview PIXI apps stable after models are loaded', () => {
+test('live2d switcher uses static previews so the panel cannot disturb the visible model runtime', () => {
   const script = readSource('src', 'renderer', 'live2dPanel.js');
   const loadModelsMatch = script.match(/async\s+function\s+loadModels\s*\(\)\s*\{([\s\S]*?)\n\s*\}/);
   assert.ok(loadModelsMatch, 'loadModels function should exist');
   const loadModelsBody = loadModelsMatch[1];
+  const setOpenMatch = script.match(/function\s+setOpen\s*\([^)]*\)\s*\{([\s\S]*?)\n\s*\}/);
+  assert.ok(setOpenMatch, 'setOpen function should exist');
+  const setOpenBody = setOpenMatch[1];
 
   assert.doesNotMatch(
     loadModelsBody,
@@ -112,32 +119,15 @@ test('live2d switcher keeps preview PIXI apps stable after models are loaded', (
     /if\s*\(\s*modelsLoaded\s*\)\s*\{[\s\S]*updateActiveCards\s*\(\s*\)[\s\S]*return\s*;/,
     'when models are already loaded, reopening the panel should only refresh active card state'
   );
-  assert.match(script, /function\s+disposePreviewApps\s*\(/, 'preview PIXI apps should have a disposal helper');
-  assert.match(
-    script,
-    /disposePreviewApps\s*\(\s*\)/,
-    'closing or replacing the switcher preview list should dispose old PIXI preview apps'
+  assert.doesNotMatch(
+    setOpenBody,
+    /else\s*\{[\s\S]*clearModelList\s*\(\s*\)[\s\S]*\}/,
+    'hiding the panel must not clear preview images or disturb the visible model'
   );
-  assert.match(
-    script,
-    /autoStart:\s*false/,
-    'preview PIXI apps should not keep a ticker running for static thumbnails'
-  );
-  assert.match(
-    script,
-    /previewApp\s*\.\s*render\s*\(\s*\)/,
-    'preview thumbnails should render once after the model is added'
-  );
-  assert.match(
-    script,
-    /previewModel\s*\.\s*autoUpdate\s*=\s*false/,
-    'preview Live2D models should detach from the shared ticker'
-  );
-  assert.match(
-    script,
-    /previewApps\s*\.\s*get\s*\(\s*modelConfig\.id\s*\)\s*!==\s*previewApp/,
-    'stale async preview loads should not attach models to disposed preview apps'
-  );
+  assert.match(script, /preview\.src\s*=\s*modelConfig\.previewImageUrl/, 'preview cards should use static image assets');
+  assert.doesNotMatch(script, /previewResources/, 'switcher previews should not own PIXI resources');
+  assert.doesNotMatch(script, /Live2DModel\.from/, 'preview cards must not load Live2D models');
+  assert.doesNotMatch(script, /new\s+window\.PIXI\.Application/, 'preview cards must not create PIXI apps');
   assert.match(
     script,
     /isCurrentModelVisible/,
@@ -312,6 +302,361 @@ test('live2d switcher does not reset the current visible model when no switch is
 
   assert.equal(setModelCalls, 0);
   assert.equal(loadCalls, 0);
+});
+
+test('live2d switcher button opens previews without touching the visible main model', async () => {
+  const script = readSource('src', 'renderer', 'live2dPanel.js');
+  const modelConfig = {
+    available: true,
+    id: 'Haru',
+    name: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json',
+    previewImageUrl: 'desktop-cat-live2d://model/Haru/textures/texture_00.png'
+  };
+  let panelOpen = false;
+  let buttonClick = null;
+  let setModelCalls = 0;
+  let loadCalls = 0;
+  let previewAppCreations = 0;
+  let previewModelLoads = 0;
+  const createdImages = [];
+
+  function createElement(id = '') {
+    return {
+      children: [],
+      classList: {
+        contains(name) {
+          return id === 'live2dPanel' && name === 'show' ? panelOpen : false;
+        },
+        toggle(name, value) {
+          if (id === 'live2dPanel' && name === 'show') {
+            panelOpen = Boolean(value);
+          }
+        },
+        add() {},
+        remove() {}
+      },
+      dataset: {},
+      setAttribute() {},
+      addEventListener(type, handler) {
+        if (id === 'live2dSwitcherBtn' && type === 'click') {
+          buttonClick = handler;
+        }
+      },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll() {
+        return [];
+      },
+      replaceChildren() {
+        this.children = [];
+      },
+      append(...children) {
+        this.children.push(...children);
+      },
+      contains() {
+        return false;
+      }
+    };
+  }
+
+  const elements = new Map([
+    ['live2dSwitcherBtn', createElement('live2dSwitcherBtn')],
+    ['live2dPanel', createElement('live2dPanel')],
+    ['live2dPanelClose', createElement('live2dPanelClose')],
+    ['live2dModelList', createElement('live2dModelList')]
+  ]);
+
+  class FakePixiApplication {
+    constructor(options = {}) {
+      previewAppCreations += 1;
+      this.view = options.view;
+      this.stage = {
+        children: [],
+        addChild(child) {
+          this.children.push(child);
+        },
+        removeChild(child) {
+          this.children = this.children.filter((entry) => entry !== child);
+        }
+      };
+    }
+
+    render() {}
+    destroy() {}
+  }
+
+  const fakeWindow = {
+    desktopCat: {
+      appearance: {
+        getLive2DModels: async () => [modelConfig],
+        setLive2DModel: async () => {
+          setModelCalls += 1;
+          return modelConfig;
+        }
+      }
+    },
+    __desktopCatLive2DAppearance: {
+      getCurrentModel: () => ({ id: 'Haru', available: true }),
+      isCurrentModelVisible: () => true,
+      ensureCurrentModelVisible: async () => {
+        loadCalls += 1;
+      },
+      loadModel: async () => {
+        loadCalls += 1;
+      }
+    },
+    localStorage: {
+      getItem: () => 'Haru',
+      setItem() {}
+    },
+    PIXI: {
+      Application: FakePixiApplication,
+      live2d: {
+        Live2DModel: {
+          from: async () => {
+            previewModelLoads += 1;
+            return {
+              width: 120,
+              height: 180,
+              anchor: { set() {} },
+              scale: { set() {} },
+              on() {},
+              destroy() {}
+            };
+          }
+        }
+      }
+    }
+  };
+
+  const fakeDocument = {
+    getElementById(id) {
+      return elements.get(id) || null;
+    },
+    createElement(tagName) {
+      const element = createElement();
+      element.tagName = tagName.toUpperCase();
+      if (tagName === 'canvas') {
+        throw new Error('switcher previews must not create canvases');
+      }
+      if (tagName === 'img') {
+        createdImages.push(element);
+      }
+      return element;
+    },
+    createDocumentFragment() {
+      return {
+        children: [],
+        append(...children) {
+          this.children.push(...children);
+        }
+      };
+    },
+    addEventListener() {}
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(setModelCalls, 0);
+  assert.equal(loadCalls, 0);
+  assert.equal(previewAppCreations, 0);
+  assert.equal(previewModelLoads, 0);
+
+  assert.ok(buttonClick, 'switcher button click handler should be registered');
+  buttonClick({ preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(panelOpen, true);
+  assert.equal(setModelCalls, 0);
+  assert.equal(loadCalls, 0);
+  assert.equal(previewAppCreations, 0);
+  assert.equal(previewModelLoads, 0);
+  assert.equal(createdImages.length, 1);
+  assert.equal(createdImages[0].src, modelConfig.previewImageUrl);
+});
+
+test('closing live2d switcher preview does not destroy the visible main model', async () => {
+  const script = readSource('src', 'renderer', 'live2dPanel.js');
+  const modelConfig = {
+    available: true,
+    id: 'Haru',
+    name: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json',
+    previewImageUrl: 'desktop-cat-live2d://model/Haru/textures/texture_00.png'
+  };
+  let panelOpen = false;
+  let buttonClick = null;
+  let mainModelDestroyed = false;
+  const loadedPreviewUrls = [];
+  const mainModel = {
+    width: 120,
+    height: 180,
+    anchor: { set() {} },
+    scale: { set() {} },
+    on() {},
+    destroy() {
+      mainModelDestroyed = true;
+    }
+  };
+
+  function createElement(id = '') {
+    return {
+      children: [],
+      classList: {
+        contains(name) {
+          return id === 'live2dPanel' && name === 'show' ? panelOpen : false;
+        },
+        toggle(name, value) {
+          if (id === 'live2dPanel' && name === 'show') {
+            panelOpen = Boolean(value);
+          }
+        },
+        add() {},
+        remove() {}
+      },
+      dataset: {},
+      setAttribute() {},
+      addEventListener(type, handler) {
+        if (id === 'live2dSwitcherBtn' && type === 'click') {
+          buttonClick = handler;
+        }
+      },
+      querySelector() {
+        return this.children.length ? this.children[0] : null;
+      },
+      querySelectorAll() {
+        return [];
+      },
+      replaceChildren() {
+        this.children = [];
+      },
+      append(...children) {
+        this.children.push(...children);
+      },
+      contains() {
+        return false;
+      }
+    };
+  }
+
+  const elements = new Map([
+    ['live2dSwitcherBtn', createElement('live2dSwitcherBtn')],
+    ['live2dPanel', createElement('live2dPanel')],
+    ['live2dPanelClose', createElement('live2dPanelClose')],
+    ['live2dModelList', createElement('live2dModelList')]
+  ]);
+
+  class FakePixiApplication {
+    constructor() {
+      this.stage = {
+        children: [],
+        addChild(child) {
+          this.children.push(child);
+        },
+        removeChild(child) {
+          this.children = this.children.filter((entry) => entry !== child);
+        }
+      };
+    }
+
+    render() {}
+    destroy() {
+      mainModelDestroyed = true;
+    }
+  }
+
+  const fakeWindow = {
+    desktopCat: {
+      appearance: {
+        getLive2DModels: async () => [modelConfig],
+        setLive2DModel: async () => modelConfig
+      }
+    },
+    __desktopCatLive2DAppearance: {
+      getCurrentModel: () => modelConfig,
+      isCurrentModelVisible: () => true,
+      ensureCurrentModelVisible: async () => modelConfig,
+      loadModel: async () => {
+        throw new Error('opening the switcher must not reload the main model');
+      }
+    },
+    localStorage: {
+      getItem: () => 'Haru',
+      setItem() {}
+    },
+    PIXI: {
+      Application: FakePixiApplication,
+      live2d: {
+        Live2DModel: {
+          from: async (url) => {
+            loadedPreviewUrls.push(url);
+            if (url === modelConfig.modelUrl) {
+              return mainModel;
+            }
+            return {
+              width: 120,
+              height: 180,
+              anchor: { set() {} },
+              scale: { set() {} },
+              on() {},
+              destroy() {}
+            };
+          }
+        }
+      }
+    }
+  };
+
+  const fakeDocument = {
+    getElementById(id) {
+      return elements.get(id) || null;
+    },
+    createElement(tagName) {
+      const element = createElement();
+      element.tagName = tagName.toUpperCase();
+      return element;
+    },
+    createDocumentFragment() {
+      return {
+        children: [],
+        append(...children) {
+          this.children.push(...children);
+        }
+      };
+    },
+    addEventListener() {}
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.ok(buttonClick, 'switcher button click handler should be registered');
+  buttonClick({ preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  buttonClick({ preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(panelOpen, false);
+  assert.equal(mainModelDestroyed, false);
+  assert.equal(loadedPreviewUrls.length, 0);
 });
 
 test('live2d renderer reuses the PIXI application across model switches', () => {
@@ -620,6 +965,129 @@ test('live2d appearance keeps the current model visible when a replacement fails
   assert.equal(fakeWindow.__desktopCatLive2DAppearance.isCurrentModelVisible(), true);
   assert.equal(stage.classList.contains('has-live2d'), true);
   assert.equal(canvas.getAttribute('aria-hidden'), 'false');
+});
+
+test('live2d appearance keeps the current model visible when replacement setup fails', async () => {
+  const script = readSource('src', 'renderer', 'live2dAppearance.js');
+  const stageClasses = new Set();
+  const stage = {
+    classList: {
+      add(name) {
+        stageClasses.add(name);
+      },
+      remove(name) {
+        stageClasses.delete(name);
+      },
+      contains(name) {
+        return stageClasses.has(name);
+      }
+    }
+  };
+  const canvas = {
+    width: 0,
+    height: 0,
+    attributes: new Map(),
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return this.attributes.get(name);
+    }
+  };
+  class FakePixiApplication {
+    constructor() {
+      this.stage = {
+        children: [],
+        addChild: (child) => {
+          this.stage.children.push(child);
+        },
+        removeChild: (child) => {
+          this.stage.children = this.stage.children.filter((entry) => entry !== child);
+        }
+      };
+    }
+  }
+  let nextModelShouldFailSetup = false;
+  let failedModelDestroyed = false;
+  const goodModel = {
+    available: true,
+    id: 'Haru',
+    name: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json'
+  };
+  const badModel = {
+    available: true,
+    id: 'Broken',
+    name: 'Broken',
+    modelUrl: 'desktop-cat-live2d://model/Broken/Broken.model3.json'
+  };
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: {
+      appearance: {}
+    },
+    live2dMotionController: {
+      createLive2DMotionController: () => ({
+        playTap() {},
+        playDrink() {},
+        dispose() {}
+      })
+    },
+    PIXI: {
+      Application: FakePixiApplication,
+      live2d: {
+        Live2DModel: {
+          from: async () => ({
+            width: 120,
+            height: 180,
+            anchor: { set() {} },
+            scale: {
+              set() {
+                if (nextModelShouldFailSetup) {
+                  throw new Error('setup failed');
+                }
+              }
+            },
+            on() {},
+            destroy() {
+              if (nextModelShouldFailSetup) {
+                failedModelDestroyed = true;
+              }
+            }
+          })
+        }
+      }
+    }
+  };
+  const fakeDocument = {
+    querySelector(selector) {
+      return selector === '.stage' ? stage : null;
+    },
+    getElementById(id) {
+      return id === 'live2dCanvas' ? canvas : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console
+  });
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel(goodModel);
+  assert.equal(fakeWindow.__desktopCatLive2DAppearance.isCurrentModelVisible(), true);
+
+  nextModelShouldFailSetup = true;
+  await assert.rejects(
+    fakeWindow.__desktopCatLive2DAppearance.loadModel(badModel),
+    /setup failed/
+  );
+
+  assert.equal(fakeWindow.__desktopCatLive2DAppearance.getCurrentModel().id, 'Haru');
+  assert.equal(fakeWindow.__desktopCatLive2DAppearance.isCurrentModelVisible(), true);
+  assert.equal(stage.classList.contains('has-live2d'), true);
+  assert.equal(canvas.getAttribute('aria-hidden'), 'false');
+  assert.equal(failedModelDestroyed, true);
 });
 
 test('live2d appearance hit-tests WebGL pixels by alpha', async () => {
