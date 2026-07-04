@@ -24,7 +24,8 @@
   "devDependencies": {
     "cross-env": "^10.1.0",
     "electron": "^33.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "rcedit": "^4.0.1"
   },
   "build": {
     "appId": "com.desktopcat.app",
@@ -36,6 +37,7 @@
       "src/**/*",
       "package.json"
     ],
+    "afterPack": "scripts/afterPack.js",
     "win": {
       "icon": "src/main/assets/tray-cat-face.ico",
       "signAndEditExecutable": false,
