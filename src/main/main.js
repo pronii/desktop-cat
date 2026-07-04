@@ -12,6 +12,7 @@ const {
   screen,
   ipcMain
 } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { centerInWorkArea } = require('./windowMovement');
 const {
   createPetWindowOptions,
@@ -787,6 +788,7 @@ if (!gotTheLock) {
     updateManager = createUpdateManager({
       app,
       dialog,
+      autoUpdater: app.isPackaged ? autoUpdater : null,
       fetch: globalThis.fetch,
       WebSocket: globalThis.WebSocket || SimpleWebSocket,
       promptForUpdate: (manifest) => requestUpdatePrompt('available', {

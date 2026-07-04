@@ -11,27 +11,40 @@ function readText(...parts) {
   return fs.readFileSync(path.join(__dirname, '..', ...parts), 'utf-8');
 }
 
-test('release metadata describes the 0.3.1 UI polish update', () => {
+test('release metadata describes the 0.3.2 auto update release', () => {
   const packageJson = readJson('package.json');
   const packageLock = readJson('package-lock.json');
   const readme = readText('README.md');
   const packaging = readText('PACKAGING.md');
   const changelog = readText('CHANGELOG.md');
 
-  assert.equal(packageJson.version, '0.3.1');
-  assert.equal(packageLock.version, '0.3.1');
-  assert.equal(packageLock.packages[''].version, '0.3.1');
+  assert.equal(packageJson.version, '0.3.2');
+  assert.equal(packageLock.version, '0.3.2');
+  assert.equal(packageLock.packages[''].version, '0.3.2');
 
-  assert.match(readme, /当前版本：`0\.3\.1`/);
-  assert.match(readme, /desktop-cat-0\.3\.1-win-x64-setup\.exe/);
-  assert.match(readme, /desktop-cat-0\.3\.1-win-x64-portable\.exe/);
+  assert.match(readme, /当前版本：`0\.3\.2`/);
+  assert.match(readme, /desktop-cat-0\.3\.2-win-x64-setup\.exe/);
+  assert.match(readme, /desktop-cat-0\.3\.2-win-x64-portable\.exe/);
 
-  assert.match(packaging, /desktop-cat-0\.3\.1-win-x64-setup\.exe/);
-  assert.match(packaging, /desktop-cat-0\.3\.1-win-x64-portable\.exe/);
-  assert.match(packaging, /发布 `0\.3\.1`/);
+  assert.match(packaging, /desktop-cat-0\.3\.2-win-x64-setup\.exe/);
+  assert.match(packaging, /desktop-cat-0\.3\.2-win-x64-portable\.exe/);
+  assert.match(packaging, /发布 `0\.3\.2`/);
 
-  assert.match(changelog, /## 0\.3\.1/);
-  assert.match(changelog, /UI\/UX/);
-  assert.match(changelog, /Lucide/);
-  assert.match(changelog, /喝水动画/);
+  assert.match(changelog, /## 0\.3\.2/);
+  assert.match(changelog, /electron-updater/);
+  assert.match(changelog, /GitHub Releases/);
+  assert.match(changelog, /latest\.yml/);
+});
+
+test('package metadata enables GitHub installer auto updates', () => {
+  const packageJson = readJson('package.json');
+
+  assert.match(packageJson.dependencies['electron-updater'], /^\^/);
+  assert.deepEqual(packageJson.build.publish, [
+    {
+      provider: 'github',
+      owner: 'pronii',
+      repo: 'desktop-cat'
+    }
+  ]);
 });

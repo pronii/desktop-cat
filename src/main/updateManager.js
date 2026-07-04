@@ -122,6 +122,7 @@ function createUpdateManager(options = {}) {
   const logger = options.logger || console;
   const promptForUpdate = options.promptForUpdate;
   const promptForRestart = options.promptForRestart;
+  const autoUpdater = options.autoUpdater || null;
   const currentVersion = options.currentVersion || app.getVersion?.() || '0.0.0';
   const executablePath = options.executablePath || process.execPath;
   const userDataPath = options.userDataPath || app.getPath?.('userData');
@@ -133,9 +134,14 @@ function createUpdateManager(options = {}) {
   let pollTimer = null;
   let streamSocket = null;
   let checking = false;
+  let lastStandardCheckWasUserInitiated = false;
 
   function isConfigured() {
-    return Boolean(manifestUrl && fetchImpl && userDataPath);
+    return Boolean(isStandardUpdaterConfigured() || (manifestUrl && fetchImpl && userDataPath));
+  }
+
+  function isStandardUpdaterConfigured() {
+    return Boolean(autoUpdater && typeof autoUpdater.checkForUpdates === 'function');
   }
 
   async function showMessageBox(messageOptions) {
@@ -177,6 +183,115 @@ function createUpdateManager(options = {}) {
       defaultId: 0
     });
     return restartPrompt.response === 0;
+  }
+
+  function normalizeStandardUpdateInfo(info = {}) {
+    return {
+      version: String(info.version || '').trim(),
+      notes: Array.isArray(info.releaseNotes)
+        ? info.releaseNotes.map((note) => note.note || '').filter(Boolean).join('\n')
+        : String(info.releaseNotes || '').trim()
+    };
+  }
+
+  async function confirmStandardUpdateDownload(info) {
+    const manifest = {
+      ...normalizeStandardUpdateInfo(info),
+      mandatory: false
+    };
+
+    if (typeof promptForUpdate === 'function') {
+      return Boolean(await promptForUpdate(manifest, { userInitiated: false }));
+    }
+
+    const prompt = await showMessageBox({
+      title: '发现新版本',
+      message: manifest.version
+        ? `发现 desktop-cat ${manifest.version}，是否下载更新？`
+        : '发现 desktop-cat 新版本，是否下载更新？',
+      detail: manifest.notes,
+      buttons: ['下载更新', '稍后'],
+      cancelId: 1,
+      defaultId: 0
+    });
+    return prompt.response === 0;
+  }
+
+  async function confirmStandardUpdateRestart(info) {
+    const manifest = normalizeStandardUpdateInfo(info);
+
+    if (typeof promptForRestart === 'function') {
+      return Boolean(await promptForRestart(manifest, {}));
+    }
+
+    const restartPrompt = await showMessageBox({
+      title: '更新已准备好',
+      message: manifest.version
+        ? `desktop-cat ${manifest.version} 已下载完成，是否现在重启完成更新？`
+        : 'desktop-cat 更新已下载完成，是否现在重启完成更新？',
+      buttons: ['立即重启', '稍后'],
+      cancelId: 1,
+      defaultId: 0
+    });
+    return restartPrompt.response === 0;
+  }
+
+  function setupStandardUpdater() {
+    if (!autoUpdater || typeof autoUpdater.on !== 'function') return;
+
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
+
+    autoUpdater.on('update-available', (info = {}) => {
+      confirmStandardUpdateDownload(info)
+        .then((shouldDownload) => {
+          if (shouldDownload && typeof autoUpdater.downloadUpdate === 'function') {
+            return autoUpdater.downloadUpdate();
+          }
+          return null;
+        })
+        .catch((error) => {
+          logger.warn?.(`Update download prompt failed: ${error.message}`);
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info = {}) => {
+      confirmStandardUpdateRestart(info)
+        .then((shouldRestart) => {
+          if (shouldRestart && typeof autoUpdater.quitAndInstall === 'function') {
+            autoUpdater.quitAndInstall(false, true);
+          }
+        })
+        .catch((error) => {
+          logger.warn?.(`Update restart prompt failed: ${error.message}`);
+        });
+    });
+
+    autoUpdater.on('update-not-available', () => {
+      if (!lastStandardCheckWasUserInitiated) return;
+      showMessageBox({
+        title: '检查更新',
+        message: `当前已是最新版本 ${currentVersion}。`,
+        buttons: ['知道了']
+      }).catch?.(() => {});
+    });
+
+    autoUpdater.on('error', (error) => {
+      logger.warn?.(`Automatic update failed: ${error.message}`);
+      if (!lastStandardCheckWasUserInitiated) return;
+      showMessageBox({
+        type: 'error',
+        title: '更新失败',
+        message: error.message,
+        buttons: ['知道了']
+      }).catch?.(() => {});
+    });
+  }
+
+  async function checkStandardUpdater({ userInitiated }) {
+    lastStandardCheckWasUserInitiated = Boolean(userInitiated);
+    await autoUpdater.checkForUpdates();
+    return { status: 'checking' };
   }
 
   async function fetchManifest() {
@@ -259,6 +374,10 @@ function createUpdateManager(options = {}) {
 
     checking = true;
     try {
+      if (isStandardUpdaterConfigured()) {
+        return await checkStandardUpdater({ userInitiated });
+      }
+
       const manifest = await fetchManifest();
       if (compareVersions(manifest.version, currentVersion) <= 0) {
         if (userInitiated) {
@@ -384,6 +503,8 @@ function createUpdateManager(options = {}) {
     }
     streamSocket = null;
   }
+
+  setupStandardUpdater();
 
   return {
     checkNow,

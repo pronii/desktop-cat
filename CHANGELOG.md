@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+- 接入 `electron-updater`，让 NSIS 安装版可以通过 GitHub Releases、`latest.yml` 和 `.blockmap` 检查并下载新版本。
+- 保留现有应用内更新提示，更新可用时先让用户确认下载，下载完成后再提示重启安装。
+- 为安装版自动更新补充 GitHub publish 打包配置和回归测试。
+- 保留原有 `latest.json` 远程更新通道，用于服务端推送提示、调试和便携版场景。
+
 ## 0.3.1
 
 - 优化桌面悬浮控件的 UI/UX，提升键盘焦点、按钮命中区域和弹窗交互体验。

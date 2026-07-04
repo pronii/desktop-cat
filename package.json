@@ -1,6 +1,6 @@
 {
   "name": "desktop-cat",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A tiny Electron desktop cat pet for Windows.",
   "main": "src/main/main.js",
   "type": "commonjs",
@@ -38,6 +38,13 @@
       "package.json"
     ],
     "afterPack": "scripts/afterPack.js",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pronii",
+        "repo": "desktop-cat"
+      }
+    ],
     "win": {
       "icon": "src/main/assets/tray-cat-face.ico",
       "signAndEditExecutable": false,
@@ -68,5 +75,8 @@
     "portable": {
       "artifactName": "${productName}-${version}-win-${arch}-portable.${ext}"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

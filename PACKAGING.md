@@ -24,8 +24,8 @@ npm run pack
 `npm run pack` 会同时生成：
 
 ```text
-dist/desktop-cat-0.3.1-win-x64-setup.exe
-dist/desktop-cat-0.3.1-win-x64-portable.exe
+dist/desktop-cat-0.3.2-win-x64-setup.exe
+dist/desktop-cat-0.3.2-win-x64-portable.exe
 ```
 
 如果只需要单独产物，可以使用：
@@ -49,13 +49,14 @@ Get-ChildItem -LiteralPath 'dist' -Filter '*.exe' |
 
 ## 发布检查
 
-发布 `0.3.1` 时至少确认：
+发布 `0.3.2` 时至少确认：
 
 - `package.json` 版本号正确。
 - `npm test` 通过。
 - `npm run pack` 成功。
 - `dist` 下存在 NSIS 安装包和 portable 免安装包。
 - 已记录每个发布产物的 SHA-256。
+- GitHub Release 已上传 NSIS 安装包、`latest.yml` 和 `.blockmap`，用于安装版自动更新。
 - GitHub Release 的附件和更新清单里的下载地址一致。
 - 更新推送服务的 `latest.json` 指向本次正式发布产物。
 

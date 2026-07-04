@@ -153,6 +153,29 @@ test('checkNow uses non-blocking prompt callbacks for optional updates', async (
   ]);
 });
 
+test('checkNow delegates installer updates to electron-updater when configured', async () => {
+  const calls = [];
+  const manager = createUpdateManager({
+    currentVersion: '0.3.0',
+    autoUpdater: {
+      autoDownload: true,
+      checkForUpdates: async () => {
+        calls.push('checkForUpdates');
+        return { updateInfo: { version: '0.3.1' } };
+      }
+    },
+    fetch: async () => {
+      throw new Error('manifest fetch should not run for electron-updater mode');
+    },
+    userDataPath: '/unused'
+  });
+
+  const result = await manager.checkNow({ userInitiated: true });
+
+  assert.equal(result.status, 'checking');
+  assert.deepEqual(calls, ['checkForUpdates']);
+});
+
 test('checkNow rejects downloaded updates with a sha256 mismatch', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-cat-update-'));
   const executablePath = path.join(tempDir, 'desktop-cat.exe');
