@@ -47,7 +47,7 @@ function startClipboardWatch(onChange, { intervalMs = DEFAULT_INTERVAL_MS } = {}
     if (fingerprint === currentFingerprint) return;
 
     currentFingerprint = fingerprint;
-    const item = { ...createItem(), timestamp: Date.now() };
+    const item = { ...createItem(), fingerprint, timestamp: Date.now() };
     lastType = item.type;
     onChange(item);
   }

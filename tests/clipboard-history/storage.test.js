@@ -54,3 +54,18 @@ test('clipboard storage tolerates non-object getAll options', () => {
 
   assert.deepEqual(storage.getAll(null).map((item) => item.id), ['one', 'two']);
 });
+
+test('clipboard storage replaces existing duplicate text content', () => {
+  const dir = makeTempDir();
+  const storage = new ClipboardStorage({ dir, maxItems: 5 });
+
+  storage.setItems([
+    { id: 'old-copy', type: 'text', content: 'same text' },
+    { id: 'other', type: 'text', content: 'other text' }
+  ]);
+
+  const removed = storage.add({ id: 'new-copy', type: 'text', content: 'same text' });
+
+  assert.deepEqual(storage.getAll().map((item) => item.id), ['new-copy', 'other']);
+  assert.deepEqual(removed.map((item) => item.id), ['old-copy']);
+});

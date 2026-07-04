@@ -9,6 +9,29 @@ function normalizeLimit(limit) {
   return Number.isFinite(normalized) && normalized > 0 ? Math.floor(normalized) : null;
 }
 
+function getDuplicateKey(item) {
+  if (!item || typeof item !== 'object') return null;
+  const type = typeof item.type === 'string' ? item.type : '';
+
+  if (typeof item.fingerprint === 'string' && item.fingerprint) {
+    return `${type}:fingerprint:${item.fingerprint}`;
+  }
+
+  if (type === 'text' && typeof item.content === 'string' && item.content) {
+    return `${type}:content:${item.content}`;
+  }
+
+  if (type === 'video' && typeof item.filePath === 'string' && item.filePath) {
+    return `${type}:file:${item.filePath}`;
+  }
+
+  if (type === 'image' && typeof item.thumbnail === 'string' && item.thumbnail) {
+    return `${type}:thumbnail:${item.thumbnail}`;
+  }
+
+  return null;
+}
+
 class ClipboardStorage {
   constructor({ dir, maxItems } = {}) {
     this.filePath = path.join(dir, 'clipboard-history.json');
@@ -34,10 +57,21 @@ class ClipboardStorage {
   }
 
   add(item) {
+    const duplicateKey = getDuplicateKey(item);
+    const duplicates = [];
+
+    if (duplicateKey) {
+      this._data.items = this._data.items.filter((existing) => {
+        if (getDuplicateKey(existing) !== duplicateKey) return true;
+        duplicates.push(existing);
+        return false;
+      });
+    }
+
     this._data.items.unshift(item);
     const removed = this._trim();
     this.scheduleSave();
-    return removed;
+    return [...duplicates, ...removed];
   }
 
   removeById(id) {

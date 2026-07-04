@@ -186,6 +186,7 @@ function initClipboardHistory({ preloadPath }) {
     const record = {
       id,
       type: item.type,
+      fingerprint: item.fingerprint,
       thumbnail: item.thumbnail,
       filePath: item.filePath,
       content: item.content,

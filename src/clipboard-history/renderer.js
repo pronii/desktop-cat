@@ -143,8 +143,16 @@
   }
 
   function addItem(item) {
+    if (!item?.id) return;
     itemsCache = [item, ...itemsCache.filter((cached) => cached.id !== item.id)];
     emptyMsg.style.display = 'none';
+
+    for (const existingCard of Array.from(grid.querySelectorAll('.ch-card'))) {
+      if (existingCard.dataset.id === item.id) {
+        existingCard.remove();
+      }
+    }
+
     const firstCard = grid.querySelector('.ch-card');
     if (firstCard) {
       grid.insertBefore(createCard(item), firstCard);
