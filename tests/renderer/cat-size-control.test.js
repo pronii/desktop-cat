@@ -57,8 +57,7 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(html, /class="toolbar-primary"/);
   assert.match(html, /class="toolbar-utility"/);
   assert.match(html, /<div class="toolbar-primary"[\s\S]*id="waterCounter"[\s\S]*id="clipboardBtn"[\s\S]*id="roomBtn"[\s\S]*<\/div>\s*<div class="toolbar-utility"[\s\S]*id="catSizeBtn"/);
-  assert.match(html, /class="cat-size-icon"/);
-  assert.match(html, /<span class="cat-size-icon" aria-hidden="true">\s*<span>↖<\/span>\s*<span>↘<\/span>\s*<\/span>/);
+  assert.match(html, /id="catSizeBtn"[\s\S]*?<svg[^>]*class="ui-icon cat-size-icon"[^>]*data-icon="move-diagonal"/);
   assert.doesNotMatch(html, /<span class="sketch-btn-icon">Aa<\/span>/);
   assert.doesNotMatch(html, /id="catSizePanel"/);
   assert.doesNotMatch(html, /id="catSizeDecreaseBtn"/);
@@ -120,12 +119,14 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(css, /\.is-cat-resizing\s+\.stage\s*\{[\s\S]*transition:\s*none/);
   assert.match(css, /\.cat-size-btn\s*\{[\s\S]*cursor:\s*nwse-resize/);
   assert.match(css, /\.cat-size-btn\.is-resizing/);
-  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*background:\s*#050505/);
-  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*color:\s*#fff/);
-  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*width:\s*20px/);
-  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*height:\s*18px/);
-  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*font-size:\s*10px/);
-  assert.match(css, /\.cat-size-icon\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*1fr\)/);
+  assert.match(css, /\.ui-icon\s*\{[\s\S]*width:\s*18px/);
+  assert.match(css, /\.ui-icon\s*\{[\s\S]*height:\s*18px/);
+  assert.match(css, /\.ui-icon\s*\{[\s\S]*stroke-width:\s*2\.25/);
+  const catSizeIconCss = readCssBlock(css, '.cat-size-icon');
+  assert.match(catSizeIconCss, /transform:\s*scaleX\(-1\)/);
+  assert.match(catSizeIconCss, /transform-origin:\s*center/);
+  assert.doesNotMatch(catSizeIconCss, /grid-template-columns/);
+  assert.doesNotMatch(catSizeIconCss, /background:\s*#050505/);
 
   assert.match(renderer, /CAT_SIZE_STORAGE_KEY/);
   assert.match(renderer, /CAT_SIZE_DRAG_PIXELS/);

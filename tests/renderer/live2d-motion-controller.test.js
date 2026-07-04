@@ -38,8 +38,7 @@ function createFakeModel() {
   const manager = new EventEmitter();
   manager.definitions = {
     Idle: [{ File: 'idle.motion3.json' }],
-    TapBody: [{ File: 'tap.motion3.json' }],
-    Drink: [{ File: 'drink.motion3.json' }]
+    TapBody: [{ File: 'tap.motion3.json' }]
   };
 
   const calls = [];
@@ -76,7 +75,7 @@ test('queues the next Live2D motion until the current motion finishes', async ()
   });
 
   await controller.playAlias('tap');
-  const queued = await controller.playAlias('drink');
+  const queued = await controller.playAlias('idle');
 
   assert.equal(queued, false);
   assert.deepEqual(calls, [{
@@ -96,7 +95,7 @@ test('queues the next Live2D motion until the current motion finishes', async ()
       priority: LIVE2D_MOTION_PRIORITY.NORMAL
     },
     {
-      group: 'Drink',
+      group: 'Idle',
       index: undefined,
       priority: LIVE2D_MOTION_PRIORITY.NORMAL
     }

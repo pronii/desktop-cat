@@ -128,6 +128,7 @@ function createRendererHarness({
   let nextTimerId = 1;
   let dragEnterCount = 0;
   let dragExitCount = 0;
+  let waterReminderTrigger = null;
   let now = 0;
 
   class FakeDate extends Date {
@@ -151,12 +152,6 @@ function createRendererHarness({
     },
     shouldClearHappyState(state) {
       return petBehavior.shouldClearHappyState(state, now);
-    },
-    createDrinkState(options = {}) {
-      return petBehavior.createDrinkState({ ...options, now });
-    },
-    shouldClearDrinkState(state) {
-      return petBehavior.shouldClearDrinkState(state, now);
     }
   };
 
@@ -172,6 +167,9 @@ function createRendererHarness({
     petBehavior: contextualPetBehavior,
     desktopCatDebug: {},
     __desktopCatLive2DAppearance: live2dAppearance,
+    __desktopCatLive2D: {
+      playTap() {}
+    },
     desktopCat: {
       dragMode: {
         enter() {
@@ -186,7 +184,8 @@ function createRendererHarness({
         getConfig() {
           return Promise.resolve({ dailyCount: 0 });
         },
-        onTrigger() {
+        onTrigger(callback) {
+          waterReminderTrigger = callback;
           return () => {};
         }
       }
@@ -251,7 +250,9 @@ function createRendererHarness({
       if (selector === '.water-bowl') return waterBowl;
       if (selector === '.bottom-bar') return bottomBar;
       if (selector === '.happy-bubble') return happyBubble;
-      if (selector === '.water-panel.show, .clipboard-panel.show, .room-panel.show, .live2d-panel.show, .settings-panel.show, .water-reminder-dialog.show') return null;
+      if (selector === '.water-panel.show, .clipboard-panel.show, .room-panel.show, .live2d-panel.show, .settings-panel.show, .water-reminder-dialog.show, .update-prompt.show') {
+        return settingsPanel.classList.contains('show') ? settingsPanel : null;
+      }
       return null;
     },
     getElementById(id) {
@@ -290,6 +291,8 @@ function createRendererHarness({
     happyBubble,
     stage,
     live2dCanvas,
+    waterBowl,
+    waterBubble,
     waterCounter,
     clipboardBtn,
     roomBtn,
@@ -313,7 +316,10 @@ function createRendererHarness({
     },
     get dragExitCount() {
       return dragExitCount;
-    }
+    },
+    get waterReminderTrigger() {
+      return waterReminderTrigger;
+    },
   };
 }
 
@@ -466,6 +472,37 @@ test('encouragement bubble renders as a centered long info bar with at most two 
   assert.match(activeBubbleCss, /transform:\s*translate\(-50%,\s*0\)\s*scale\(1\)/);
 });
 
+test('legacy cat drinking animation markup and styles are removed', () => {
+  const html = readSource('src', 'renderer', 'index.html');
+  const css = readSource('src', 'renderer', 'styles.css');
+  const rendererScript = readSource('src', 'renderer', 'renderer.js');
+  const waterPanelScript = readSource('src', 'renderer', 'waterPanel.js');
+  const live2dAppearanceScript = readSource('src', 'renderer', 'live2dAppearance.js');
+  const live2dMotionScript = readSource('src', 'renderer', 'live2dMotionController.js');
+
+  assert.doesNotMatch(html, /class="water-bubble"/);
+  assert.doesNotMatch(html, /class="water-bowl"/);
+  assert.doesNotMatch(css, /\.water-bubble\b/);
+  assert.doesNotMatch(css, /\.water-bowl\b/);
+  assert.doesNotMatch(css, /\.cat\.is-drinking\b/);
+  assert.doesNotMatch(css, /@keyframes\s+tongue-lick\b/);
+  assert.doesNotMatch(css, /@keyframes\s+ripple\b/);
+  assert.doesNotMatch(rendererScript, /__waterRetryTimer/);
+  assert.doesNotMatch(waterPanelScript, /__waterRetryTimer/);
+  assert.doesNotMatch(live2dAppearanceScript, /playDrink/);
+  assert.doesNotMatch(live2dMotionScript, /playDrink/);
+  assert.doesNotMatch(live2dMotionScript, /\bdrink:\s*\[/);
+});
+
+test('renderer does not subscribe to water reminders for the legacy cat drinking animation', () => {
+  const harness = createRendererHarness();
+
+  assert.equal(harness.waterReminderTrigger, null);
+  assert.equal(harness.cat.classList.contains('is-drinking'), false);
+  assert.equal(harness.waterBowl.classList.contains('is-visible'), false);
+  assert.equal(harness.waterBubble.textContent, '');
+});
+
 test('cat mouse press without click does not show encouragement text', () => {
   const harness = createRendererHarness();
 
@@ -616,6 +653,25 @@ test('bottom controls stay visible while moving from the pet to the toolbar', ()
 
   assert.equal(harness.settingsPanel.classList.contains('show'), true);
   assert.equal(harness.settingsBtn.attributes.get('aria-expanded'), 'true');
+});
+
+test('bottom controls stay visible while a floating panel is open', () => {
+  const harness = createRendererHarness();
+
+  harness.settingsBtn.dispatch('click', {
+    preventDefault() {},
+    stopPropagation() {}
+  });
+
+  assert.equal(harness.settingsPanel.classList.contains('show'), true);
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
+  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
+
+  harness.document.dispatch('mousemove', { clientX: 120, clientY: 120 });
+  harness.stage.dispatch('pointerleave');
+
+  assert.equal(harness.documentElement.classList.contains('is-bottom-controls-visible'), true);
+  assert.equal(harness.documentElement.classList.contains('is-cat-size-control-visible'), true);
 });
 
 test('random speech schedules a later encouragement and respects the settings toggle', () => {

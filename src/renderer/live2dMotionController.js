@@ -7,8 +7,7 @@ const LIVE2D_MOTION_PRIORITY = {
 
 const DEFAULT_GROUP_ALIASES = {
   idle: ['Idle', 'idle'],
-  tap: ['TapBody', 'TapHead', 'Tap', 'tapBody', 'tap'],
-  drink: ['Drink', 'drink', 'Water', 'water', 'TapBody', 'Tap']
+  tap: ['TapBody', 'TapHead', 'Tap', 'tapBody', 'tap']
 };
 
 function getMotionDefinitions(model) {
@@ -191,10 +190,6 @@ function createLive2DMotionController({
     return playAlias('tap');
   }
 
-  function playDrink() {
-    return playAlias('drink', { fallbackAlias: 'tap' });
-  }
-
   function dispose() {
     disposed = true;
     clearTransitionTimer();
@@ -217,7 +212,6 @@ function createLive2DMotionController({
   return {
     playAlias,
     playTap,
-    playDrink,
     dispose
   };
 }

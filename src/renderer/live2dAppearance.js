@@ -64,7 +64,6 @@
     window.__desktopCatLive2D = controller
       ? {
         playTap: () => controller.playTap(),
-        playDrink: () => controller.playDrink(),
         dispose: () => controller.dispose()
       }
       : null;

@@ -29,6 +29,18 @@
   box-sizing: border-box;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 html,
 body {
   width: 100%;
@@ -72,8 +84,7 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.stage.has-live2d .cat,
-.stage.has-live2d .water-bowl {
+.stage.has-live2d .cat {
   display: none;
 }
 
@@ -95,6 +106,12 @@ body {
   -webkit-user-drag: none;
   transform-origin: 50% 82%;
   animation: breathe 2.8s ease-in-out infinite;
+}
+
+.cat:focus-visible {
+  outline: 3px solid rgba(79, 127, 188, 0.72);
+  outline-offset: 8px;
+  border-radius: 30px;
 }
 
 .cat:active {
@@ -406,122 +423,6 @@ body {
   transform: translate(-50%, 0) scale(1);
 }
 
-/* --- 舌头 --- */
-.tongue {
-  position: absolute;
-  left: 60px;
-  top: 84px;
-  width: 9px;
-  height: 4px;
-  border-radius: 0 0 5px 5px;
-  background: #f58da8;
-  opacity: 0;
-  transform: scaleY(0);
-  transform-origin: top center;
-  z-index: 4;
-}
-
-.cat.is-drinking .tongue {
-  opacity: 1;
-  animation: tongue-lick 0.45s ease-in-out 3;
-}
-
-/* --- 喝水泡泡 --- */
-.water-bubble {
-  position: absolute;
-  left: -6px;
-  top: -14px;
-  padding: 5px 10px;
-  border: 3px solid var(--ink);
-  border-radius: 20px;
-  background: #e0f7fa;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(6px) scale(0.92);
-  transition: opacity 240ms ease, transform 240ms ease;
-  z-index: 13;
-  pointer-events: none;
-}
-
-.cat.is-drinking .water-bubble {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-/* --- 水碗 --- */
-.water-bowl {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  width: 52px;
-  height: 22px;
-  margin-left: -26px;
-  border: 3px solid var(--ink);
-  border-radius: 6px 6px 16px 16px;
-  background: #d7eef5;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 4px 10px var(--shadow);
-  opacity: 0;
-  transform: translateY(10px) scale(0.9);
-  transition: opacity 260ms ease, transform 260ms ease;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.water-bowl.is-visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.water-surf {
-  position: absolute;
-  left: 5px;
-  top: 3px;
-  right: 5px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(100, 181, 246, 0.35);
-}
-
-.water-ripple {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 4px;
-  height: 4px;
-  margin-left: -2px;
-  margin-top: -2px;
-  border-radius: 50%;
-  background: rgba(100, 181, 246, 0.6);
-  opacity: 0;
-}
-
-.water-bowl.is-visible .water-ripple {
-  animation: ripple 0.6s ease-out infinite;
-  animation-delay: 0.3s;
-}
-
-/* --- 喝水状态 --- */
-.cat.is-drinking {
-  animation: none;
-  transform: translateY(4px);
-}
-
-.cat.is-drinking .head {
-  transform: rotate(6deg) translateX(3px);
-}
-
-.cat.is-drinking .body {
-  transform: translateY(4px);
-}
-
-.cat.is-drinking .tail {
-  animation-duration: 0.7s;
-}
-
 /* --- 底部工具栏 --- */
 .bottom-bar {
   position: fixed;
@@ -660,9 +561,32 @@ body {
   box-shadow: 0 4px 0 var(--sketch-accent);
 }
 
+.sketch-btn:focus-visible {
+  outline: 3px solid rgba(79, 127, 188, 0.72);
+  outline-offset: 3px;
+}
+
 .sketch-btn-icon {
-  font-size: 16px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  color: var(--sketch-text);
+}
+
+.ui-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
 }
 
 .sketch-btn-text {
@@ -687,17 +611,23 @@ body {
 }
 
 .cat-size-icon {
-  width: 20px;
+  width: 18px;
   height: 18px;
-  border-radius: 5px;
-  background: #050505;
-  color: #fff;
-  display: inline-grid;
-  grid-template-columns: repeat(2, 1fr);
-  place-items: center;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
+  color: var(--sketch-text);
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+
+.panel-title-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.4;
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
 }
 
 /* 喝水按钮专属 */
@@ -753,6 +683,7 @@ body {
   place-items: center;
   font-size: 18px;
   line-height: 1;
+  color: #8b5a00;
 }
 
 .water-reminder-copy {
@@ -776,8 +707,8 @@ body {
 }
 
 .water-reminder-close {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: 1.5px solid rgba(60, 43, 36, 0.18);
   border-radius: 7px;
   background: #fff;
@@ -787,6 +718,11 @@ body {
   font-weight: 800;
   line-height: 1;
   padding: 0;
+}
+
+.water-reminder-close:focus-visible {
+  outline: 3px solid rgba(79, 127, 188, 0.72);
+  outline-offset: 2px;
 }
 
 .water-reminder-close:hover {
@@ -891,8 +827,8 @@ body {
 }
 
 .update-prompt-close {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: 1.5px solid rgba(60, 43, 36, 0.18);
   border-radius: 7px;
   background: #fff;
@@ -902,6 +838,11 @@ body {
   font-weight: 800;
   line-height: 1;
   padding: 0;
+}
+
+.update-prompt-close:focus-visible {
+  outline: 3px solid rgba(79, 127, 188, 0.72);
+  outline-offset: 2px;
 }
 
 .update-prompt-close:hover {
@@ -986,28 +927,6 @@ body {
   }
 }
 
-@keyframes tongue-lick {
-  0%,
-  100% {
-    transform: scaleY(0);
-  }
-  40%,
-  60% {
-    transform: scaleY(1);
-  }
-}
-
-@keyframes ripple {
-  0% {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(6);
-  }
-}
-
 /* 剪贴板面板样式（基础由 .sketch-panel 提供，此处仅保留内部元素样式） */
 .clipboard-panel-header {
   padding: 7px 8px 6px 10px;
@@ -1024,11 +943,14 @@ body {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .clipboard-panel-close {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border: 1px solid rgba(255, 255, 255, 0.46);
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
@@ -1043,6 +965,11 @@ body {
   flex-shrink: 0;
   font-weight: 700;
   padding: 0;
+}
+
+.clipboard-panel-close:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 2px;
 }
 
 .clipboard-panel-close:hover {
@@ -1061,7 +988,7 @@ body {
 .clipboard-panel-action {
   flex: 1;
   min-width: 0;
-  height: 22px;
+  min-height: 32px;
   border: 1px solid rgba(60, 43, 36, 0.18);
   border-radius: 6px;
   background: #fff;
@@ -1071,6 +998,11 @@ body {
   font-weight: 700;
   line-height: 1;
   padding: 0 6px;
+}
+
+.clipboard-panel-action:focus-visible {
+  outline: 3px solid rgba(125, 106, 199, 0.55);
+  outline-offset: 2px;
 }
 
 .clipboard-panel-action:hover {
@@ -1306,11 +1238,14 @@ body {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .sketch-panel-close {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border: 1.5px solid rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
@@ -1325,6 +1260,11 @@ body {
   font-weight: 700;
   padding: 0;
   transition: background 160ms ease;
+}
+
+.sketch-panel-close:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 2px;
 }
 
 .sketch-panel-close:hover {
@@ -1421,11 +1361,21 @@ body {
   color: #8b5a00;
   font-size: 11px;
   font-weight: 700;
+  min-height: 32px;
   padding: 6px 4px;
   cursor: pointer;
   transition: background 160ms ease, transform 160ms ease;
   flex: 1;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.sketch-action-btn:focus-visible {
+  outline: 3px solid rgba(79, 127, 188, 0.72);
+  outline-offset: 2px;
 }
 
 .sketch-action-btn:hover {
@@ -1521,7 +1471,7 @@ body {
 .water-task-time-input {
   flex: 1;
   min-width: 0;
-  height: 24px;
+  min-height: 32px;
   border: 1.5px solid var(--sketch-border);
   border-radius: 6px;
   background: #fff;
@@ -1599,8 +1549,8 @@ body {
 }
 
 .water-task-remove {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border: 1.5px solid rgba(60, 43, 36, 0.2);
   border-radius: 7px;
   background: #fff;
@@ -1610,6 +1560,11 @@ body {
   font-weight: 800;
   line-height: 1;
   padding: 0;
+}
+
+.water-task-remove:focus-visible {
+  outline: 3px solid rgba(47, 154, 131, 0.45);
+  outline-offset: 2px;
 }
 
 .water-task-remove:hover {
@@ -1721,7 +1676,7 @@ body {
 
 .sketch-interval {
   flex: 1;
-  height: 22px;
+  min-height: 30px;
   border: 1.5px solid var(--sketch-border);
   border-radius: 4px;
   background: #fff;
@@ -1731,6 +1686,11 @@ body {
   font-weight: 700;
   line-height: 1;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.sketch-interval:focus-visible {
+  outline: 3px solid rgba(79, 127, 188, 0.56);
+  outline-offset: 2px;
 }
 
 .sketch-interval:hover {
@@ -1862,7 +1822,7 @@ body {
 
 .room-field input {
   width: 100%;
-  height: 28px;
+  min-height: 32px;
   border: 1.5px solid rgba(60, 43, 36, 0.22);
   border-radius: 6px;
   background: #fff;
@@ -2029,6 +1989,11 @@ body {
   transform: translateY(-1px);
   border-color: rgba(188, 111, 159, 0.55);
   box-shadow: 0 5px 12px rgba(60, 43, 36, 0.14);
+}
+
+.live2d-model-card:focus-visible {
+  outline: 3px solid rgba(188, 111, 159, 0.5);
+  outline-offset: 2px;
 }
 
 .live2d-model-card.is-active {

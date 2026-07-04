@@ -796,7 +796,6 @@ test('live2d appearance can restore the current model when settings leave it hid
     live2dMotionController: {
       createLive2DMotionController: () => ({
         playTap() {},
-        playDrink() {},
         dispose() {}
       })
     },
@@ -912,7 +911,6 @@ test('live2d appearance keeps the current model visible when a replacement fails
     live2dMotionController: {
       createLive2DMotionController: () => ({
         playTap() {},
-        playDrink() {},
         dispose() {}
       })
     },
@@ -1029,7 +1027,6 @@ test('live2d appearance keeps the current model visible when replacement setup f
     live2dMotionController: {
       createLive2DMotionController: () => ({
         playTap() {},
-        playDrink() {},
         dispose() {}
       })
     },
@@ -1161,7 +1158,6 @@ test('live2d appearance hit-tests WebGL pixels by alpha', async () => {
     live2dMotionController: {
       createLive2DMotionController: () => ({
         playTap() {},
-        playDrink() {},
         dispose() {}
       })
     },

@@ -108,24 +108,6 @@ function shouldClearHappyState(state, now = Date.now()) {
   return Boolean(state.isHappy && now >= state.happyUntil);
 }
 
-function createDrinkState({ now = Date.now(), duration = 3200 } = {}) {
-  return {
-    isDrinking: true,
-    drinkUntil: now + duration
-  };
-}
-
-function clearDrinkState() {
-  return {
-    isDrinking: false,
-    drinkUntil: 0
-  };
-}
-
-function shouldClearDrinkState(state, now = Date.now()) {
-  return Boolean(state.isDrinking && now >= state.drinkUntil);
-}
-
 const petBehavior = {
   clamp,
   CAT_SCALE_DEFAULT,
@@ -147,10 +129,7 @@ const petBehavior = {
   stepCatScale,
   createHappyState,
   clearHappyState,
-  shouldClearHappyState,
-  createDrinkState,
-  clearDrinkState,
-  shouldClearDrinkState
+  shouldClearHappyState
 };
 
 if (typeof window !== 'undefined') {

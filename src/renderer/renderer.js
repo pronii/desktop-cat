@@ -3,9 +3,6 @@
     createHappyState,
     clearHappyState,
     shouldClearHappyState,
-    createDrinkState,
-    clearDrinkState,
-    shouldClearDrinkState,
     CAT_SCALE_DEFAULT,
     CAT_SCALE_DRAG_PIXELS,
     CAT_SCALE_MAX,
@@ -23,10 +20,8 @@
 
   const stage = document.querySelector('.stage');
   const cat = document.querySelector('.cat');
-  const waterBowl = document.querySelector('.water-bowl');
   const live2dCanvas = document.getElementById('live2dCanvas');
   const happyBubble = document.querySelector('.happy-bubble');
-  const waterBubble = cat.querySelector('.water-bubble');
   const waterCounter = document.getElementById('waterCounter');
   const bottomBar = document.querySelector('.bottom-bar');
   const catSizeBtn = document.getElementById('catSizeBtn');
@@ -44,6 +39,7 @@
   const updatePromptClose = document.getElementById('updatePromptClose');
   const updatePromptPrimary = document.getElementById('updatePromptPrimary');
   const updatePromptSecondary = document.getElementById('updatePromptSecondary');
+  let updatePromptReturnFocus = null;
 
   const CAT_SIZE_STORAGE_KEY = 'desktopCat.catScale';
   const CAT_SIZE_DRAG_PIXELS = CAT_SCALE_DRAG_PIXELS;
@@ -60,8 +56,6 @@
 
   let happyState = clearHappyState();
   let happyTimer = null;
-  let drinkState = clearDrinkState();
-  let drinkTimer = null;
   let catScale = CAT_SCALE_DEFAULT;
   let encouragementIndex = 0;
   let catSizeDragState = null;
@@ -132,6 +126,18 @@
 
   window.__desktopCatApplySettings = (nextSettings) => applySettings(nextSettings);
 
+  function focusFirstPromptControl(container) {
+    const target = container?.querySelector?.(
+      'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    target?.focus?.({ preventScroll: true });
+  }
+
+  function restorePromptFocus(element) {
+    if (typeof element?.focus !== 'function') return;
+    element.focus({ preventScroll: true });
+  }
+
   function readStoredCatScale() {
     try {
       return normalizeCatScale(window.localStorage?.getItem(CAT_SIZE_STORAGE_KEY));
@@ -180,7 +186,7 @@
 
   function hideCatSizeControl() {
     clearCatSizeHideTimer();
-    if (catSizeDragState) {
+    if (catSizeDragState || isAnyOverlayOpen()) {
       showCatSizeControl();
       return;
     }
@@ -237,7 +243,6 @@
   function canRunRandomSpeech() {
     return Boolean(
       petSettings.randomSpeechEnabled &&
-      !drinkState.isDrinking &&
       !pressActive &&
       !isLongPress &&
       !catSizeDragState &&
@@ -256,36 +261,6 @@
       }
       scheduleRandomSpeech();
     }, createRandomSpeechDelay());
-  }
-
-  async function setDrinking() {
-    if (drinkState.isDrinking) return;
-
-    // 清除上一次的重试定时器
-    if (window.__waterRetryTimer) {
-      window.clearTimeout(window.__waterRetryTimer);
-      window.__waterRetryTimer = null;
-    }
-
-    drinkState = createDrinkState({ duration: 3200 });
-    cat.classList.add('is-drinking');
-    waterBowl.classList.add('is-visible');
-    window.__desktopCatLive2D?.playDrink?.();
-
-    waterBubble.textContent = '该喝水啦！';
-
-    window.clearTimeout(drinkTimer);
-    drinkTimer = window.setTimeout(async () => {
-      if (shouldClearDrinkState(drinkState)) {
-        drinkState = clearDrinkState();
-        cat.classList.remove('is-drinking');
-        waterBowl.classList.remove('is-visible');
-      }
-      // 动画结束后，5 秒后再次提醒（如果用户还没记录）
-      window.__waterRetryTimer = window.setTimeout(() => {
-        setDrinking();
-      }, 5000);
-    }, 3500);
   }
 
   async function loadWaterCount() {
@@ -483,7 +458,7 @@
   }
 
   function updateBottomControlsForPointer(x, y) {
-    if (isPointOverPetVisible(x, y) || isPointOverBottomControls(x, y)) {
+    if (isAnyOverlayOpen() || isPointOverPetVisible(x, y) || isPointOverBottomControls(x, y)) {
       showCatSizeControl();
     } else {
       hideCatSizeControl();
@@ -531,7 +506,10 @@
 
   // 安全兜底：面板/弹窗打开时确保窗口可交互（mouse 不动时 mousemove 不会触发）
   window.setInterval(() => {
-    if (clickThroughEnabled && isAnyOverlayOpen()) {
+    if (!isAnyOverlayOpen()) return;
+
+    showCatSizeControl();
+    if (clickThroughEnabled) {
       applyClickThrough(false);
     }
   }, 300);
@@ -633,6 +611,7 @@
   function setUpdatePromptOpen(isOpen) {
     updatePrompt?.classList.toggle('show', isOpen);
     if (isOpen) {
+      updatePromptReturnFocus = document.activeElement;
       window.__closeWaterPanel?.();
       window.__closeClipboardPanel?.();
       window.__closeRoomPanel?.();
@@ -640,6 +619,10 @@
       setSettingsPanelOpen(false);
       showCatSizeControl();
       applyClickThrough(false);
+      focusFirstPromptControl(updatePrompt);
+    } else {
+      restorePromptFocus(updatePromptReturnFocus);
+      updatePromptReturnFocus = null;
     }
   }
 
@@ -724,15 +707,6 @@
       setSettingsPanelOpen(false);
     }
   });
-
-  // Listen for water reminder triggers from main process
-  if (window.desktopCat && window.desktopCat.waterReminder) {
-    window.desktopCat.waterReminder.onTrigger((payload) => {
-      if (!payload || payload.type === 'water') {
-        setDrinking();
-      }
-    });
-  }
 
   loadWaterCount();
   scheduleRandomSpeech();

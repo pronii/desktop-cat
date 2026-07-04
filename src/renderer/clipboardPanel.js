@@ -6,6 +6,7 @@
   const clipboardPanelContent = document.getElementById('clipboardPanelContent');
   const clipboardPauseBtn = document.getElementById('clipboardPauseBtn');
   const clipboardClearBtn = document.getElementById('clipboardClearBtn');
+  const clipboardPanelStatus = document.getElementById('clipboardPanelStatus');
 
   const api = window.desktopCat?.clipboardHistory;
   const PANEL_ITEM_LIMIT = 50;
@@ -55,6 +56,14 @@
     return emptyEl;
   }
 
+  function announceClipboardStatus(message) {
+    if (!clipboardPanelStatus) return;
+    clipboardPanelStatus.textContent = '';
+    setTimeout(() => {
+      clipboardPanelStatus.textContent = message;
+    }, 0);
+  }
+
   function createDeleteButton(item, itemEl) {
     const button = document.createElement('button');
     button.className = 'clipboard-item-delete';
@@ -76,6 +85,7 @@
             renderClipboardItems([]);
           }
         }
+        announceClipboardStatus('已删除');
       });
     });
 
@@ -120,6 +130,7 @@
 
         api.copy(item.id).then(() => {
           itemEl.classList.add('is-copied');
+          announceClipboardStatus('已复制');
           setTimeout(() => {
             itemEl.classList.remove('is-copied');
           }, 300);
@@ -207,6 +218,7 @@
 
     api.clear().then(() => {
       renderClipboardItems([]);
+      announceClipboardStatus('已清空历史');
     });
   });
 

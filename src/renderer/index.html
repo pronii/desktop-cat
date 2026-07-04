@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,9 +7,9 @@
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <main class="stage" aria-label="Desktop cat pet">
+    <main class="stage" aria-label="桌面小猫宠物">
       <canvas class="live2d-canvas" id="live2dCanvas" width="240" height="240" aria-hidden="true"></canvas>
-      <button class="cat" type="button" aria-label="Pet the cat">
+      <button class="cat" type="button" aria-label="摸摸小猫">
         <span class="ear ear-left"></span>
         <span class="ear ear-right"></span>
         <span class="head">
@@ -21,7 +21,6 @@
           <span class="cheek cheek-right"></span>
           <span class="nose"></span>
           <span class="mouth"></span>
-          <span class="tongue"></span>
           <span class="whisker whisker-left whisker-top"></span>
           <span class="whisker whisker-left whisker-bottom"></span>
           <span class="whisker whisker-right whisker-top"></span>
@@ -32,13 +31,8 @@
           <span class="paw paw-right"></span>
         </span>
         <span class="tail"></span>
-        <span class="water-bubble">该喝水啦！</span>
       </button>
       <span class="happy-bubble"></span>
-      <span class="water-bowl" aria-hidden="true">
-        <span class="water-surf"></span>
-        <span class="water-ripple"></span>
-      </span>
     </main>
 
     <div class="bottom-bar">
@@ -52,7 +46,11 @@
           aria-expanded="false"
           title="喝水记录"
         >
-          <span class="sketch-btn-icon">💧</span>
+          <span class="sketch-btn-icon">
+            <svg class="ui-icon" data-icon="droplet" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
+            </svg>
+          </span>
           <span class="sketch-btn-text"><span class="water-counter-num">0</span>杯</span>
         </button>
 
@@ -65,7 +63,16 @@
           aria-expanded="false"
           title="剪贴板历史"
         >
-          <span class="sketch-btn-icon">📋</span>
+          <span class="sketch-btn-icon">
+            <svg class="ui-icon" data-icon="clipboard-list" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <path d="M12 11h4" />
+              <path d="M12 16h4" />
+              <path d="M8 11h.01" />
+              <path d="M8 16h.01" />
+            </svg>
+          </span>
           <span class="sketch-btn-text">历史</span>
         </button>
 
@@ -78,7 +85,14 @@
           aria-expanded="false"
           title="好友同屏"
         >
-          <span class="sketch-btn-icon">👥</span>
+          <span class="sketch-btn-icon">
+            <svg class="ui-icon" data-icon="users" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <circle cx="9" cy="7" r="4" />
+            </svg>
+          </span>
           <span class="sketch-btn-text">好友</span>
         </button>
 
@@ -91,7 +105,19 @@
           aria-expanded="false"
           title="切换 Live2D 形象"
         >
-          <span class="sketch-btn-icon">🎭</span>
+          <span class="sketch-btn-icon">
+            <svg class="ui-icon" data-icon="theater" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M2 10s3-3 3-8" />
+              <path d="M22 10s-3-3-3-8" />
+              <path d="M10 2c0 4.4-3.6 8-8 8" />
+              <path d="M14 2c0 4.4 3.6 8 8 8" />
+              <path d="M2 10s2 2 2 5" />
+              <path d="M22 10s-2 2-2 5" />
+              <path d="M8 15h8" />
+              <path d="M2 22v-1a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" />
+              <path d="M14 22v-1a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" />
+            </svg>
+          </span>
           <span class="sketch-btn-text">形象</span>
         </button>
       </div>
@@ -104,10 +130,11 @@
           aria-label="拖动调整小猫大小"
           title="拖动调整小猫大小"
         >
-          <span class="cat-size-icon" aria-hidden="true">
-            <span>↖</span>
-            <span>↘</span>
-          </span>
+          <svg class="ui-icon cat-size-icon" data-icon="move-diagonal" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M11 19H5v-6" />
+            <path d="M13 5h6v6" />
+            <path d="M19 5 5 19" />
+          </svg>
           <span class="sketch-btn-text">大小</span>
         </button>
 
@@ -120,7 +147,12 @@
           aria-expanded="false"
           title="设置"
         >
-          <span class="sketch-btn-icon">⚙</span>
+          <span class="sketch-btn-icon">
+            <svg class="ui-icon" data-icon="settings" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </span>
           <span class="sketch-btn-text">设置</span>
         </button>
       </div>
@@ -128,7 +160,11 @@
 
     <div class="water-reminder-dialog" id="waterReminderDialog" role="dialog" aria-modal="false" aria-labelledby="waterReminderTitle">
       <div class="water-reminder-main">
-        <div class="water-reminder-icon" aria-hidden="true">💧</div>
+        <div class="water-reminder-icon" aria-hidden="true">
+          <svg class="ui-icon" data-icon="droplet" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
+          </svg>
+        </div>
         <div class="water-reminder-copy">
           <h3 id="waterReminderTitle">该喝水啦！</h3>
           <p id="waterReminderText">起来活动一下，顺手补一杯水。</p>
@@ -147,7 +183,12 @@
 
     <div class="update-prompt" id="updatePrompt" role="dialog" aria-modal="false" aria-labelledby="updatePromptTitle">
       <div class="update-prompt-main">
-        <div class="update-prompt-icon" aria-hidden="true">↑</div>
+        <div class="update-prompt-icon" aria-hidden="true">
+          <svg class="ui-icon" data-icon="arrow-up" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="m5 12 7-7 7 7" />
+            <path d="M12 19V5" />
+          </svg>
+        </div>
         <div class="update-prompt-copy">
           <h3 id="updatePromptTitle">发现新版本</h3>
           <p id="updatePromptText">desktop-cat 有新版本可用。</p>
@@ -162,7 +203,12 @@
 
     <div class="water-panel sketch-panel" id="waterPanel">
       <div class="sketch-panel-header sketch-panel-header-water">
-        <h3>💧 喝水记录</h3>
+        <h3>
+          <svg class="ui-icon panel-title-icon" data-icon="droplet" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
+          </svg>
+          喝水记录
+        </h3>
         <button class="sketch-panel-close" id="waterPanelClose" type="button" aria-label="关闭喝水记录">×</button>
       </div>
       <div class="water-panel-body">
@@ -177,7 +223,13 @@
           <div class="water-panel-section-label">喝水提醒</div>
           <div class="water-panel-btns">
             <button class="sketch-action-btn" id="waterPanelDrinkBtn" type="button">
-              <span>🥤</span> 记录
+              <svg class="ui-icon action-icon" data-icon="cup-soda" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <path d="m6 8 1.75 12.28a2 2 0 0 0 2 1.72h4.54a2 2 0 0 0 2-1.72L18 8" />
+                <path d="M5 8h14" />
+                <path d="M7 15a6.47 6.47 0 0 1 5 0 6.47 6.47 0 0 0 5 0" />
+                <path d="m12 8 1-6h2" />
+              </svg>
+              记录
             </button>
             <button class="sketch-action-btn sketch-action-btn-snooze" id="waterPanelSnoozeBtn" type="button">
               稍后提醒
@@ -202,7 +254,7 @@
           </div>
           <div class="water-panel-footer">
             <div class="water-panel-last" id="waterPanelLast">尚未提醒</div>
-            <div class="water-panel-next" id="waterPanelNext">⏰ 等待提醒</div>
+            <div class="water-panel-next" id="waterPanelNext">等待提醒</div>
           </div>
           <div class="water-task-section">
             <div class="water-panel-section-label water-task-section-title">事项提醒</div>
@@ -241,6 +293,7 @@
         <button class="clipboard-panel-action" id="clipboardPauseBtn" type="button" aria-pressed="false">暂停</button>
         <button class="clipboard-panel-action" id="clipboardClearBtn" type="button">清空</button>
       </div>
+      <div class="sr-only" id="clipboardPanelStatus" aria-live="polite"></div>
       <div class="clipboard-panel-content" id="clipboardPanelContent">
         <!-- 内容将通过 JavaScript 动态加载 -->
       </div>
@@ -248,7 +301,15 @@
 
     <div class="room-panel sketch-panel" id="roomPanel">
       <div class="sketch-panel-header sketch-panel-header-room">
-        <h3>👥 好友同屏</h3>
+        <h3>
+          <svg class="ui-icon panel-title-icon" data-icon="users" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <circle cx="9" cy="7" r="4" />
+          </svg>
+          好友同屏
+        </h3>
         <button class="sketch-panel-close" id="roomPanelClose" type="button" aria-label="关闭好友同屏">×</button>
       </div>
       <div class="room-panel-body">
@@ -280,7 +341,20 @@
 
     <div class="live2d-panel sketch-panel" id="live2dPanel">
       <div class="sketch-panel-header sketch-panel-header-live2d">
-        <h3>🎭 Live2D 形象</h3>
+        <h3>
+          <svg class="ui-icon panel-title-icon" data-icon="theater" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M2 10s3-3 3-8" />
+            <path d="M22 10s-3-3-3-8" />
+            <path d="M10 2c0 4.4-3.6 8-8 8" />
+            <path d="M14 2c0 4.4 3.6 8 8 8" />
+            <path d="M2 10s2 2 2 5" />
+            <path d="M22 10s-2 2-2 5" />
+            <path d="M8 15h8" />
+            <path d="M2 22v-1a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" />
+            <path d="M14 22v-1a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" />
+          </svg>
+          Live2D 形象
+        </h3>
         <button class="sketch-panel-close" id="live2dPanelClose" type="button" aria-label="关闭 Live2D 形象">×</button>
       </div>
       <div class="live2d-panel-body">
@@ -290,7 +364,13 @@
 
     <div class="settings-panel sketch-panel" id="settingsPanel">
       <div class="sketch-panel-header sketch-panel-header-settings">
-        <h3>⚙ 设置</h3>
+        <h3>
+          <svg class="ui-icon panel-title-icon" data-icon="settings" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          设置
+        </h3>
         <button class="sketch-panel-close" id="settingsPanelClose" type="button" aria-label="关闭设置">×</button>
       </div>
       <div class="settings-panel-body">

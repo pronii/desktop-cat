@@ -37,6 +37,23 @@
   let activeReminderType = 'water';
   let activeReminderTaskId = null;
   let selectedNewTaskInterval = DEFAULT_TASK_INTERVAL;
+  let waterReminderReturnFocus = null;
+  const REMINDER_ICONS = {
+    water: '<svg class="ui-icon" data-icon="droplet" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg>',
+    task: '<svg class="ui-icon" data-icon="timer" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2" /><line x1="12" x2="15" y1="14" y2="11" /><circle cx="12" cy="14" r="8" /></svg>'
+  };
+
+  function focusFirstReminderControl(container) {
+    const target = container?.querySelector?.(
+      'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    target?.focus?.({ preventScroll: true });
+  }
+
+  function restoreReminderFocus(element) {
+    if (typeof element?.focus !== 'function') return;
+    element.focus({ preventScroll: true });
+  }
 
   function updateProgressRing(count) {
     const fillEl = document.querySelector('.water-progress-fill');
@@ -85,35 +102,35 @@
     if (min >= 60) {
       const hr = Math.floor(min / 60);
       const remainMin = min % 60;
-      return `⏰ ${hr}时${remainMin}分后提醒`;
+      return `${hr}时${remainMin}分后提醒`;
     }
     if (min > 0) {
-      return `⏰ ${min}分${String(sec).padStart(2, '0')}秒后提醒`;
+      return `${min}分${String(sec).padStart(2, '0')}秒后提醒`;
     }
-    return `⏰ ${sec}秒后提醒`;
+    return `${sec}秒后提醒`;
   }
 
   function formatNextTrigger(config, taskName = DEFAULT_WATER_NAME) {
     if (config?.scheduledAt) {
-      if (!config.enabled) return '⏰ 提醒已关闭';
+      if (!config.enabled) return '提醒已关闭';
       const scheduledTime = new Date(config.scheduledAt).getTime();
-      if (isNaN(scheduledTime)) return '⏰ 等待提醒';
+      if (isNaN(scheduledTime)) return '等待提醒';
       const remaining = scheduledTime - Date.now();
-      if (remaining <= 0) return `🚨 请${taskName}吧！`;
+      if (remaining <= 0) return `请${taskName}吧！`;
       return formatRemaining(remaining);
     }
-    if (!config) return '⏰ 等待提醒';
-    if (!config.enabled) return '⏰ 提醒已关闭';
-    if (!config.lastTriggerAt) return '⏰ 等待第一次提醒';
+    if (!config) return '等待提醒';
+    if (!config.enabled) return '提醒已关闭';
+    if (!config.lastTriggerAt) return '等待第一次提醒';
 
     const lastTime = new Date(config.lastTriggerAt).getTime();
-    if (isNaN(lastTime)) return '⏰ 等待提醒';
+    if (isNaN(lastTime)) return '等待提醒';
 
     const intervalMs = config.interval * 60 * 1000;
     const nextTime = lastTime + intervalMs;
     const remaining = nextTime - Date.now();
 
-    if (remaining <= 0) return `🚨 该${taskName}啦！`;
+    if (remaining <= 0) return `该${taskName}啦！`;
 
     const totalSec = Math.floor(remaining / 1000);
     const min = Math.floor(totalSec / 60);
@@ -122,12 +139,12 @@
     if (min >= 60) {
       const hr = Math.floor(min / 60);
       const remainMin = min % 60;
-      return `⏰ ${hr}时${remainMin}分后提醒`;
+      return `${hr}时${remainMin}分后提醒`;
     }
     if (min > 0) {
-      return `⏰ ${min}分${String(sec).padStart(2, '0')}秒后提醒`;
+      return `${min}分${String(sec).padStart(2, '0')}秒后提醒`;
     }
-    return `⏰ ${sec}秒后提醒`;
+    return `${sec}秒后提醒`;
   }
 
   function isUrgent(config) {
@@ -178,13 +195,6 @@
     waterTaskNewIntervals?.querySelectorAll('.sketch-interval').forEach((btn) => {
       btn.classList.toggle('is-active', Number(btn.dataset.minutes) === selectedNewTaskInterval);
     });
-  }
-
-  function stopRetry() {
-    if (window.__waterRetryTimer) {
-      window.clearTimeout(window.__waterRetryTimer);
-      window.__waterRetryTimer = null;
-    }
   }
 
   function updateTaskCountdowns() {
@@ -330,7 +340,7 @@
     const name = isTaskReminder ? normalizeTaskName(task?.name) : DEFAULT_WATER_NAME;
     waterReminderDialog?.classList.toggle('is-task-reminder', isTaskReminder);
     if (waterReminderIcon) {
-      waterReminderIcon.textContent = isTaskReminder ? '⏰' : '💧';
+      waterReminderIcon.innerHTML = isTaskReminder ? REMINDER_ICONS.task : REMINDER_ICONS.water;
     }
     if (waterReminderTitle) {
       waterReminderTitle.textContent = `该${name}啦！`;
@@ -385,6 +395,7 @@
 
   function openReminderDialog(type = 'water', taskId = null) {
     if (!waterReminderDialog) return;
+    waterReminderReturnFocus = document.activeElement;
     activeReminderTaskId = taskId;
     applyReminderDialog(type, taskId);
     window.__closeClipboardPanel?.();
@@ -393,15 +404,17 @@
     window.__closeLive2DPanel?.();
     closePanel();
     waterReminderDialog.classList.add('show');
+    focusFirstReminderControl(waterReminderDialog);
   }
 
   function closeReminderDialog() {
     waterReminderDialog?.classList.remove('show');
+    restoreReminderFocus(waterReminderReturnFocus);
+    waterReminderReturnFocus = null;
   }
 
   async function recordDrinkFromReminder() {
     if (!api?.recordDrink) return;
-    stopRetry();
     try {
       const newCount = await api.recordDrink();
       closeReminderDialog();
@@ -422,7 +435,6 @@
       closeReminderDialog();
       return;
     }
-    stopRetry();
     try {
       await api.snooze();
       closeReminderDialog();
@@ -437,7 +449,6 @@
       closeReminderDialog();
       return;
     }
-    stopRetry();
     try {
       await api.completeTask(activeReminderTaskId);
       closeReminderDialog();
@@ -452,7 +463,6 @@
       closeReminderDialog();
       return;
     }
-    stopRetry();
     try {
       await api.snoozeTask(activeReminderTaskId);
       closeReminderDialog();
@@ -502,7 +512,6 @@
 
   waterPanelDrinkBtn?.addEventListener('click', async () => {
     if (!api?.recordDrink) return;
-    stopRetry();
     try {
       const newCount = await api.recordDrink();
       waterPanelCount.textContent = newCount;
@@ -521,7 +530,6 @@
 
   waterPanelSnoozeBtn?.addEventListener('click', async () => {
     if (!api?.snooze) return;
-    stopRetry();
     try {
       await api.snooze();
       refreshConfig();
