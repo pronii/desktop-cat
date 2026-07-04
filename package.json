@@ -9,7 +9,10 @@
     "start": "node scripts/start.js",
     "room:server": "node server/roomServer.js",
     "test": "node --test",
-    "pack": "electron-builder --win portable"
+    "pack": "npm run pack:release",
+    "pack:portable": "electron-builder --win portable",
+    "pack:installer": "electron-builder --win nsis",
+    "pack:release": "electron-builder --win nsis portable"
   },
   "keywords": [
     "electron",
@@ -34,10 +37,34 @@
       "package.json"
     ],
     "win": {
+      "icon": "src/main/assets/tray-cat-face.ico",
       "signAndEditExecutable": false,
       "target": [
-        "portable"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-win-${arch}-setup.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "desktop-cat"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-win-${arch}-portable.${ext}"
     }
   }
 }

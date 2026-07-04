@@ -1,135 +1,124 @@
 # desktop-cat
 
-`desktop-cat` 是一个基于 Electron 的 Windows 桌面宠物项目。它会在桌面上显示一只可互动的小猫，并提供喝水提醒、剪贴板历史、Live2D 外观和好友同屏等辅助功能。
-
 当前版本：`0.3.0`
 
-## 功能概览
+`desktop-cat` 是一个面向 Windows 的 Electron 桌面宠物。它把一只可互动的小猫放在桌面上，既能陪伴、提醒喝水、管理剪贴板，也能切换 Live2D 形象、和朋友进入同一个房间同屏出现。
 
-- 透明、无边框的桌面宠物窗口，默认置顶显示。
-- 支持右键菜单和系统托盘菜单，可显示、隐藏、回到屏幕中央、切换置顶和退出。
-- 检测到全屏前台窗口时会临时取消置顶，避免遮挡游戏或视频。
-- 小猫支持点击反馈、话痨模式、喝水动画、长按拖动窗口、拖动按钮调整大小。
-- 设置面板可控制话痨模式是否启用，也可控制底部喝水、剪贴板、好友、形象和大小按钮是否显示。
-- 喝水提醒支持今日杯数、提醒间隔、稍后提醒和提醒开关。
-- 剪贴板历史支持文本、图片和视频文件路径，支持暂停记录、删除、清空和复制回剪贴板。
-- Live2D 内置 Haru、Hiyori、Mao 三套样例形象，也支持用本地 `live2d/` 目录替换。
-- 好友同屏支持加入 6 位数字房间码，在同一房间中显示其他人的小猫。
+项目的目标不是做一个厚重的效率软件，而是做一个轻量、可打包、可扩展、不会打扰用户当前工作的桌面伙伴。
 
-## 环境要求
+## 项目特点
+
+- 轻量桌面宠物：透明无边框窗口，默认置顶显示，支持拖动、缩放、隐藏、回到屏幕中央和托盘控制。
+- 不打扰工作：检测到全屏前台窗口时会临时取消置顶，避免遮挡游戏、视频或演示。
+- Live2D 形象切换：内置 Haru、Hiyori、Mao 三套示例形象，支持外置 `live2d/` 目录加载自定义 Cubism 模型。
+- 稳定的 Live2D 预览：形象面板使用静态预览图，不在切换窗口里重复创建 Live2D runtime，降低主形象消失和 WebGL 上下文异常的风险。
+- 话痨模式：小猫会随机显示陪伴文案，也可以在设置里关闭。
+- 喝水提醒：记录今日杯数，支持提醒间隔、稍后提醒、启停提醒和喝水动画。
+- 剪贴板历史：保存最近文本、图片和视频文件路径，支持暂停记录、删除、清空和复制回系统剪贴板。
+- 好友同屏：通过 WebSocket 房间同步宠物状态，输入 6 位房间码即可看到同房间里的其他小猫。
+- 远程更新提示：支持服务端清单、WebSocket 推送提醒、SHA-256 校验和紧凑的应用内更新提示。
+- 正式打包：使用 `electron-builder` 生成 Windows NSIS 安装包和 portable 免安装包。
+
+## 快速开始
+
+### 环境要求
 
 - Windows
 - Node.js 20 或更新版本
 - npm
 
-## 本地开发
-
-安装依赖：
+### 安装依赖
 
 ```powershell
 npm install
 ```
 
-启动桌面宠物：
+### 启动桌面宠物
 
 ```powershell
 npm start
 ```
 
-启动好友同屏房间服务端：
+### 启动好友同屏服务端
 
 ```powershell
 npm run room:server
 ```
 
-运行测试：
+### 运行测试
 
 ```powershell
 npm test
 ```
 
+## 常用脚本
+
+| 命令 | 作用 |
+| --- | --- |
+| `npm start` | 启动 Electron 桌面宠物 |
+| `npm run room:server` | 启动好友同屏和更新推送服务 |
+| `npm test` | 运行 Node.js 测试 |
+| `npm run pack` | 打包 Windows 正式发布产物 |
+| `npm run pack:installer` | 只打包 Windows NSIS 安装包 |
+| `npm run pack:portable` | 只打包 Windows portable 免安装包 |
+
 ## 打包
 
-打包前必须先阅读 [PACKAGING.md](./PACKAGING.md)。
-
-标准流程：
+打包前建议先运行完整测试：
 
 ```powershell
 npm test
 npm run pack
 ```
 
-`npm run pack` 会生成 Windows portable 免安装 `.exe`。打包完成后，`dist` 目录最终只保留一个可直接双击运行的 `.exe`，例如：
+`npm run pack` 会同时生成 Windows 安装包和免安装包。当前版本产物示例：
 
 ```text
-dist/desktop-cat 0.3.0.exe
+dist/desktop-cat-0.3.0-win-x64-setup.exe
+dist/desktop-cat-0.3.0-win-x64-portable.exe
 ```
 
-不要把 zip 当作最终免安装包交付。
+打包前请阅读 [PACKAGING.md](./PACKAGING.md)。正式发布建议优先给普通用户提供 NSIS 安装包，同时保留 portable 免安装包作为绿色版。
 
-## Live2D 外观
+## 核心功能
 
-应用启动时会优先搜索外置 `live2d/` 目录中的 Cubism `*.model3.json` 模型；没有外置模型时，会回退到内置的 Haru、Hiyori、Mao。找到模型后会加载 Live2D；加载失败时，会继续使用默认 CSS 小猫。
+### 桌面宠物
 
-内置模型放在 `src/renderer/live2d-models/`，会随 `npm run pack` 一起打进 portable `.exe`。这些样例模型来自 [Live2D/CubismWebSamples](https://github.com/Live2D/CubismWebSamples)，按 Live2D Free Material License 使用，仓库内保留了对应的 `LICENSE.Live2D.md` 和 `NOTICE.Live2D.md`。
+默认形象是一只 CSS 绘制的小猫。它支持：
 
-开发运行时，可以把模型放到项目根目录：
+- 点击反馈和随机陪伴文案。
+- 长按拖动窗口。
+- 拖动尺寸按钮调整大小。
+- 通过托盘或右键菜单显示、隐藏、置顶、回到屏幕中央、退出。
+- 全屏前台窗口保护，避免置顶遮挡。
 
-```text
-desktop-cat/
-└─ live2d/
-   └─ Hiyori/
-      ├─ Hiyori.model3.json
-      ├─ Hiyori.moc3
-      └─ textures/
-```
+### 设置面板
 
-portable `.exe` 运行时，可以把 `live2d/` 放到 `.exe` 同级目录：
+设置面板可以控制：
 
-```text
-dist/
-├─ desktop-cat 0.3.0.exe
-└─ live2d/
-   └─ Hiyori/
-      └─ Hiyori.model3.json
-```
+- 话痨模式开关。
+- 底部喝水、剪贴板、好友同屏、Live2D 形象、大小调节按钮是否显示。
 
-搜索优先级从高到低是：
-- portable `.exe` 同级的 `live2d/`
-- 当前工作目录下的 `live2d/`
-- Electron `userData/live2d/`
-- 应用内置的 `src/renderer/live2d-models/`
+设置会保存在浏览器本地存储中。
 
-## 喝水提醒
+### 喝水提醒
 
-默认开启喝水提醒，初始间隔为 30 分钟。触发提醒时，小猫会进入喝水动画，界面中会显示水碗和提醒气泡。
+喝水提醒默认开启，初始提醒间隔为 30 分钟。触发提醒时，小猫会播放喝水动画，并显示提醒气泡。
 
 喝水面板支持：
 
 - 记录一杯水。
-- 查看今日已喝杯数。
+- 查看今日杯数。
 - 调整提醒间隔。
 - 暂停或开启提醒。
 - 稍后提醒。
+- 自定义事项提醒。
 
-配置会持久化到 Electron `userData` 下的 `water-reminder.json`。
+喝水配置会持久化到 Electron `userData` 下的 `water-reminder.json`。
 
-## 设置与话痨模式
+### 剪贴板历史
 
-底部工具栏中的设置按钮会打开设置面板。设置面板支持：
-
-- 开启或关闭话痨模式。
-- 显示或隐藏底部喝水按钮。
-- 显示或隐藏底部剪贴板按钮。
-- 显示或隐藏底部好友同屏按钮。
-- 显示或隐藏底部 Live2D 形象按钮。
-- 显示或隐藏底部大小调整按钮。
-
-话痨模式默认开启。开启后，小猫会每隔一段随机时间显示一句陪伴文案；拖拽、喝水动画或面板打开时不会主动打断当前操作。设置会保存在浏览器本地存储中。
-
-## 剪贴板历史
-
-剪贴板历史会定时轮询系统剪贴板，并保存最近记录。它支持：
+剪贴板历史会轮询系统剪贴板并保存最近记录。它支持：
 
 - 文本。
 - 图片。
@@ -142,9 +131,43 @@ dist/
 
 数据保存在 Electron `userData/clipboard-history/` 下。图片原图会保存到 `images/`，界面优先加载缩略图以降低内存占用。
 
-## 好友同屏
+### Live2D 形象
 
-好友同屏通过 WebSocket 房间服务同步宠物状态。客户端默认会连接代码中配置的房间服务地址，也可以通过环境变量覆盖：
+应用启动时会优先搜索外置 `live2d/` 目录中的 Cubism `*.model3.json` 模型；没有外置模型时，会回退到内置的 Haru、Hiyori、Mao。
+
+搜索优先级从高到低：
+
+- portable `.exe` 同级目录下的 `live2d/`
+- 当前工作目录下的 `live2d/`
+- Electron `userData/live2d/`
+- 应用内置的 `src/renderer/live2d-models/`
+
+开发运行时，可以把模型放到项目根目录：
+
+```text
+desktop-cat/
+└─ live2d/
+   └─ Hiyori/
+      ├─ Hiyori.model3.json
+      ├─ Hiyori.moc3
+      └─ Hiyori.2048/
+```
+
+portable `.exe` 运行时，可以把 `live2d/` 放到 `.exe` 同级目录：
+
+```text
+dist/
+├─ desktop-cat 0.3.0.exe
+└─ live2d/
+   └─ Hiyori/
+      └─ Hiyori.model3.json
+```
+
+内置 Live2D 示例模型来自 [Live2D/CubismWebSamples](https://github.com/Live2D/CubismWebSamples)，按 Live2D Free Material License 使用。仓库内保留了对应的 `LICENSE.Live2D.md` 和 `NOTICE.Live2D.md`。
+
+### 好友同屏
+
+好友同屏通过 WebSocket 房间服务同步宠物状态。客户端默认连接代码中配置的房间服务地址，也可以用环境变量覆盖：
 
 ```powershell
 $env:DESKTOP_CAT_ROOM_ENDPOINT = "ws://127.0.0.1:3001/room"
@@ -162,41 +185,9 @@ Docker 启动服务端：
 docker compose up -d --build
 ```
 
-服务端当前使用内存房间状态，不依赖数据库；服务重启后房间会清空。
+服务端当前使用内存保存房间状态，不依赖数据库。服务重启后房间会清空。
 
-## 常用脚本
-
-| 命令 | 作用 |
-| --- | --- |
-| `npm start` | 启动 Electron 桌面宠物 |
-| `npm run room:server` | 启动好友同屏房间服务 |
-| `npm test` | 运行 Node 测试 |
-| `npm run pack` | 生成 Windows portable `.exe` |
-
-## 项目结构
-
-```text
-desktop-cat/
-├─ server/                    好友同屏 WebSocket 服务
-├─ src/
-│  ├─ clipboard-history/       剪贴板历史主进程、存储和窗口
-│  ├─ main/                    Electron 主进程、菜单、托盘、提醒、房间客户端
-│  └─ renderer/                小猫 UI、动画、面板和 Live2D 渲染
-├─ tests/                      自动化测试
-├─ dist/                       打包产物目录
-├─ PACKAGING.md                打包规程
-├─ package.json
-└─ README.md
-```
-
-## 注意事项
-
-- 这是 Windows 桌面宠物项目，其他系统没有作为主要目标验证。
-- 当前没有安装器，交付物是 portable `.exe`。
-- 好友同屏服务端是轻量 MVP，房间状态只保存在内存中。
-- Live2D 已内置 Haru、Hiyori、Mao；外置 `live2d/` 目录仍可用于替换或调试其他模型。
-
-## 远程更新推送
+### 远程更新推送
 
 远程更新使用“服务端清单 + 可选 WebSocket 推送提醒”的方式。客户端不会直接信任推送消息，收到提醒后仍会重新拉取 `latest.json`，并校验下载文件的 `sha256`。
 
@@ -223,7 +214,7 @@ npm start
 {
   "version": "0.3.1",
   "url": "https://example.com/releases/desktop-cat-0.3.1.exe",
-  "sha256": "64位十六进制 sha256",
+  "sha256": "64位十六进制sha256",
   "notes": "新增远程更新提示。",
   "mandatory": false
 }
@@ -241,3 +232,29 @@ Invoke-RestMethod `
 ```
 
 即使 WebSocket 不可用，客户端也会在启动后和后台轮询时检查更新。
+
+## 项目结构
+
+```text
+desktop-cat/
+├─ server/                    好友同屏与更新推送 WebSocket/HTTP 服务
+├─ scripts/                   启动脚本和辅助脚本
+├─ src/
+│  ├─ clipboard-history/       剪贴板历史主进程、存储和窗口
+│  ├─ main/                    Electron 主进程、菜单、托盘、提醒、更新和房间客户端
+│  └─ renderer/                小猫 UI、动画、面板和 Live2D 渲染
+├─ tests/                      自动化测试
+├─ dist/                       打包产物目录
+├─ PACKAGING.md                打包规程
+├─ package.json
+└─ README.md
+```
+
+## 注意事项
+
+- 当前主要目标平台是 Windows，其他系统没有作为主要目标验证。
+- Windows 正式发布会生成 NSIS 安装包，portable `.exe` 作为免安装版本保留。
+- 好友同屏服务端是轻量 MVP，房间状态只保存在内存中。
+- Live2D 外置模型需要保持 Cubism 模型文件的相对路径完整。
+- 更新下载会校验 `sha256`，生产环境中应使用 HTTPS 下载地址和保密的发布 token。
+- 托盘猫脸图标来自 Microsoft Fluent Emoji `Cat face`，按 MIT 许可证使用。

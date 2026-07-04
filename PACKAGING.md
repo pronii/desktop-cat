@@ -1,76 +1,66 @@
 # 打包说明
 
-以后凡是执行打包、重新打免安装包、整理 `dist` 产物前，都先阅读本文件。
+以后凡是执行打包、重新打包、整理 `dist` 产物或准备发布版本前，都先阅读本文件。
 
 ## 当前约定
 
-- Windows 免安装包指可直接双击运行的 portable `.exe` 文件，不使用 zip 作为最终交付物。
-- 不要在用户测试前反复打包；只有用户明确要求“打包/重新打包/打免安装包”时才执行。
+- Windows 正式发布产物包含 NSIS 安装包和 portable 免安装包。
+- 面向普通用户优先交付 NSIS 安装包；portable `.exe` 作为绿色版保留。
+- 不使用 zip 作为最终交付物。
 - 打包前先运行 `npm test`，确认测试通过后再生成产物。
-- `dist` 目录最终保留一个免安装 `.exe`，以及可选的 `live2d/` 外置覆盖资源目录。
+- `dist` 目录可以保留本次发布的安装包、免安装包、校验文件，以及可选的 `live2d/` 外置覆盖资源目录。
 - Live2D 内置模型位于 `src/renderer/live2d-models/`，会随 `.exe` 打包；`dist/live2d/` 只用于用户替换或测试外部模型。
-- 不保留 `win-unpacked`、`builder-debug.yml`、`builder-effective-config.yaml`、旧 zip、旧 exe、临时启动脚本等中间产物；`live2d/` 不是中间产物，可以随 portable `.exe` 保留。
+- 当前未配置代码签名证书，Windows SmartScreen 仍可能提示未知发布者。正式公开发布前建议购买并配置代码签名证书。
 
-## 标准打包流程
+## 打包命令
 
-在项目根目录执行：
+在项目根目录执行完整发布打包：
 
 ```powershell
 npm test
 npm run pack
 ```
 
-`npm run pack` 使用 `electron-builder --win portable`，会在 `dist` 下生成类似下面的最终产物：
+`npm run pack` 会同时生成：
 
 ```text
-desktop-cat 0.2.0.exe
+dist/desktop-cat-0.3.0-win-x64-setup.exe
+dist/desktop-cat-0.3.0-win-x64-portable.exe
 ```
 
-## 打包后清理 `dist`
-
-打包完成后，只保留最新的 portable `.exe`，以及可选的 `dist/live2d/` 外置覆盖目录。清理前必须确认删除目标都在当前项目的 `dist` 目录内：
+如果只需要单独产物，可以使用：
 
 ```powershell
-$workspace = (Resolve-Path -LiteralPath '.').Path
-$dist = (Resolve-Path -LiteralPath 'dist').Path
-$keep = Get-ChildItem -Force -LiteralPath $dist -Filter '*.exe' |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
-
-if (-not $keep) {
-  throw 'No portable exe found in dist.'
-}
-
-$workspacePrefix = $workspace.TrimEnd('\') + '\'
-$distPrefix = $dist.TrimEnd('\') + '\'
-$keepPaths = @($keep.FullName)
-$live2dPath = Join-Path $dist 'live2d'
-
-if (-not ($dist -eq (Join-Path $workspace 'dist'))) {
-  throw "Unexpected dist path: $dist"
-}
-
-if (Test-Path -LiteralPath $live2dPath) {
-  $keepPaths += (Resolve-Path -LiteralPath $live2dPath).Path
-}
-
-$items = Get-ChildItem -Force -LiteralPath $dist | Where-Object { $keepPaths -notcontains $_.FullName }
-
-foreach ($item in $items) {
-  if (-not $item.FullName.StartsWith($distPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to remove path outside dist: $($item.FullName)"
-  }
-  if (-not $item.FullName.StartsWith($workspacePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to remove path outside workspace: $($item.FullName)"
-  }
-  Remove-Item -LiteralPath $item.FullName -Recurse -Force
-}
+npm run pack:installer
+npm run pack:portable
 ```
 
-最后检查：
+## 校验值
+
+发布前为最终 `.exe` 生成 SHA-256：
 
 ```powershell
-Get-ChildItem -Force -LiteralPath 'dist'
+Get-ChildItem -LiteralPath 'dist' -Filter '*.exe' |
+  Get-FileHash -Algorithm SHA256 |
+  Select-Object Path, Hash
 ```
 
-检查结果应包含一个 `desktop-cat <version>.exe`；内置 Live2D 模型已经在 `.exe` 中。如果本次包需要测试外部 Live2D 覆盖模型，也可以同时包含 `live2d/`。
+远程更新清单里的 `sha256` 必须使用最终下载文件对应的 SHA-256。
+
+## 发布检查
+
+发布 `0.3.0` 时至少确认：
+
+- `package.json` 版本号正确。
+- `npm test` 通过。
+- `npm run pack` 成功。
+- `dist` 下存在 NSIS 安装包和 portable 免安装包。
+- 已记录每个发布产物的 SHA-256。
+- GitHub Release 的附件和更新清单里的下载地址一致。
+- 更新推送服务的 `latest.json` 指向本次正式发布产物。
+
+## 打包后整理 `dist`
+
+如果需要清理 `dist`，只保留本次发布的 `.exe`、校验文件，以及可选的 `dist/live2d/` 外置覆盖目录。清理前必须确认删除目标都在当前项目的 `dist` 目录内。
+
+不要删除当前仍需要发布或用于更新清单计算的产物。
