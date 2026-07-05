@@ -48,3 +48,9 @@ test('package metadata enables GitHub installer auto updates', () => {
     }
   ]);
 });
+
+test('package metadata exposes the GitHub release automation command', () => {
+  const packageJson = readJson('package.json');
+
+  assert.equal(packageJson.scripts['release:github'], 'node scripts/release-github.js');
+});

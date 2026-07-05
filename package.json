@@ -12,7 +12,8 @@
     "pack": "npm run pack:release",
     "pack:portable": "electron-builder --win portable",
     "pack:installer": "electron-builder --win nsis",
-    "pack:release": "electron-builder --win nsis portable"
+    "pack:release": "electron-builder --win nsis portable",
+    "release:github": "node scripts/release-github.js"
   },
   "keywords": [
     "electron",
