@@ -169,6 +169,8 @@ dist/
 
 好友同屏通过 WebSocket 房间服务同步宠物状态。客户端默认连接代码中配置的房间服务地址，也可以用环境变量覆盖：
 
+好友同屏会同步当前形象标识。若双方本机都有相同 ID 的 Live2D 模型，好友会优先以 Live2D 形象显示；若模型缺失、运行时不可用或房间内 Live2D 好友数量超过性能上限，会自动回退为轻量 CSS 小猫。
+
 ```powershell
 $env:DESKTOP_CAT_ROOM_ENDPOINT = "ws://127.0.0.1:3001/room"
 npm start
