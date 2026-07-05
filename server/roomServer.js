@@ -2,7 +2,9 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 
+const { createLicenseStore } = require('./licenseStore');
 const { createRoomManager } = require('./roomManager');
+const { createUsageTracker } = require('./usageTracker');
 
 const WEBSOCKET_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const DEFAULT_MAX_PAYLOAD_BYTES = 16 * 1024;
@@ -249,6 +251,15 @@ function normalizeNickname(nickname, fallback) {
   return normalizeBoundedString(nickname, fallback, MAX_NICKNAME_LENGTH, 'Nickname');
 }
 
+function normalizeDeviceMetadata(data) {
+  return {
+    deviceId: normalizeBoundedString(data.deviceId, '', 128, 'Device id'),
+    deviceLabel: normalizeBoundedString(data.deviceLabel, '', 128, 'Device label'),
+    appVersion: normalizeBoundedString(data.appVersion, '', 32, 'App version'),
+    platform: normalizeBoundedString(data.platform, '', 32, 'Platform')
+  };
+}
+
 function sanitizePet(pet) {
   if (pet == null) {
     return null;
@@ -303,6 +314,19 @@ function createRoomServer(options = {}) {
     options.updateManifestPath || process.env.DESKTOP_CAT_UPDATE_MANIFEST_PATH;
   const updateManifestUrl =
     options.updateManifestUrl || process.env.DESKTOP_CAT_UPDATE_MANIFEST_URL || DEFAULT_UPDATE_MANIFEST_URL;
+  const usageTracker = options.usageTracker || createUsageTracker();
+  const adminToken = options.adminToken || process.env.DESKTOP_CAT_ADMIN_TOKEN;
+  let licenseStore = options.licenseStore || null;
+  const ownsLicenseStore = !options.licenseStore;
+
+  function getLicenseStore() {
+    if (!licenseStore) {
+      licenseStore = createLicenseStore({
+        dbPath: options.licenseDbPath || process.env.DESKTOP_CAT_LICENSE_DB_PATH
+      });
+    }
+    return licenseStore;
+  }
 
   function getUpdateManifest() {
     if (options.updateManifest) {
@@ -329,6 +353,30 @@ function createRoomServer(options = {}) {
     }
   }
 
+  function getRequestIp(request, socket = null) {
+    return socket?.remoteAddress || request.socket?.remoteAddress || '';
+  }
+
+  function isAdminAuthorized(requestUrl, request) {
+    if (!adminToken) return false;
+    if (request.headers.authorization === `Bearer ${adminToken}`) return true;
+    return requestUrl.searchParams.get('token') === adminToken;
+  }
+
+  function sendAdminUnauthorized(response) {
+    sendJsonResponse(response, 401, { error: 'unauthorized' });
+  }
+
+  function getLicenseStatusByDevice() {
+    const statuses = new Map();
+    for (const row of getLicenseStore().listLicenseDevices()) {
+      if (row.deviceId) {
+        statuses.set(row.deviceId, row.status);
+      }
+    }
+    return statuses;
+  }
+
   const server = http.createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/health') {
       sendJsonResponse(response, 200, { ok: true });
@@ -336,6 +384,60 @@ function createRoomServer(options = {}) {
     }
 
     const requestUrl = new URL(request.url, 'http://127.0.0.1');
+    if (request.method === 'GET' && requestUrl.pathname === '/admin/usage.json') {
+      if (!isAdminAuthorized(requestUrl, request)) {
+        sendAdminUnauthorized(response);
+        return;
+      }
+      const licensedDevices = getLicenseStatusByDevice();
+      sendJsonResponse(response, 200, usageTracker.snapshot({
+        getLicenseStatusForDevice: (deviceId) => licensedDevices.get(deviceId) || 'unlicensed'
+      }));
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname === '/admin/licenses.json') {
+      if (!isAdminAuthorized(requestUrl, request)) {
+        sendAdminUnauthorized(response);
+        return;
+      }
+      sendJsonResponse(response, 200, { licenses: getLicenseStore().listLicenseDevices() });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/license/activate') {
+      try {
+        const body = await readJsonBody(request);
+        const result = getLicenseStore().activateLicense({
+          code: body.licenseKey,
+          deviceId: body.deviceId,
+          deviceLabel: body.deviceLabel,
+          platform: body.platform,
+          appVersion: body.appVersion,
+          ip: getRequestIp(request)
+        });
+        sendJsonResponse(response, result.status === 'active' ? 200 : 403, result);
+      } catch (error) {
+        sendJsonResponse(response, 400, { status: 'invalid_request', message: error.message });
+      }
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/license/check') {
+      try {
+        const body = await readJsonBody(request);
+        const result = getLicenseStore().checkLicense({
+          code: body.licenseKey,
+          deviceId: body.deviceId,
+          ip: getRequestIp(request)
+        });
+        sendJsonResponse(response, result.status === 'active' ? 200 : 403, result);
+      } catch (error) {
+        sendJsonResponse(response, 400, { status: 'invalid_request', message: error.message });
+      }
+      return;
+    }
+
     if (request.method === 'GET' && requestUrl.pathname === DEFAULT_UPDATE_MANIFEST_URL) {
       try {
         const manifest = getUpdateManifest();
@@ -395,8 +497,15 @@ function createRoomServer(options = {}) {
     if (data.type === 'room:join') {
       const roomCode = validateRoomCode(data.roomCode);
       client.id = normalizeUserId(data.userId, client.id);
+      const nickname = normalizeNickname(data.nickname, client.id);
+      usageTracker.updateConnection(client.usageConnectionId, {
+        roomCode,
+        userId: client.id,
+        nickname,
+        ...normalizeDeviceMetadata(data)
+      });
       manager.joinRoom(roomCode, client, {
-        nickname: normalizeNickname(data.nickname, client.id),
+        nickname,
         pet: sanitizePet(data.pet)
       });
       return;
@@ -444,15 +553,22 @@ function createRoomServer(options = {}) {
 
       sockets.add(socket);
       updateStreamSockets.add(socket);
+      const usageConnection = usageTracker.registerConnection({
+        path,
+        ip: getRequestIp(request, socket),
+        userAgent: request.headers['user-agent'] || ''
+      });
 
       socket.on('data', () => {});
       socket.on('close', () => {
         sockets.delete(socket);
         updateStreamSockets.delete(socket);
+        usageTracker.removeConnection(usageConnection.connectionId);
       });
       socket.on('error', () => {
         sockets.delete(socket);
         updateStreamSockets.delete(socket);
+        usageTracker.removeConnection(usageConnection.connectionId);
       });
       return;
     }
@@ -467,9 +583,15 @@ function createRoomServer(options = {}) {
     }
 
     sockets.add(socket);
+    const usageConnection = usageTracker.registerConnection({
+      path,
+      ip: getRequestIp(request, socket),
+      userAgent: request.headers['user-agent'] || ''
+    });
 
     const client = {
       id: makeClientId(),
+      usageConnectionId: usageConnection.connectionId,
       send(message) {
         if (!socket.destroyed) {
           socket.write(encodeServerFrame(JSON.stringify(message)));
@@ -492,6 +614,7 @@ function createRoomServer(options = {}) {
           }
 
           if (frame.opcode === 0x1) {
+            usageTracker.markSeen(usageConnection.connectionId);
             handleClientMessage(client, frame.payload);
           }
         }
@@ -509,10 +632,12 @@ function createRoomServer(options = {}) {
 
     socket.on('close', () => {
       sockets.delete(socket);
+      usageTracker.removeConnection(usageConnection.connectionId);
       manager.leaveClient(client);
     });
     socket.on('error', () => {
       sockets.delete(socket);
+      usageTracker.removeConnection(usageConnection.connectionId);
       manager.leaveClient(client);
     });
   });
@@ -536,6 +661,10 @@ function createRoomServer(options = {}) {
           if (error) {
             reject(error);
           } else {
+            if (ownsLicenseStore && licenseStore?.close) {
+              licenseStore.close();
+              licenseStore = null;
+            }
             resolve();
           }
         });

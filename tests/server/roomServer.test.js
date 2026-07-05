@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
+const { createLicenseStore } = require('../../server/licenseStore');
 const { createRoomServer } = require('../../server/roomServer');
 
 function httpGetJson(url) {
@@ -25,6 +26,10 @@ function httpGetJson(url) {
       });
     }).on('error', reject);
   });
+}
+
+function tempLicenseDbPath(prefix = 'desktop-cat-license-route-') {
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), prefix)), 'db.sqlite');
 }
 
 function httpPostJson(url, body, headers = {}) {
@@ -485,5 +490,97 @@ test('room server rejects oversized WebSocket messages', async () => {
   } finally {
     alice.close();
     await roomServer.close();
+  }
+});
+
+test('room server protects admin usage json with the admin token', async () => {
+  const roomServer = createRoomServer({
+    port: 0,
+    adminToken: 'admin-secret',
+    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-route-')
+  });
+  await roomServer.listen();
+
+  try {
+    const port = roomServer.address().port;
+    const unauthorized = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json`);
+    const authorized = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json?token=admin-secret`);
+
+    assert.equal(unauthorized.statusCode, 401);
+    assert.equal(authorized.statusCode, 200);
+    assert.equal(authorized.body.metrics.onlineConnections, 0);
+  } finally {
+    await roomServer.close();
+  }
+});
+
+test('room server records device metadata from room joins in admin usage', async () => {
+  const roomServer = createRoomServer({
+    port: 0,
+    adminToken: 'admin-secret',
+    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-route-')
+  });
+  await roomServer.listen();
+  const port = roomServer.address().port;
+  const alice = await connectWebSocket(port);
+
+  try {
+    alice.sendJson({
+      type: 'room:join',
+      roomCode: '123456',
+      userId: 'alice',
+      nickname: 'Alice',
+      deviceId: 'device-1',
+      deviceLabel: 'Office PC',
+      appVersion: '0.3.8',
+      platform: 'win32'
+    });
+    assert.equal((await alice.nextJson()).type, 'room:joined');
+
+    const usage = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json?token=admin-secret`);
+
+    assert.equal(usage.statusCode, 200);
+    assert.equal(usage.body.metrics.onlineConnections, 1);
+    assert.equal(usage.body.metrics.onlineDevices, 1);
+    assert.equal(usage.body.connections[0].deviceId, 'device-1');
+    assert.equal(usage.body.connections[0].roomCode, '123456');
+  } finally {
+    alice.close();
+    await roomServer.close();
+  }
+});
+
+test('room server activates and checks a license against a device', async () => {
+  const store = createLicenseStore({
+    dbPath: tempLicenseDbPath()
+  });
+  store.createLicense({ code: 'DCAT-1111-2222-3333' });
+  const roomServer = createRoomServer({
+    port: 0,
+    licenseStore: store
+  });
+  await roomServer.listen();
+
+  try {
+    const port = roomServer.address().port;
+    const activate = await httpPostJson(`http://127.0.0.1:${port}/license/activate`, {
+      licenseKey: 'DCAT-1111-2222-3333',
+      deviceId: 'device-1',
+      deviceLabel: 'Office PC',
+      platform: 'win32',
+      appVersion: '0.3.8'
+    });
+    const check = await httpPostJson(`http://127.0.0.1:${port}/license/check`, {
+      licenseKey: 'DCAT-1111-2222-3333',
+      deviceId: 'device-1'
+    });
+
+    assert.equal(activate.statusCode, 200);
+    assert.equal(activate.body.status, 'active');
+    assert.equal(check.statusCode, 200);
+    assert.equal(check.body.status, 'active');
+  } finally {
+    await roomServer.close();
+    store.close();
   }
 });
