@@ -381,6 +381,61 @@ test('room server relays pet state between WebSocket room clients', async () => 
   }
 });
 
+test('room server relays sanitized Live2D appearance fields', async () => {
+  const roomServer = createRoomServer({ port: 0 });
+  await roomServer.listen();
+
+  const port = roomServer.address().port;
+  const alice = await connectWebSocket(port);
+  const bob = await connectWebSocket(port);
+
+  try {
+    alice.sendJson({
+      type: 'room:join',
+      roomCode: '123456',
+      userId: 'alice',
+      nickname: 'Alice'
+    });
+    assert.equal((await alice.nextJson()).type, 'room:joined');
+
+    alice.sendJson({
+      type: 'pet:update',
+      pet: {
+        x: 0.2,
+        y: 0.8,
+        action: 'idle',
+        facing: 'right',
+        appearanceType: 'live2d',
+        modelId: 'Haru',
+        modelName: 'Haru',
+        modelUrl: 'file:///must-not-pass'
+      }
+    });
+
+    bob.sendJson({
+      type: 'room:join',
+      roomCode: '123456',
+      userId: 'bob',
+      nickname: 'Bob'
+    });
+    const bobJoined = await bob.nextJson();
+
+    assert.deepEqual(bobJoined.peers[0].pet, {
+      x: 0.2,
+      y: 0.8,
+      action: 'idle',
+      facing: 'right',
+      appearanceType: 'live2d',
+      modelId: 'Haru',
+      modelName: 'Haru'
+    });
+  } finally {
+    alice.close();
+    bob.close();
+    await roomServer.close();
+  }
+});
+
 test('room server rejects invalid room codes from WebSocket clients', async () => {
   const roomServer = createRoomServer({ port: 0 });
   await roomServer.listen();

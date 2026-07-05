@@ -187,6 +187,38 @@ test('room client updates and removes peers from server messages', () => {
   assert.deepEqual(client.getState().peers, []);
 });
 
+test('room client preserves Live2D appearance fields in peer state', () => {
+  const client = createClient();
+
+  client.join({ roomCode: '123456', nickname: 'Alice' });
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+  socket.message({
+    type: 'pet:update',
+    userId: 'bob',
+    nickname: 'Bob',
+    pet: {
+      action: 'idle',
+      appearanceType: 'live2d',
+      modelId: 'Haru',
+      modelName: 'Haru'
+    },
+    updatedAt: 2000
+  });
+
+  assert.deepEqual(client.getState().peers, [{
+    userId: 'bob',
+    nickname: 'Bob',
+    pet: {
+      action: 'idle',
+      appearanceType: 'live2d',
+      modelId: 'Haru',
+      modelName: 'Haru'
+    },
+    updatedAt: 2000
+  }]);
+});
+
 test('room client leaves the room and clears peer state', () => {
   const client = createClient();
 

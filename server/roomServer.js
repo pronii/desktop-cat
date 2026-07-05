@@ -18,7 +18,13 @@ const PET_NUMBER_FIELDS = new Set([
   'relativeX',
   'relativeY'
 ]);
-const PET_STRING_FIELDS = new Set(['action', 'facing']);
+const PET_STRING_FIELDS = new Set([
+  'action',
+  'facing',
+  'appearanceType',
+  'modelId',
+  'modelName'
+]);
 const DEFAULT_UPDATE_MANIFEST_URL = '/updates/latest.json';
 
 function createFatalError(message) {
