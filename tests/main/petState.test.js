@@ -3,7 +3,7 @@ const test = require('node:test');
 
 const { buildLocalPetState } = require('../../src/main/petState');
 
-function createWindow(bounds) {
+function createWindow(bounds = { x: 350, y: 450, width: 300, height: 360 }) {
   return {
     isDestroyed: () => false,
     getBounds: () => bounds
@@ -20,7 +20,7 @@ const fakeScreen = {
 
 test('buildLocalPetState includes Live2D appearance when current model is available', () => {
   const state = buildLocalPetState({
-    petWindow: createWindow({ x: 350, y: 450, width: 300, height: 360 }),
+    petWindow: createWindow(),
     screen: fakeScreen,
     dragModeActive: true,
     catScale: 0.5,
@@ -35,13 +35,7 @@ test('buildLocalPetState includes Live2D appearance when current model is availa
   });
 
   assert.deepEqual(state, {
-    x: 350,
-    y: 450,
-    width: 300,
-    height: 360,
     scale: 0.5,
-    relativeX: 0.25,
-    relativeY: 0.5,
     action: 'drag',
     facing: 'right',
     appearanceType: 'live2d',
@@ -62,6 +56,10 @@ test('buildLocalPetState reports css-cat when Live2D is unavailable', () => {
 
   assert.equal(state.action, 'idle');
   assert.equal(state.appearanceType, 'css-cat');
+  assert.equal(Object.hasOwn(state, 'x'), false);
+  assert.equal(Object.hasOwn(state, 'y'), false);
+  assert.equal(Object.hasOwn(state, 'relativeX'), false);
+  assert.equal(Object.hasOwn(state, 'relativeY'), false);
   assert.equal(Object.hasOwn(state, 'modelId'), false);
   assert.equal(Object.hasOwn(state, 'modelName'), false);
 });

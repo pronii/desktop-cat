@@ -58,7 +58,7 @@ function resolvePeerBounds(anchorBounds, screen, index, total) {
   const rawX = canFitRight
     ? rightStartX + index * step
     : anchor.x - PEER_WINDOW_GAP - PEER_WINDOW_WIDTH - index * step;
-  const rawY = anchor.y + Math.round((anchor.height - PEER_WINDOW_HEIGHT) / 2);
+  const rawY = anchor.y + anchor.height - PEER_WINDOW_HEIGHT;
 
   return {
     x: clamp(rawX, workArea.x, workArea.x + workArea.width - PEER_WINDOW_WIDTH),

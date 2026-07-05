@@ -3,7 +3,8 @@ const test = require('node:test');
 
 const {
   createPeerPetWindowManager,
-  resolveLocalPetAnchorBounds
+  resolveLocalPetAnchorBounds,
+  resolvePeerBounds
 } = require('../../src/main/peerPetWindows');
 
 class FakeBrowserWindow {
@@ -106,7 +107,7 @@ test('peer pet manager creates a transparent window for each peer', () => {
   assert.equal(FakeBrowserWindow.instances[0].loadedFile, 'peer.html');
   assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
     x: 344,
-    y: 215,
+    y: 230,
     width: 160,
     height: 150
   });
@@ -138,7 +139,7 @@ test('peer pet manager reuses existing windows when peers update', () => {
   assert.equal(FakeBrowserWindow.instances.length, 1);
   assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
     x: 364,
-    y: 235,
+    y: 250,
     width: 160,
     height: 150
   });
@@ -197,9 +198,38 @@ test('peer pet manager lays out multiple peers beside the local pet', () => {
   ], { x: 100, y: 200, width: 240, height: 180 });
 
   assert.deepEqual(FakeBrowserWindow.instances.map((window) => window.bounds), [
-    { x: 344, y: 215, width: 160, height: 150 },
-    { x: 508, y: 215, width: 160, height: 150 }
+    { x: 344, y: 230, width: 160, height: 150 },
+    { x: 508, y: 230, width: 160, height: 150 }
   ]);
+});
+
+test('peer pet manager ignores peer screen coordinates when keeping fixed spacing', () => {
+  const manager = createManager();
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { x: 900, y: 700, relativeX: 0.9, relativeY: 0.9 } }
+  ], { x: 100, y: 200, width: 240, height: 180 });
+  const firstBounds = FakeBrowserWindow.instances[0].bounds;
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { x: 10, y: 20, relativeX: 0.01, relativeY: 0.02 } }
+  ], { x: 100, y: 200, width: 240, height: 180 });
+
+  assert.deepEqual(FakeBrowserWindow.instances[0].bounds, firstBounds);
+});
+
+test('peer bounds keep a fixed side gap and shared baseline for scaled local anchors', () => {
+  assert.deepEqual(resolvePeerBounds({
+    x: 100,
+    y: 300,
+    width: 89,
+    height: 95
+  }, fakeScreen, 0, 1), {
+    x: 193,
+    y: 245,
+    width: 160,
+    height: 150
+  });
 });
 
 test('peer pet manager keeps peer windows inside the local display work area', () => {
@@ -231,7 +261,7 @@ test('peer pet manager aligns peers beside the visible local cat area', () => {
 
   assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
     x: 597,
-    y: 237,
+    y: 257,
     width: 160,
     height: 150
   });

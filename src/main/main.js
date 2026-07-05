@@ -560,12 +560,13 @@ function startRoomPetStateReporting() {
   if (roomPetStateTimer) return;
   roomPetStateTimer = setInterval(() => {
     if (!roomClient) return;
+    const localLayoutBounds = getLocalPetLayoutBounds();
     const petState = buildLocalPetState();
     if (petState) {
       roomClient.sendPetState(petState);
       const roomState = roomClient.getState();
       if (roomState.status === 'connected') {
-        syncPeerPetsBesideLocal(roomState.peers, petState);
+        syncPeerPetsBesideLocal(roomState.peers, localLayoutBounds);
       }
     }
   }, 1000);
