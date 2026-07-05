@@ -71,6 +71,30 @@ body {
   animation: peer-wiggle 0.8s ease-in-out infinite;
 }
 
+.peer-live2d-canvas {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 138px;
+  height: 126px;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.peer-stage.has-live2d .peer-live2d-canvas {
+  opacity: 1;
+}
+
+.peer-stage.has-live2d .peer-cat {
+  opacity: 0;
+}
+
+.peer-stage.is-drag .peer-live2d-canvas {
+  animation: peer-wiggle 0.8s ease-in-out infinite;
+}
+
 .peer-head {
   position: absolute;
   left: 19px;

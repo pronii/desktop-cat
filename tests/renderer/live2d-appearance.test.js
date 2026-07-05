@@ -76,6 +76,106 @@ test('peer preload exposes read-only Live2D model lookup APIs', () => {
   assert.match(main, /live2DAppearance\.getCurrentModel/);
 });
 
+test('peer pet page includes Live2D canvas, runtime scripts, and fallback classes', () => {
+  const html = readSource('src', 'renderer', 'peerPet.html');
+  const css = readSource('src', 'renderer', 'peerPet.css');
+  const peerLive2D = readSource('src', 'renderer', 'peerLive2D.js');
+
+  assert.match(html, /id="peerLive2DCanvas"/);
+  assert.match(html, /vendor\/live2d\/live2dcubismcore\.min\.js/);
+  assert.match(html, /vendor\/live2d\/pixi\.min\.js/);
+  assert.match(html, /vendor\/live2d\/pixi-live2d-cubism4\.min\.js/);
+  assert.ok(
+    html.indexOf('peerLive2D.js') < html.indexOf('peerPet.js'),
+    'peer Live2D helper must load before peerPet.js'
+  );
+  assert.match(css, /\.peer-live2d-canvas\s*\{/);
+  assert.match(css, /\.peer-stage\.has-live2d\s+\.peer-cat/);
+  assert.match(css, /\.peer-stage\.is-drag\s+\.peer-live2d-canvas/);
+  assert.match(peerLive2D, /createPeerLive2D/);
+  assert.match(peerLive2D, /Live2DModel\.from/);
+  assert.match(peerLive2D, /showCssCat/);
+});
+
+test('peer Live2D helper ignores a stale model load after CSS fallback', async () => {
+  const script = readSource('src', 'renderer', 'peerLive2D.js');
+  const stageClasses = new Set();
+  const canvasAttributes = new Map();
+  let createdApp = null;
+  let resolveModelLoad = null;
+
+  const stage = {
+    classList: {
+      add(name) {
+        stageClasses.add(name);
+      },
+      remove(name) {
+        stageClasses.delete(name);
+      }
+    }
+  };
+  const canvas = {
+    width: 0,
+    height: 0,
+    setAttribute(name, value) {
+      canvasAttributes.set(name, String(value));
+    }
+  };
+  class FakePixiApplication {
+    constructor() {
+      this.stage = {
+        children: [],
+        addChild(child) {
+          this.children.push(child);
+        },
+        removeChild(child) {
+          this.children = this.children.filter((entry) => entry !== child);
+        }
+      };
+      createdApp = this;
+    }
+  }
+  const fakeWindow = {
+    PIXI: {
+      Application: FakePixiApplication,
+      live2d: {
+        Live2DModel: {
+          from: async () => new Promise((resolve) => {
+            resolveModelLoad = resolve;
+          })
+        }
+      }
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    console
+  });
+
+  const peerLive2D = fakeWindow.peerLive2D.createPeerLive2D({ canvas, stage });
+  const loadPromise = peerLive2D.loadModel({
+    available: true,
+    id: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json'
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  peerLive2D.showCssCat();
+  resolveModelLoad({
+    width: 100,
+    height: 120,
+    anchor: { set() {} },
+    scale: { set() {} },
+    destroy() {}
+  });
+
+  assert.equal(await loadPromise, false);
+  assert.equal(stageClasses.has('has-live2d'), false);
+  assert.equal(canvasAttributes.get('aria-hidden'), 'true');
+  assert.deepEqual(createdApp.stage.children, []);
+});
+
 test('live2d renderer script keeps the default cat when no model is configured', () => {
   const script = readSource('src', 'renderer', 'live2dAppearance.js');
 
