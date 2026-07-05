@@ -458,6 +458,7 @@ test('encouragement bubble renders as a centered long info bar with at most two 
 
   assert.match(html, /<\/button>\s*<span class="happy-bubble"><\/span>/);
   assert.match(bubbleCss, /left:\s*50%/);
+  assert.match(bubbleCss, /top:\s*-28px/);
   assert.doesNotMatch(bubbleCss, /left:\s*132px/);
   assert.match(bubbleCss, /width:\s*max-content/);
   assert.match(bubbleCss, /min-width:\s*168px/);

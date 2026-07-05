@@ -393,7 +393,7 @@ body {
 .happy-bubble {
   position: absolute;
   left: 50%;
-  top: 12px;
+  top: -28px;
   width: max-content;
   min-width: 168px;
   max-width: min(280px, calc(100vw - 32px));
