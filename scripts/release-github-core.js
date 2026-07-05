@@ -78,8 +78,19 @@ function parseGitCredentialOutput(output) {
   return match[1];
 }
 
-function resolveNpmCommand(platform = process.platform) {
-  return platform === 'win32' ? 'npm.cmd' : 'npm';
+function resolveNpmInvocation(args, platform = process.platform) {
+  const npmArgs = Array.isArray(args) ? args.map(String) : [];
+  if (platform === 'win32') {
+    return {
+      command: 'cmd.exe',
+      args: ['/d', '/s', '/c', ['npm', ...npmArgs].join(' ')]
+    };
+  }
+
+  return {
+    command: 'npm',
+    args: npmArgs
+  };
 }
 
 module.exports = {
@@ -90,5 +101,5 @@ module.exports = {
   getReleaseMetadata,
   parseGitCredentialOutput,
   resolveRequiredAssets,
-  resolveNpmCommand
+  resolveNpmInvocation
 };

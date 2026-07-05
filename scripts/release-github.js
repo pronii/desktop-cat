@@ -11,7 +11,7 @@ const {
   extractChangelogSection,
   getReleaseMetadata,
   parseGitCredentialOutput,
-  resolveNpmCommand,
+  resolveNpmInvocation,
   resolveRequiredAssets
 } = require('./release-github-core');
 
@@ -175,9 +175,10 @@ async function main() {
   });
   assertReleaseBodySafe(body);
 
-  const npmCommand = resolveNpmCommand();
-  run(npmCommand, ['test']);
-  run(npmCommand, ['run', 'pack']);
+  const npmTest = resolveNpmInvocation(['test']);
+  run(npmTest.command, npmTest.args);
+  const npmPack = resolveNpmInvocation(['run', 'pack']);
+  run(npmPack.command, npmPack.args);
 
   const distDir = path.join(projectRoot, 'dist');
   const setupPath = path.join(distDir, `${metadata.productName}-${metadata.version}-win-x64-setup.exe`);
