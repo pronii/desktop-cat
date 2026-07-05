@@ -35,6 +35,24 @@ npm run pack:installer
 npm run pack:portable
 ```
 
+## GitHub Release 自动发布
+
+准备发布前，先手动确认版本内容已经更新：
+
+- `package.json` 和 `package-lock.json` 版本号一致。
+- `README.md`、`PACKAGING.md`、`CHANGELOG.md` 已写入本次版本内容。
+- `CHANGELOG.md` 包含 `## 当前版本号` 小节。
+
+确认后使用首选发布命令：
+
+```powershell
+npm run release:github
+```
+
+This is the preferred publishing path for GitHub Releases.
+
+该命令会运行测试、打包、生成 `SHA256SUMS.txt`、创建或更新 tag、创建或更新 GitHub Release，并上传安装版自动更新所需的 `latest.yml` 和 `.blockmap`。
+
 ## 校验值
 
 发布前为最终 `.exe` 生成 SHA-256：

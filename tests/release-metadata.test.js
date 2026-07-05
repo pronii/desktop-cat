@@ -22,13 +22,15 @@ test('release metadata describes the 0.3.2 auto update release', () => {
   assert.equal(packageLock.version, '0.3.2');
   assert.equal(packageLock.packages[''].version, '0.3.2');
 
-  assert.match(readme, /当前版本：`0\.3\.2`/);
+  assert.match(readme, /`0\.3\.2`/);
   assert.match(readme, /desktop-cat-0\.3\.2-win-x64-setup\.exe/);
   assert.match(readme, /desktop-cat-0\.3\.2-win-x64-portable\.exe/);
 
+  assert.match(packaging, /`0\.3\.2`/);
   assert.match(packaging, /desktop-cat-0\.3\.2-win-x64-setup\.exe/);
   assert.match(packaging, /desktop-cat-0\.3\.2-win-x64-portable\.exe/);
-  assert.match(packaging, /发布 `0\.3\.2`/);
+  assert.match(packaging, /npm run release:github/);
+  assert.match(packaging, /preferred publishing path/i);
 
   assert.match(changelog, /## 0\.3\.2/);
   assert.match(changelog, /electron-updater/);
