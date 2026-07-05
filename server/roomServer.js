@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 
+const { createAdminPage } = require('./adminPage');
 const { createLicenseStore } = require('./licenseStore');
 const { createRoomManager } = require('./roomManager');
 const { createUsageTracker } = require('./usageTracker');
@@ -384,6 +385,20 @@ function createRoomServer(options = {}) {
     }
 
     const requestUrl = new URL(request.url, 'http://127.0.0.1');
+    if (request.method === 'GET' && requestUrl.pathname === '/admin') {
+      if (!isAdminAuthorized(requestUrl, request)) {
+        response.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
+        response.end('unauthorized');
+        return;
+      }
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store'
+      });
+      response.end(createAdminPage({ token: requestUrl.searchParams.get('token') || '' }));
+      return;
+    }
+
     if (request.method === 'GET' && requestUrl.pathname === '/admin/usage.json') {
       if (!isAdminAuthorized(requestUrl, request)) {
         sendAdminUnauthorized(response);

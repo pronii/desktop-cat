@@ -28,6 +28,21 @@ function httpGetJson(url) {
   });
 }
 
+function httpGetText(url) {
+  return new Promise((resolve, reject) => {
+    http.get(url, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        body += chunk;
+      });
+      response.on('end', () => {
+        resolve({ statusCode: response.statusCode, body });
+      });
+    }).on('error', reject);
+  });
+}
+
 function tempLicenseDbPath(prefix = 'desktop-cat-license-route-') {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), prefix)), 'db.sqlite');
 }
@@ -582,5 +597,26 @@ test('room server activates and checks a license against a device', async () => 
   } finally {
     await roomServer.close();
     store.close();
+  }
+});
+
+test('room server serves a token-protected admin dashboard page', async () => {
+  const roomServer = createRoomServer({
+    port: 0,
+    adminToken: 'admin-secret',
+    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-page-')
+  });
+  await roomServer.listen();
+
+  try {
+    const port = roomServer.address().port;
+    const response = await httpGetText(`http://127.0.0.1:${port}/admin?token=admin-secret`);
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /desktop-cat Admin/);
+    assert.match(response.body, /admin\/usage\.json/);
+    assert.match(response.body, /Online connections/);
+  } finally {
+    await roomServer.close();
   }
 });
