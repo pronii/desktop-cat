@@ -21,6 +21,15 @@ npm test
 npm run pack
 ```
 
+正式发布包需要连接线上房间服务时，先在本机或 CI Secret 中设置房间端点，再打包：
+
+```powershell
+$env:DESKTOP_CAT_ROOM_ENDPOINT = "ws://your-room-host.example:3001/room"
+npm run pack
+```
+
+打包命令会先运行 `npm run build:config`，把该值写入 `src/main/buildConfig.generated.json`。这个生成文件已被 Git 忽略，不能提交；未设置该变量时，打包产物会回退到本地房间服务地址 `ws://127.0.0.1:3001/room`。
+
 `npm run pack` 会同时生成：
 
 ```text

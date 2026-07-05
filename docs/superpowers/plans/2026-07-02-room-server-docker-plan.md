@@ -13,7 +13,7 @@
 - No database in MVP; rooms disappear after server restart.
 - No new runtime npm dependencies for the first deploy.
 - Room state stores only room membership and latest pet state.
-- Public MVP endpoint is IP-based: `ws://45.136.28.241:3001/room`.
+- Public MVP endpoint is configured outside source, for example `ws://203.0.113.10:3001/room`.
 - Keep tests runnable through `npm test`.
 
 ---
@@ -109,8 +109,8 @@ Expected: PASS.
 - Remote path: `/opt/desktop-cat-room`
 
 **Interfaces:**
-- Consumes: SSH access to `root@45.136.28.241`.
-- Produces: reachable service at `http://45.136.28.241:3001/health` and `ws://45.136.28.241:3001/room`.
+- Consumes: SSH access to the deployment host.
+- Produces: reachable service at `http://203.0.113.10:3001/health` and `ws://203.0.113.10:3001/room`.
 
 - [ ] **Step 1: Copy files to server**
 

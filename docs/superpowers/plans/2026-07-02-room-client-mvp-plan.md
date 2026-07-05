@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Use `ws://45.136.28.241:3001/room` as the default room endpoint.
+- Use a configured room endpoint, for example `ws://203.0.113.10:3001/room`, instead of committing a private deployment address.
 - Do not add a separate friend pet window in this MVP.
 - Keep network logic out of renderer code.
 - Preserve the existing hand-drawn compact desktop pet UI.

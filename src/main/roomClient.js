@@ -1,8 +1,12 @@
-const DEFAULT_ROOM_ENDPOINT = 'ws://45.136.28.241:3001/room';
+const {
+  LOCAL_ROOM_ENDPOINT,
+  resolveBuildRoomEndpoint
+} = require('./buildConfig');
+
+const DEFAULT_ROOM_ENDPOINT = LOCAL_ROOM_ENDPOINT;
 
 function resolveRoomEndpoint(env = process.env) {
-  const configured = String(env.DESKTOP_CAT_ROOM_ENDPOINT || '').trim();
-  return configured || DEFAULT_ROOM_ENDPOINT;
+  return resolveBuildRoomEndpoint(env);
 }
 
 function clonePet(pet) {

@@ -8,3 +8,4 @@ out/
 .codebuddy/
 .dc-test-data/
 .worktrees/
+src/main/buildConfig.generated.json

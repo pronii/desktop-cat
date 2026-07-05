@@ -73,6 +73,7 @@ function createClient() {
 }
 
 test('room endpoint can be configured through environment', () => {
+  assert.equal(DEFAULT_ROOM_ENDPOINT, 'ws://127.0.0.1:3001/room');
   assert.equal(
     resolveRoomEndpoint({
       DESKTOP_CAT_ROOM_ENDPOINT: ' ws://127.0.0.1:3001/room '

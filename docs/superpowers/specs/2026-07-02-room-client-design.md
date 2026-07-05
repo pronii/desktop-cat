@@ -12,7 +12,7 @@ Add a usable "好友同屏" entry to the desktop cat client so a user can create
 - Let the user create a six-digit room code locally and join it.
 - Show connection state, current room code, and online friend count.
 - Let the user leave the room.
-- Connect from the Electron main process to `ws://45.136.28.241:3001/room`.
+- Connect from the Electron main process to the configured room endpoint, for example `ws://203.0.113.10:3001/room`.
 - Periodically publish the local pet window position and action state.
 - Receive friend presence and show a list with recent pet state in the panel.
 - Defer separate transparent friend pet windows to a later feature.

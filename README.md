@@ -72,6 +72,15 @@ npm test
 npm run pack
 ```
 
+正式发布时，房间服务器地址通过打包环境变量注入，不要写进源码：
+
+```powershell
+$env:DESKTOP_CAT_ROOM_ENDPOINT = "ws://your-room-host.example:3001/room"
+npm run pack
+```
+
+`npm run pack`、`npm run pack:installer` 和 `npm run pack:portable` 会先生成 `src/main/buildConfig.generated.json`。该文件已被 Git 忽略，只会进入本次打包产物。未设置 `DESKTOP_CAT_ROOM_ENDPOINT` 时，客户端默认连接本地 `ws://127.0.0.1:3001/room`。
+
 `npm run pack` 会同时生成 Windows 安装包和免安装包。当前版本产物示例：
 
 ```text
