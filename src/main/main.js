@@ -45,6 +45,7 @@ const {
 const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = require('../clipboard-history/main');
 const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
+const { createDeviceIdentity } = require('./deviceIdentity');
 const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
 const { buildLocalPetState: createLocalPetState } = require('./petState');
 const { SimpleWebSocket } = require('./simpleWebSocket');
@@ -98,6 +99,7 @@ let roomClient = null;
 let roomStateTeardown = null;
 let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
+let deviceIdentity = null;
 let peerPetWindowManager = null;
 let updateManager = null;
 let currentCatScale = CAT_SCALE_DEFAULT;
@@ -594,7 +596,8 @@ function setupRoomClient() {
   roomClient = createRoomClient({
     WebSocket: globalThis.WebSocket || SimpleWebSocket,
     endpoint: resolveRoomEndpoint(),
-    userId: roomUserId
+    userId: roomUserId,
+    deviceInfo: deviceIdentity || {}
   });
   roomStateTeardown = roomClient.onStateChanged(handleRoomStateChanged);
   startRoomPetStateReporting();
@@ -804,6 +807,10 @@ if (!gotTheLock) {
       preloadPath: path.join(__dirname, '..', 'clipboard-history', 'preload.js')
     });
     waterReminder.start();
+    deviceIdentity = createDeviceIdentity({
+      userDataPath: app.getPath('userData'),
+      appVersion: app.getVersion()
+    });
     setupRoomClient();
     updateManager = createUpdateManager({
       app,

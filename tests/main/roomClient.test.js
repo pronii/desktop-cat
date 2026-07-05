@@ -62,6 +62,12 @@ function createClient() {
     WebSocket: FakeWebSocket,
     endpoint: 'ws://example.test/room',
     userId: 'local-user',
+    deviceInfo: {
+      deviceId: 'device-1',
+      deviceLabel: 'Office PC',
+      appVersion: '0.3.8',
+      platform: 'win32'
+    },
     now: () => 1234
   });
 }
@@ -91,7 +97,11 @@ test('room client sends a join message when the socket opens', () => {
     type: 'room:join',
     roomCode: '123456',
     userId: 'local-user',
-    nickname: 'Alice'
+    nickname: 'Alice',
+    deviceId: 'device-1',
+    deviceLabel: 'Office PC',
+    appVersion: '0.3.8',
+    platform: 'win32'
   }]);
   assert.equal(client.getState().status, 'connecting');
 });

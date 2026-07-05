@@ -84,10 +84,20 @@ function validateRoomCode(roomCode) {
   return normalized;
 }
 
+function normalizeDeviceInfo(deviceInfo = {}) {
+  return {
+    deviceId: String(deviceInfo.deviceId || '').trim(),
+    deviceLabel: String(deviceInfo.deviceLabel || '').trim(),
+    appVersion: String(deviceInfo.appVersion || '').trim(),
+    platform: String(deviceInfo.platform || '').trim()
+  };
+}
+
 function createRoomClient({
   WebSocket,
   endpoint = resolveRoomEndpoint(),
   userId,
+  deviceInfo = {},
   now = () => Date.now()
 } = {}) {
   if (!WebSocket) {
@@ -215,11 +225,13 @@ function createRoomClient({
     socket = activeSocket;
     addSocketListener(activeSocket, 'open', () => {
       if (socket !== activeSocket) return;
+      const normalizedDeviceInfo = normalizeDeviceInfo(deviceInfo);
       sendJson({
         type: 'room:join',
         roomCode: normalizedRoomCode,
         userId,
-        nickname: state.nickname
+        nickname: state.nickname,
+        ...normalizedDeviceInfo
       });
     });
     addSocketListener(activeSocket, 'message', (event) => {
