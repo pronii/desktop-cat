@@ -1,6 +1,6 @@
 # desktop-cat
 
-当前版本：`0.3.5`
+当前版本：`0.3.6`
 
 `desktop-cat` 是一个面向 Windows 的 Electron 桌面宠物。它把一只可互动的小猫放在桌面上，既能陪伴、提醒喝水、管理剪贴板，也能切换 Live2D 形象、和朋友进入同一个房间同屏出现。
 
@@ -15,7 +15,7 @@
 - 话痨模式：小猫会随机显示陪伴文案，也可以在设置里关闭。
 - 喝水提醒：记录今日杯数，支持提醒间隔、稍后提醒、启停提醒和紧凑的应用内提醒弹窗。
 - 剪贴板历史：保存最近文本、图片和视频文件路径，支持暂停记录、删除、清空和复制回系统剪贴板。
-- 好友同屏：通过 WebSocket 房间同步宠物状态，输入 6 位房间码即可看到同房间里的其他小猫。
+- 好友同屏：通过 WebSocket 房间同步宠物状态，输入 6 位房间码即可看到同房间里的其他小猫，并优先展示好友的 Live2D 形象。
 - 远程更新提示：支持服务端清单、WebSocket 推送提醒、SHA-256 校验和紧凑的应用内更新提示。
 - 正式打包：使用 `electron-builder` 生成 Windows NSIS 安装包和 portable 免安装包。
 
@@ -74,8 +74,8 @@ npm run pack
 `npm run pack` 会同时生成 Windows 安装包和免安装包。当前版本产物示例：
 
 ```text
-dist/desktop-cat-0.3.5-win-x64-setup.exe
-dist/desktop-cat-0.3.5-win-x64-portable.exe
+dist/desktop-cat-0.3.6-win-x64-setup.exe
+dist/desktop-cat-0.3.6-win-x64-portable.exe
 ```
 
 打包前请阅读 [PACKAGING.md](./PACKAGING.md)。正式发布建议优先给普通用户提供 NSIS 安装包，同时保留 portable 免安装包作为绿色版。
@@ -157,7 +157,7 @@ portable `.exe` 运行时，可以把 `live2d/` 放到 `.exe` 同级目录：
 
 ```text
 dist/
-├─ desktop-cat 0.3.5.exe
+├─ desktop-cat 0.3.6.exe
 └─ live2d/
    └─ Hiyori/
       └─ Hiyori.model3.json
@@ -214,10 +214,10 @@ npm start
 
 ```json
 {
-  "version": "0.3.5",
-  "url": "https://example.com/releases/desktop-cat-0.3.5.exe",
+  "version": "0.3.6",
+  "url": "https://example.com/releases/desktop-cat-0.3.6.exe",
   "sha256": "64位十六进制sha256",
-  "notes": "新增远程更新提示。",
+  "notes": "好友同屏支持同步 Live2D 形象。",
   "mandatory": false
 }
 ```
