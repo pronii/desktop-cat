@@ -687,6 +687,14 @@ ipcMain.handle('appearance:set-live2d-model', (_event, modelId) => {
   return live2DAppearance.setCurrentModel(modelId);
 });
 
+ipcMain.handle('peer-live2d:get-model-by-id', (_event, modelId) => {
+  return live2DAppearance.getModelById(modelId);
+});
+
+ipcMain.handle('peer-live2d:get-default-model', () => {
+  return live2DAppearance.getCurrentModel();
+});
+
 ipcMain.on('diagnostics:live2d-log', (_event, entry = {}) => {
   appendLive2DDiagnostic(entry);
 });

@@ -244,3 +244,33 @@ test('createLive2DAppearance can switch the current Live2D model by id', (t) => 
   appearance.registerProtocol();
   assert.equal(registeredProtocols[0].scheme, LIVE2D_PROTOCOL);
 });
+
+test('createLive2DAppearance returns serialized model by id without filesystem paths', (t) => {
+  const root = makeTempRoot(t);
+  const modelsRoot = path.join(root, 'live2d-models');
+  writeModel(modelsRoot, path.join('Hiyori', 'Hiyori.model3.json'), 'Hiyori');
+  writeModel(modelsRoot, path.join('Mao', 'Mao.model3.json'), 'Mao');
+  const appearance = createLive2DAppearance({
+    app: {
+      isPackaged: false,
+      getPath: () => path.join(root, 'userData')
+    },
+    protocol: {
+      registerFileProtocol() {}
+    },
+    searchRoots: [modelsRoot]
+  });
+
+  const model = appearance.getModelById('Mao');
+
+  assert.deepEqual(model, {
+    available: true,
+    id: 'Mao',
+    name: 'Mao',
+    modelUrl: `${LIVE2D_PROTOCOL}://model/Mao/Mao.model3.json`,
+    previewImageUrl: `${LIVE2D_PROTOCOL}://model/Mao/textures/texture_00.png`
+  });
+  assert.equal(appearance.getModelById('missing').available, false);
+  assert.equal(Object.hasOwn(model, 'rootDir'), false);
+  assert.equal(Object.hasOwn(model, 'modelJsonPath'), false);
+});

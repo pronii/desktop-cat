@@ -327,6 +327,16 @@ function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRo
     return availableModels.map(serializeModel);
   }
 
+  function getModelById(modelId) {
+    if (!availableModels.length) {
+      refresh();
+    }
+
+    const normalizedId = String(modelId || '').trim();
+    const model = availableModels.find((entry) => entry.id === normalizedId);
+    return model ? serializeModel(model) : { available: false };
+  }
+
   function setCurrentModel(modelId) {
     if (!availableModels.length) {
       refresh();
@@ -361,6 +371,7 @@ function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRo
   return {
     getAvailableModels,
     getCurrentModel,
+    getModelById,
     refresh,
     registerProtocol,
     setCurrentModel

@@ -62,6 +62,20 @@ test('renderer auto-loads Live2D from folder without adding an import button', (
   assert.match(preload, /setLive2DModel:\s*\(modelId\)\s*=>\s*ipcRenderer\.invoke\('appearance:set-live2d-model',\s*modelId\)/);
 });
 
+test('peer preload exposes read-only Live2D model lookup APIs', () => {
+  const preload = readSource('src', 'main', 'peerPreload.js');
+  const main = readSource('src', 'main', 'main.js');
+
+  assert.match(preload, /getLive2DModelById/);
+  assert.match(preload, /ipcRenderer\.invoke\('peer-live2d:get-model-by-id'/);
+  assert.match(preload, /getDefaultLive2DModel/);
+  assert.match(preload, /ipcRenderer\.invoke\('peer-live2d:get-default-model'/);
+  assert.match(main, /peer-live2d:get-model-by-id/);
+  assert.match(main, /live2DAppearance\.getModelById/);
+  assert.match(main, /peer-live2d:get-default-model/);
+  assert.match(main, /live2DAppearance\.getCurrentModel/);
+});
+
 test('live2d renderer script keeps the default cat when no model is configured', () => {
   const script = readSource('src', 'renderer', 'live2dAppearance.js');
 
