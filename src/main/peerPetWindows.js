@@ -8,6 +8,7 @@ const LOCAL_CAT_WIDTH = 178;
 const LOCAL_CAT_HEIGHT = 190;
 const LOCAL_CAT_OFFSET_X_IN_STAGE = 31;
 const LOCAL_CAT_OFFSET_Y_IN_STAGE = 25;
+const MAX_PEER_LIVE2D_WINDOWS = 3;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -73,6 +74,24 @@ function normalizeUniquePeers(peers) {
     });
   }
   return Array.from(peersByUserId.values());
+}
+
+function wantsLive2D(peer) {
+  return Boolean(peer?.pet?.appearanceType === 'live2d' && peer.pet.modelId);
+}
+
+function decoratePeersForRender(peers, maxLive2DWindows = MAX_PEER_LIVE2D_WINDOWS) {
+  let live2DCount = 0;
+  return peers.map((peer) => {
+    const useLive2D = wantsLive2D(peer) && live2DCount < maxLive2DWindows;
+    if (useLive2D) {
+      live2DCount += 1;
+    }
+    return {
+      ...peer,
+      renderMode: useLive2D ? 'live2d' : 'css-cat'
+    };
+  });
 }
 
 function createPeerWindow({ BrowserWindow, peerPetFile, peerPetPreload }) {
@@ -147,7 +166,7 @@ function createPeerPetWindowManager({
   }
 
   function syncPeers(peers, anchorBounds) {
-    const uniquePeers = normalizeUniquePeers(peers);
+    const uniquePeers = decoratePeersForRender(normalizeUniquePeers(peers));
     const activeUserIds = new Set();
 
     for (let index = 0; index < uniquePeers.length; index += 1) {
@@ -185,7 +204,9 @@ function createPeerPetWindowManager({
 }
 
 module.exports = {
+  MAX_PEER_LIVE2D_WINDOWS,
   createPeerPetWindowManager,
+  decoratePeersForRender,
   resolveLocalPetAnchorBounds,
   resolvePeerBounds
 };

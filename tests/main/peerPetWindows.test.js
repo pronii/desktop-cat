@@ -100,7 +100,8 @@ test('peer pet manager creates a transparent window for each peer', () => {
     payload: {
       userId: 'bob',
       nickname: 'Bob',
-      pet: { relativeX: 0.25, relativeY: 0.5, action: 'idle' }
+      pet: { relativeX: 0.25, relativeY: 0.5, action: 'idle' },
+      renderMode: 'css-cat'
     }
   });
 });
@@ -141,8 +142,35 @@ test('peer pet manager ignores duplicate peers in a single sync', () => {
   assert.deepEqual(FakeBrowserWindow.instances[0].webContents.messages.at(-1).payload, {
     userId: 'bob',
     nickname: 'Bobby',
-    pet: { action: 'drag' }
+    pet: { action: 'drag' },
+    renderMode: 'css-cat'
   });
+});
+
+test('peer pet manager marks only the first three Live2D peers for Live2D rendering', () => {
+  const manager = createManager();
+
+  manager.syncPeers([
+    { userId: 'a', nickname: 'A', pet: { appearanceType: 'live2d', modelId: 'Haru' } },
+    { userId: 'b', nickname: 'B', pet: { appearanceType: 'live2d', modelId: 'Hiyori' } },
+    { userId: 'c', nickname: 'C', pet: { appearanceType: 'live2d', modelId: 'Mao' } },
+    { userId: 'd', nickname: 'D', pet: { appearanceType: 'live2d', modelId: 'Custom' } }
+  ], { x: 100, y: 200, width: 240, height: 180 });
+
+  assert.deepEqual(
+    FakeBrowserWindow.instances.map((window) => window.webContents.messages.at(-1).payload.renderMode),
+    ['live2d', 'live2d', 'live2d', 'css-cat']
+  );
+});
+
+test('peer pet manager uses CSS cat render mode for peers without Live2D identity', () => {
+  const manager = createManager();
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } }
+  ], { x: 100, y: 200, width: 240, height: 180 });
+
+  assert.equal(FakeBrowserWindow.instances[0].webContents.messages.at(-1).payload.renderMode, 'css-cat');
 });
 
 test('peer pet manager lays out multiple peers beside the local pet', () => {
