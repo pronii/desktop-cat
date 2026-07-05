@@ -58,3 +58,12 @@ test('package metadata exposes the GitHub release automation command', () => {
 
   assert.equal(packageJson.scripts['release:github'], 'node scripts/release-github.js');
 });
+
+test('package and docker metadata expose license administration support', () => {
+  const packageJson = readJson('package.json');
+  const dockerCompose = readText('docker-compose.yml');
+
+  assert.equal(packageJson.scripts['license:create'], 'node scripts/create-license-codes.js');
+  assert.match(dockerCompose, /DESKTOP_CAT_ADMIN_TOKEN/);
+  assert.match(dockerCompose, /\.\/data:\/app\/data/);
+});

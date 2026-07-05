@@ -57,6 +57,7 @@ npm test
 | --- | --- |
 | `npm start` | 启动 Electron 桌面宠物 |
 | `npm run room:server` | 启动好友同屏和更新推送服务 |
+| `npm run license:create` | 创建付费功能设备授权码 |
 | `npm test` | 运行 Node.js 测试 |
 | `npm run pack` | 打包 Windows 正式发布产物 |
 | `npm run pack:installer` | 只打包 Windows NSIS 安装包 |
@@ -187,7 +188,27 @@ Docker 启动服务端：
 docker compose up -d --build
 ```
 
-服务端当前使用内存保存房间状态，不依赖数据库。服务重启后房间会清空。
+服务端当前使用内存保存房间在线状态，服务重启后房间会清空。授权码、设备绑定和授权检查记录会保存到 SQLite，Docker 默认通过 `./data:/app/data` 持久化。
+
+#### 管理页与设备授权
+
+房间服务端可以提供浏览器管理页，用来查看当前在线连接数、客户端 IP、设备标识和授权状态。管理接口需要 `DESKTOP_CAT_ADMIN_TOKEN`：
+
+```powershell
+$env:DESKTOP_CAT_ADMIN_TOKEN = "change-me"
+$env:DESKTOP_CAT_LICENSE_DB_PATH = ".\data\desktop-cat.sqlite"
+npm run room:server
+```
+
+打开 `http://127.0.0.1:3001/admin?token=change-me`。
+
+创建设备授权码：
+
+```powershell
+npm run license:create -- --count 5 --db ".\data\desktop-cat.sqlite"
+```
+
+服务端只保存授权码哈希，不保存明文授权码。命令打印出的授权码只显示这一次，请妥善保存后发给已付费用户。
 
 ### 远程更新推送
 

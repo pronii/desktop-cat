@@ -1,12 +1,16 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV DESKTOP_CAT_LICENSE_DB_PATH=/app/data/desktop-cat.sqlite
 
-COPY package.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
 COPY server ./server
+COPY scripts ./scripts
 
 EXPOSE 3001
 
