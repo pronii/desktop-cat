@@ -626,7 +626,7 @@ test('room server protects admin usage json with the admin token', async () => {
   }
 });
 
-test('room server records device metadata from room joins in admin usage', async () => {
+test('room server records software client heartbeat metadata in admin usage', async () => {
   const roomServer = createRoomServer({
     port: 0,
     adminToken: 'admin-secret',
@@ -634,12 +634,9 @@ test('room server records device metadata from room joins in admin usage', async
   });
   await roomServer.listen();
   const port = roomServer.address().port;
-  const alice = await connectWebSocket(port);
 
   try {
-    alice.sendJson({
-      type: 'room:join',
-      roomCode: '123456',
+    const heartbeat = await httpPostJson(`http://127.0.0.1:${port}/client/online`, {
       userId: 'alice',
       nickname: 'Alice',
       deviceId: 'device-1',
@@ -647,20 +644,21 @@ test('room server records device metadata from room joins in admin usage', async
       appVersion: '0.3.8',
       platform: 'win32'
     });
-    assert.equal((await alice.nextJson()).type, 'room:joined');
 
     const usage = await httpGetJson(
       `http://127.0.0.1:${port}/admin/usage.json`,
       { Authorization: 'Bearer admin-secret' }
     );
 
+    assert.equal(heartbeat.statusCode, 200);
+    assert.equal(heartbeat.body.ok, true);
     assert.equal(usage.statusCode, 200);
     assert.equal(usage.body.metrics.onlineConnections, 1);
     assert.equal(usage.body.metrics.onlineDevices, 1);
     assert.equal(usage.body.connections[0].deviceId, 'device-1');
-    assert.equal(usage.body.connections[0].roomCode, '123456');
+    assert.equal(usage.body.connections[0].deviceLabel, 'Office PC');
+    assert.equal(usage.body.connections[0].platform, 'win32');
   } finally {
-    alice.close();
     await roomServer.close();
   }
 });
@@ -789,7 +787,7 @@ test('room server protects the admin dashboard with an http-only login session',
     assert.equal(response.statusCode, 200);
     assert.match(response.body, /桌面猫服务后台/);
     assert.match(response.body, /生成授权码/);
-    assert.match(response.body, /在线连接数/);
+    assert.match(response.body, /在线客户端数/);
     assert.match(response.body, /授权码列表/);
     assert.match(response.body, /admin\/licenses\/create/);
     assert.match(response.body, /admin\/usage\.json/);

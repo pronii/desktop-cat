@@ -463,8 +463,20 @@ function createRoomServer(options = {}) {
     }
   }
 
+  function normalizeRequestIp(value) {
+    const ip = String(value || '').split(',')[0].trim();
+    const mappedIpv4 = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+    return mappedIpv4 ? mappedIpv4[1] : ip;
+  }
+
   function getRequestIp(request, socket = null) {
-    return socket?.remoteAddress || request.socket?.remoteAddress || '';
+    return normalizeRequestIp(
+      request.headers['x-forwarded-for'] ||
+      request.headers['x-real-ip'] ||
+      socket?.remoteAddress ||
+      request.socket?.remoteAddress ||
+      ''
+    );
   }
 
   function isAdminAuthorized(_requestUrl, request) {
@@ -523,6 +535,32 @@ function createRoomServer(options = {}) {
     }
 
     const requestUrl = new URL(request.url, 'http://127.0.0.1');
+    if (request.method === 'POST' && requestUrl.pathname === '/client/online') {
+      try {
+        const body = await readJsonBody(request);
+        const metadata = normalizeDeviceMetadata(body);
+        if (!metadata.deviceId) {
+          sendJsonResponse(response, 400, { error: 'invalid_request', message: 'Device id is required' });
+          return;
+        }
+        usageTracker.reportClientOnline({
+          path: requestUrl.pathname,
+          ip: getRequestIp(request),
+          userAgent: request.headers['user-agent'] || '',
+          userId: body.userId,
+          nickname: body.nickname,
+          ...metadata
+        });
+        sendJsonResponse(response, 200, {
+          ok: true,
+          nextHeartbeatMs: 30000
+        });
+      } catch (error) {
+        sendJsonResponse(response, 400, { error: 'invalid_request', message: error.message });
+      }
+      return;
+    }
+
     if (request.method === 'GET' && requestUrl.pathname === '/admin') {
       if (!isAdminAuthorized(requestUrl, request)) {
         response.writeHead(200, {

@@ -52,6 +52,7 @@ const {
   createLicenseClient,
   resolveLicenseEndpoint
 } = require('./licenseClient');
+const { createOnlineClient } = require('./onlineClient');
 const { buildLocalPetState: createLocalPetState } = require('./petState');
 const { SimpleWebSocket } = require('./simpleWebSocket');
 const {
@@ -107,6 +108,7 @@ let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let deviceIdentity = null;
 let licenseClient = null;
+let onlineClient = null;
 let peerPetWindowManager = null;
 let updateManager = null;
 let currentCatScale = CAT_SCALE_DEFAULT;
@@ -622,6 +624,16 @@ function setupLicenseClient() {
   });
 }
 
+function setupOnlineClient() {
+  if (onlineClient) return;
+  onlineClient = createOnlineClient({
+    endpoint: resolveLicenseEndpoint(process.env, resolveRoomEndpoint()),
+    deviceInfo: deviceIdentity || {},
+    fetch: globalThis.fetch
+  });
+  onlineClient.start().catch(() => {});
+}
+
 function teardownRoomClient() {
   stopRoomPetStateReporting();
   if (roomStateTeardown) {
@@ -636,6 +648,12 @@ function teardownRoomClient() {
     peerPetWindowManager.destroyAll();
     peerPetWindowManager = null;
   }
+}
+
+function teardownOnlineClient() {
+  if (!onlineClient) return;
+  onlineClient.stop();
+  onlineClient = null;
 }
 
 function suspendWindowTopmost(window) {
@@ -923,6 +941,7 @@ if (!gotTheLock) {
       userDataPath: app.getPath('userData'),
       appVersion: app.getVersion()
     });
+    setupOnlineClient();
     setupLicenseClient();
     setupRoomClient();
     updateManager = createUpdateManager({
@@ -959,6 +978,7 @@ app.on('before-quit', () => {
     updateManager = null;
   }
   teardownRoomClient();
+  teardownOnlineClient();
   teardownClipboardHistory();
   getForegroundProbeWorker().stop();
   if (tray) {

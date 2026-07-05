@@ -143,7 +143,7 @@ ${BASE_STYLES}
       <button id="logoutButton" class="secondary" type="button">退出登录</button>
     </div>
     <div class="metrics">
-      <div class="metric"><span>在线连接数</span><strong id="onlineConnections">0</strong></div>
+      <div class="metric"><span>在线客户端数</span><strong id="onlineConnections">0</strong></div>
       <div class="metric"><span>在线设备数</span><strong id="onlineDevices">0</strong></div>
       <div class="metric"><span>已授权设备</span><strong id="authorizedOnlineDevices">0</strong></div>
       <div class="metric"><span>未授权设备</span><strong id="unauthorizedOnlineDevices">0</strong></div>

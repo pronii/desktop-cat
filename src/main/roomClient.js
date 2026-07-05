@@ -5,8 +5,8 @@ const {
 
 const DEFAULT_ROOM_ENDPOINT = LOCAL_ROOM_ENDPOINT;
 
-function resolveRoomEndpoint(env = process.env) {
-  return resolveBuildRoomEndpoint(env);
+function resolveRoomEndpoint(env = process.env, generatedConfig) {
+  return resolveBuildRoomEndpoint(env, generatedConfig);
 }
 
 function clonePet(pet) {
@@ -214,6 +214,15 @@ function createRoomClient({
 
   function join({ roomCode, nickname = '' }) {
     const normalizedRoomCode = validateRoomCode(roomCode);
+    const normalizedNickname = String(nickname || '').trim() || '小猫好友';
+    if (
+      socket &&
+      state.roomCode === normalizedRoomCode &&
+      (state.status === 'connecting' || state.status === 'connected')
+    ) {
+      return cloneState(state);
+    }
+
     closeSocket();
 
     state = {
@@ -221,7 +230,7 @@ function createRoomClient({
       status: 'connecting',
       roomCode: normalizedRoomCode,
       selfId: userId,
-      nickname: String(nickname || '').trim() || '小猫好友'
+      nickname: normalizedNickname
     };
     notify();
 

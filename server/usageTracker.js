@@ -4,8 +4,20 @@ function normalizeText(value, maxLength) {
   return String(value || '').trim().slice(0, maxLength);
 }
 
-function createUsageTracker({ now = Date.now, makeId = () => crypto.randomUUID() } = {}) {
+function normalizeIpAddress(value) {
+  const text = normalizeText(value, 128);
+  const firstAddress = text.split(',')[0].trim();
+  const mappedIpv4 = firstAddress.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  return mappedIpv4 ? mappedIpv4[1] : firstAddress;
+}
+
+function createUsageTracker({
+  now = Date.now,
+  makeId = () => crypto.randomUUID(),
+  clientTtlMs = 2 * 60 * 1000
+} = {}) {
   const connections = new Map();
+  const softwareClients = new Map();
 
   function registerConnection({ path = '', ip = '', userAgent = '' } = {}) {
     const connectionId = makeId();
@@ -13,7 +25,7 @@ function createUsageTracker({ now = Date.now, makeId = () => crypto.randomUUID()
     connections.set(connectionId, {
       connectionId,
       path: normalizeText(path, 128),
-      ip: normalizeText(ip, 128),
+      ip: normalizeIpAddress(ip),
       userAgent: normalizeText(userAgent, 512),
       connectedAt: timestamp,
       lastSeenAt: timestamp,
@@ -56,8 +68,46 @@ function createUsageTracker({ now = Date.now, makeId = () => crypto.randomUUID()
     connections.delete(connectionId);
   }
 
+  function reportClientOnline({
+    path = '/client/online',
+    ip = '',
+    userAgent = '',
+    roomCode = '',
+    userId = '',
+    nickname = '',
+    deviceId = '',
+    deviceLabel = '',
+    appVersion = '',
+    platform = ''
+  } = {}) {
+    const normalizedDeviceId = normalizeText(deviceId, 128);
+    if (!normalizedDeviceId) return false;
+
+    const timestamp = now();
+    const existing = softwareClients.get(normalizedDeviceId);
+    softwareClients.set(normalizedDeviceId, {
+      connectionId: existing?.connectionId || `client:${normalizedDeviceId}`,
+      path: normalizeText(path, 128),
+      ip: normalizeIpAddress(ip),
+      userAgent: normalizeText(userAgent, 512),
+      connectedAt: existing?.connectedAt || timestamp,
+      lastSeenAt: timestamp,
+      roomCode: roomCode ? normalizeText(roomCode, 16) : existing?.roomCode || null,
+      userId: userId ? normalizeText(userId, 64) : existing?.userId || null,
+      nickname: nickname ? normalizeText(nickname, 32) : existing?.nickname || null,
+      deviceId: normalizedDeviceId,
+      deviceLabel: deviceLabel ? normalizeText(deviceLabel, 128) : existing?.deviceLabel || null,
+      appVersion: appVersion ? normalizeText(appVersion, 32) : existing?.appVersion || null,
+      platform: platform ? normalizeText(platform, 32) : existing?.platform || null
+    });
+    return true;
+  }
+
   function snapshot({ getLicenseStatusForDevice = () => 'unlicensed' } = {}) {
-    const rows = Array.from(connections.values()).map((connection) => ({
+    const timestamp = now();
+    const activeClients = Array.from(softwareClients.values())
+      .filter((client) => timestamp - Number(client.lastSeenAt || 0) <= clientTtlMs);
+    const rows = activeClients.map((connection) => ({
       ...connection,
       licenseStatus: connection.deviceId
         ? getLicenseStatusForDevice(connection.deviceId)
@@ -86,6 +136,7 @@ function createUsageTracker({ now = Date.now, makeId = () => crypto.randomUUID()
     updateConnection,
     markSeen,
     removeConnection,
+    reportClientOnline,
     snapshot
   };
 }

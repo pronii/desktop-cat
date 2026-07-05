@@ -81,7 +81,7 @@ test('room endpoint can be configured through environment', () => {
     'ws://127.0.0.1:3001/room'
   );
   assert.equal(
-    resolveRoomEndpoint({ DESKTOP_CAT_ROOM_ENDPOINT: '' }),
+    resolveRoomEndpoint({ DESKTOP_CAT_ROOM_ENDPOINT: '' }, {}),
     DEFAULT_ROOM_ENDPOINT
   );
 });
@@ -138,6 +138,28 @@ test('room client records joined room state and peers', () => {
       updatedAt: 1000
     }]
   });
+});
+
+test('room client does not create another socket when joining the same room again', () => {
+  const client = createClient();
+
+  client.join({ roomCode: '123456', nickname: 'Alice' });
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+  socket.message({
+    type: 'room:joined',
+    roomCode: '123456',
+    selfId: 'local-user',
+    peers: []
+  });
+
+  const repeatedState = client.join({ roomCode: '123456', nickname: 'Alice' });
+
+  assert.equal(FakeWebSocket.instances.length, 1);
+  assert.equal(socket.readyState, FakeWebSocket.OPEN);
+  assert.deepEqual(repeatedState, client.getState());
+  assert.equal(client.getState().status, 'connected');
+  assert.equal(client.getState().roomCode, '123456');
 });
 
 test('room client excludes self and deduplicates peers from joined room state', () => {
