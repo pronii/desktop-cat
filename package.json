@@ -13,6 +13,7 @@
     "pack:portable": "electron-builder --win portable",
     "pack:installer": "electron-builder --win nsis",
     "pack:release": "electron-builder --win nsis portable",
+    "license:create": "node scripts/create-license-codes.js",
     "release:github": "node scripts/release-github.js"
   },
   "keywords": [
