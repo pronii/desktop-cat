@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+- 重绘 Live2D 形象更换按钮，将原本过密的剧场面具图标替换为更清晰的 `appearance-sparkles` 头像星光图标。
+- 保留形象更换按钮原有的圆形白底、棕色描边、阴影、尺寸和位置，仅替换内部 SVG 图形。
+- 补充图标回归测试，防止形象更换按钮退回旧的高密度图标。
+
 ## 0.3.2
 
 - 接入 `electron-updater`，让 NSIS 安装版可以通过 GitHub Releases、`latest.yml` 和 `.blockmap` 检查并下载新版本。
