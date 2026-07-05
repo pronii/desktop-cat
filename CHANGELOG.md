@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.11
+
+- 重新打包 Windows 安装包与 portable 包，并继续在构建时注入线上好友同屏服务端点。
+- 管理后台改为登录密码 + HttpOnly Cookie 会话，不再通过浏览器地址栏 token 访问后台页面。
+- 管理 API 仍保留 Bearer token 方式用于脚本和服务端调用，浏览器管理页会在登录失效时回到登录页。
+- Docker 部署示例新增 `DESKTOP_CAT_ADMIN_PASSWORD`，用于单独配置后台登录密码。
+
 ## 0.3.10
 
 - 重新打包 Windows 安装包与 portable 包，并在构建时注入线上好友同屏服务端点，让普通用户安装后可以直接连接远程房间服务。

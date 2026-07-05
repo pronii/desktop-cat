@@ -2,7 +2,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 
-const { createAdminPage } = require('./adminPage');
+const { createAdminLoginPage, createAdminPage } = require('./adminPage');
 const { createLicenseCode, createLicenseStore } = require('./licenseStore');
 const { createRoomManager } = require('./roomManager');
 const { createUsageTracker } = require('./usageTracker');
@@ -13,6 +13,8 @@ const MAX_WEBSOCKET_HEADER_BYTES = 14;
 const MAX_USER_ID_LENGTH = 64;
 const MAX_NICKNAME_LENGTH = 32;
 const MAX_PET_STRING_LENGTH = 32;
+const ADMIN_SESSION_COOKIE_NAME = 'desktop_cat_admin_session';
+const ADMIN_SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
 const PET_NUMBER_FIELDS = new Set([
   'x',
   'y',
@@ -173,6 +175,82 @@ function readJsonBody(request, { maxBytes = 64 * 1024 } = {}) {
     });
     request.on('error', reject);
   });
+}
+
+function timingSafeTextEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ''));
+  const rightBuffer = Buffer.from(String(right || ''));
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function signAdminSessionPayload(payload, secret) {
+  return crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('base64url');
+}
+
+function createAdminSessionCookie(secret, { now = Date.now, secure = false } = {}) {
+  const issuedAt = now();
+  const payload = Buffer.from(JSON.stringify({
+    iat: issuedAt,
+    exp: issuedAt + ADMIN_SESSION_MAX_AGE_SECONDS * 1000
+  })).toString('base64url');
+  const signature = signAdminSessionPayload(payload, secret);
+  const attributes = [
+    `${ADMIN_SESSION_COOKIE_NAME}=${payload}.${signature}`,
+    'HttpOnly',
+    'SameSite=Strict',
+    'Path=/admin',
+    `Max-Age=${ADMIN_SESSION_MAX_AGE_SECONDS}`
+  ];
+  if (secure) attributes.push('Secure');
+  return attributes.join('; ');
+}
+
+function createExpiredAdminSessionCookie() {
+  return [
+    `${ADMIN_SESSION_COOKIE_NAME}=`,
+    'HttpOnly',
+    'SameSite=Strict',
+    'Path=/admin',
+    'Max-Age=0'
+  ].join('; ');
+}
+
+function parseCookies(header = '') {
+  const cookies = new Map();
+  for (const part of String(header || '').split(';')) {
+    const index = part.indexOf('=');
+    if (index === -1) continue;
+    const name = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (name) cookies.set(name, value);
+  }
+  return cookies;
+}
+
+function isValidAdminSessionCookie(cookieHeader, secret, { now = Date.now } = {}) {
+  const value = parseCookies(cookieHeader).get(ADMIN_SESSION_COOKIE_NAME);
+  if (!value || !secret) return false;
+
+  const [payload, signature] = value.split('.');
+  if (!payload || !signature) return false;
+  const expectedSignature = signAdminSessionPayload(payload, secret);
+  if (!timingSafeTextEqual(signature, expectedSignature)) return false;
+
+  try {
+    const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return Number(session.exp) > now();
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isHttpsRequest(request) {
+  return Boolean(request.socket?.encrypted) ||
+    String(request.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
 }
 
 function normalizeUpdateManifest(manifest) {
@@ -346,6 +424,8 @@ function createRoomServer(options = {}) {
     options.updateManifestUrl || process.env.DESKTOP_CAT_UPDATE_MANIFEST_URL || DEFAULT_UPDATE_MANIFEST_URL;
   const usageTracker = options.usageTracker || createUsageTracker();
   const adminToken = options.adminToken || process.env.DESKTOP_CAT_ADMIN_TOKEN;
+  const adminPassword = options.adminPassword || process.env.DESKTOP_CAT_ADMIN_PASSWORD || adminToken;
+  const now = options.now || Date.now;
   let licenseStore = options.licenseStore || null;
   const ownsLicenseStore = !options.licenseStore;
 
@@ -387,10 +467,16 @@ function createRoomServer(options = {}) {
     return socket?.remoteAddress || request.socket?.remoteAddress || '';
   }
 
-  function isAdminAuthorized(requestUrl, request) {
+  function isAdminAuthorized(_requestUrl, request) {
     if (!adminToken) return false;
+    if (isValidAdminSessionCookie(request.headers.cookie, adminToken, { now })) return true;
     if (request.headers.authorization === `Bearer ${adminToken}`) return true;
-    return requestUrl.searchParams.get('token') === adminToken;
+    return false;
+  }
+
+  function isAdminPasswordValid(password) {
+    if (!adminPassword) return false;
+    return timingSafeTextEqual(password, adminPassword);
   }
 
   function sendAdminUnauthorized(response) {
@@ -439,15 +525,50 @@ function createRoomServer(options = {}) {
     const requestUrl = new URL(request.url, 'http://127.0.0.1');
     if (request.method === 'GET' && requestUrl.pathname === '/admin') {
       if (!isAdminAuthorized(requestUrl, request)) {
-        response.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
-        response.end('unauthorized');
+        response.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store'
+        });
+        response.end(createAdminLoginPage());
         return;
       }
       response.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store'
       });
-      response.end(createAdminPage({ token: requestUrl.searchParams.get('token') || '' }));
+      response.end(createAdminPage());
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/admin/login') {
+      try {
+        const body = await readJsonBody(request);
+        if (!isAdminPasswordValid(body.password)) {
+          sendAdminUnauthorized(response);
+          return;
+        }
+        response.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'Set-Cookie': createAdminSessionCookie(adminToken, {
+            now,
+            secure: isHttpsRequest(request)
+          })
+        });
+        response.end(JSON.stringify({ ok: true }));
+      } catch (error) {
+        sendJsonResponse(response, 400, { error: 'invalid_request', message: error.message });
+      }
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/admin/logout') {
+      response.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Set-Cookie': createExpiredAdminSessionCookie()
+      });
+      response.end(JSON.stringify({ ok: true }));
       return;
     }
 

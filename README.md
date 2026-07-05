@@ -1,6 +1,6 @@
 # desktop-cat
 
-当前版本：`0.3.10`
+当前版本：`0.3.11`
 
 `desktop-cat` 是一个面向 Windows 的 Electron 桌面宠物。它把一只可互动的小猫放在桌面上，既能陪伴、提醒喝水、管理剪贴板，也能切换 Live2D 形象、和朋友进入同一个房间同屏出现。
 
@@ -84,8 +84,8 @@ npm run pack
 `npm run pack` 会同时生成 Windows 安装包和免安装包。当前版本产物示例：
 
 ```text
-dist/desktop-cat-0.3.10-win-x64-setup.exe
-dist/desktop-cat-0.3.10-win-x64-portable.exe
+dist/desktop-cat-0.3.11-win-x64-setup.exe
+dist/desktop-cat-0.3.11-win-x64-portable.exe
 ```
 
 打包前请阅读 [PACKAGING.md](./PACKAGING.md)。正式发布建议优先给普通用户提供 NSIS 安装包，同时保留 portable 免安装包作为绿色版。
@@ -167,7 +167,7 @@ portable `.exe` 运行时，可以把 `live2d/` 放到 `.exe` 同级目录：
 
 ```text
 dist/
-├─ desktop-cat 0.3.10.exe
+├─ desktop-cat 0.3.11.exe
 └─ live2d/
    └─ Hiyori/
       └─ Hiyori.model3.json
@@ -201,15 +201,16 @@ docker compose up -d --build
 
 #### 管理页与设备授权
 
-房间服务端可以提供浏览器管理页，用来查看当前在线连接数、客户端 IP、设备标识和授权状态。管理接口需要 `DESKTOP_CAT_ADMIN_TOKEN`：
+房间服务端可以提供浏览器管理页，用来查看当前在线连接数、客户端 IP、设备标识和授权状态。管理 API 需要 `DESKTOP_CAT_ADMIN_TOKEN`，浏览器管理页使用 `DESKTOP_CAT_ADMIN_PASSWORD` 登录并保存 HttpOnly 会话：
 
 ```powershell
 $env:DESKTOP_CAT_ADMIN_TOKEN = "change-me"
+$env:DESKTOP_CAT_ADMIN_PASSWORD = "change-me"
 $env:DESKTOP_CAT_LICENSE_DB_PATH = ".\data\desktop-cat.sqlite"
 npm run room:server
 ```
 
-打开 `http://127.0.0.1:3001/admin?token=change-me`。
+打开 `http://127.0.0.1:3001/admin`，输入后台登录密码。
 
 创建设备授权码：
 
@@ -244,10 +245,10 @@ npm start
 
 ```json
 {
-  "version": "0.3.10",
-  "url": "https://example.com/releases/desktop-cat-0.3.10.exe",
+  "version": "0.3.11",
+  "url": "https://example.com/releases/desktop-cat-0.3.11.exe",
   "sha256": "64位十六进制sha256",
-  "notes": "重新打包并注入线上好友同屏服务端点，安装后可直接连接远程房间。",
+  "notes": "重新打包并注入线上好友同屏服务端点，管理后台改为登录会话。",
   "mandatory": false
 }
 ```

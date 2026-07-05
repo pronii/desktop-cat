@@ -1,15 +1,4 @@
-function jsonForScript(value) {
-  return JSON.stringify(String(value || '')).replace(/</g, '\\u003c');
-}
-
-function createAdminPage({ token = '' } = {}) {
-  return `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>桌面猫服务后台</title>
-  <style>
+const BASE_STYLES = `
     :root {
       color-scheme: light;
       --bg: #f5f7fa;
@@ -30,13 +19,7 @@ function createAdminPage({ token = '' } = {}) {
     main { max-width: 1180px; margin: 0 auto; padding: 24px; }
     h1 { font-size: 24px; line-height: 1.25; margin: 0 0 18px; }
     h2 { font-size: 16px; line-height: 1.35; margin: 0; padding: 14px; border-bottom: 1px solid var(--border); }
-    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
-    .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; min-width: 0; }
-    .metric span { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
-    .metric strong { display: block; font-size: 26px; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
     section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 14px; overflow: hidden; }
-    .panel-body { padding: 14px; }
-    .form-grid { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; align-items: end; }
     label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; line-height: 1.35; }
     input { width: 100%; min-height: 44px; border: 1px solid var(--border); border-radius: 6px; padding: 9px 10px; color: var(--text); background: #fff; font: inherit; }
     input:focus { outline: 3px solid rgba(31, 111, 235, 0.18); border-color: var(--primary); }
@@ -46,6 +29,92 @@ function createAdminPage({ token = '' } = {}) {
     .notice { min-height: 22px; margin-top: 12px; font-size: 13px; color: var(--muted); }
     .notice.success { color: var(--success); }
     .notice.error { color: var(--danger); }
+`;
+
+function createAdminLoginPage() {
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>后台登录</title>
+  <style>
+${BASE_STYLES}
+    body { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+    main { width: min(420px, 100%); padding: 0; }
+    .login-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px; }
+    .login-panel p { margin: -8px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .login-form { display: grid; gap: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="login-panel">
+      <h1>后台登录</h1>
+      <p>请输入后台登录密码。服务端密钥不会出现在浏览器地址栏或页面脚本中。</p>
+      <form id="loginForm" class="login-form">
+        <label for="adminPassword">登录密码
+          <input id="adminPassword" name="password" type="password" autocomplete="current-password" required autofocus>
+        </label>
+        <button id="loginButton" type="submit">登录</button>
+      </form>
+      <div id="loginMessage" class="notice" role="alert" aria-live="polite"></div>
+    </section>
+  </main>
+  <script>
+    const form = document.getElementById('loginForm');
+    const button = document.getElementById('loginButton');
+    const message = document.getElementById('loginMessage');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      button.textContent = '登录中...';
+      message.className = 'notice';
+      message.textContent = '';
+      try {
+        const response = await fetch('/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: document.getElementById('adminPassword').value })
+        });
+        if (!response.ok) {
+          message.className = 'notice error';
+          message.textContent = '登录密码不正确';
+          return;
+        }
+        window.location.href = '/admin';
+      } catch (_error) {
+        message.className = 'notice error';
+        message.textContent = '登录失败，请稍后重试';
+      } finally {
+        button.disabled = false;
+        button.textContent = '登录';
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function createAdminPage() {
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>桌面猫服务后台</title>
+  <style>
+${BASE_STYLES}
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .topbar h1 { margin: 0; }
+    .secondary { background: #eef2f7; color: #253449; }
+    .secondary:hover { background: #dde6f0; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; min-width: 0; }
+    .metric span { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .metric strong { display: block; font-size: 26px; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .panel-body { padding: 14px; }
+    .form-grid { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; align-items: end; }
     .created-codes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin-top: 10px; }
     code { display: block; border: 1px solid #b9d7ff; border-radius: 6px; padding: 8px 10px; background: var(--code-bg); color: #123b68; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
     .table-wrap { overflow-x: auto; }
@@ -62,13 +131,17 @@ function createAdminPage({ token = '' } = {}) {
     }
     @media (max-width: 560px) {
       main { padding: 14px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
       .metrics, .form-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <main>
-    <h1>桌面猫服务后台</h1>
+    <div class="topbar">
+      <h1>桌面猫服务后台</h1>
+      <button id="logoutButton" class="secondary" type="button">退出登录</button>
+    </div>
     <div class="metrics">
       <div class="metric"><span>在线连接数</span><strong id="onlineConnections">0</strong></div>
       <div class="metric"><span>在线设备数</span><strong id="onlineDevices">0</strong></div>
@@ -114,8 +187,6 @@ function createAdminPage({ token = '' } = {}) {
     </section>
   </main>
   <script>
-    const token = ${jsonForScript(token)};
-    const auth = token ? { Authorization: 'Bearer ' + token } : {};
     const STATUS_LABELS = {
       active: '有效',
       revoked: '已作废',
@@ -153,6 +224,10 @@ function createAdminPage({ token = '' } = {}) {
     };
     async function fetchJson(url, options = {}) {
       const response = await fetch(url, options);
+      if (response.status === 401) {
+        window.location.href = '/admin';
+        throw new Error('登录已失效');
+      }
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.message || data.error || '请求失败');
@@ -160,8 +235,8 @@ function createAdminPage({ token = '' } = {}) {
       return data;
     }
     async function refresh() {
-      const usage = await fetchJson('/admin/usage.json', { headers: auth });
-      const licenses = await fetchJson('/admin/licenses.json', { headers: auth });
+      const usage = await fetchJson('/admin/usage.json');
+      const licenses = await fetchJson('/admin/licenses.json');
       for (const [key, value] of Object.entries(usage.metrics || {})) {
         const node = document.getElementById(key);
         if (node) node.textContent = value;
@@ -211,10 +286,7 @@ function createAdminPage({ token = '' } = {}) {
       try {
         const result = await fetchJson('/admin/licenses/create', {
           method: 'POST',
-          headers: {
-            ...auth,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             count: document.getElementById('licenseCount').value,
             maxDevices: document.getElementById('licenseMaxDevices').value,
@@ -231,6 +303,10 @@ function createAdminPage({ token = '' } = {}) {
         button.textContent = '生成授权码';
       }
     });
+    document.getElementById('logoutButton').addEventListener('click', async () => {
+      await fetch('/admin/logout', { method: 'POST' }).catch(() => {});
+      window.location.href = '/admin';
+    });
     refresh().catch((error) => setMessage(error.message || '刷新失败', 'error'));
     setInterval(() => refresh().catch(console.error), 5000);
   </script>
@@ -239,5 +315,6 @@ function createAdminPage({ token = '' } = {}) {
 }
 
 module.exports = {
+  createAdminLoginPage,
   createAdminPage
 };

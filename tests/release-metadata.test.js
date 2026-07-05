@@ -11,33 +11,33 @@ function readText(...parts) {
   return fs.readFileSync(path.join(__dirname, '..', ...parts), 'utf-8');
 }
 
-test('release metadata describes the 0.3.10 room endpoint rebuild release', () => {
+test('release metadata describes the 0.3.11 admin login rebuild release', () => {
   const packageJson = readJson('package.json');
   const packageLock = readJson('package-lock.json');
   const readme = readText('README.md');
   const packaging = readText('PACKAGING.md');
   const changelog = readText('CHANGELOG.md');
 
-  assert.equal(packageJson.version, '0.3.10');
-  assert.equal(packageLock.version, '0.3.10');
-  assert.equal(packageLock.packages[''].version, '0.3.10');
+  assert.equal(packageJson.version, '0.3.11');
+  assert.equal(packageLock.version, '0.3.11');
+  assert.equal(packageLock.packages[''].version, '0.3.11');
 
-  assert.match(readme, /`0\.3\.10`/);
-  assert.match(readme, /desktop-cat-0\.3\.10-win-x64-setup\.exe/);
-  assert.match(readme, /desktop-cat-0\.3\.10-win-x64-portable\.exe/);
+  assert.match(readme, /`0\.3\.11`/);
+  assert.match(readme, /desktop-cat-0\.3\.11-win-x64-setup\.exe/);
+  assert.match(readme, /desktop-cat-0\.3\.11-win-x64-portable\.exe/);
 
-  assert.match(packaging, /`0\.3\.10`/);
-  assert.match(packaging, /desktop-cat-0\.3\.10-win-x64-setup\.exe/);
-  assert.match(packaging, /desktop-cat-0\.3\.10-win-x64-portable\.exe/);
+  assert.match(packaging, /`0\.3\.11`/);
+  assert.match(packaging, /desktop-cat-0\.3\.11-win-x64-setup\.exe/);
+  assert.match(packaging, /desktop-cat-0\.3\.11-win-x64-portable\.exe/);
   assert.match(packaging, /npm run release:github/);
   assert.match(packaging, /preferred publishing path/i);
 
-  assert.match(changelog, /## 0\.3\.10/);
+  assert.match(changelog, /## 0\.3\.11/);
   assert.match(changelog, /重新打包/);
   assert.match(changelog, /线上好友同屏服务端点/);
-  assert.match(changelog, /远程房间服务/);
-  assert.match(changelog, /构建环境变量/);
-  assert.match(changelog, /完整安装包/);
+  assert.match(changelog, /登录密码/);
+  assert.match(changelog, /HttpOnly Cookie/);
+  assert.match(changelog, /DESKTOP_CAT_ADMIN_PASSWORD/);
 });
 
 test('package metadata enables GitHub installer auto updates', () => {
@@ -65,5 +65,6 @@ test('package and docker metadata expose license administration support', () => 
 
   assert.equal(packageJson.scripts['license:create'], 'node scripts/create-license-codes.js');
   assert.match(dockerCompose, /DESKTOP_CAT_ADMIN_TOKEN/);
+  assert.match(dockerCompose, /DESKTOP_CAT_ADMIN_PASSWORD/);
   assert.match(dockerCompose, /\.\/data:\/app\/data/);
 });

@@ -6,6 +6,7 @@ services:
     environment:
       PORT: "3001"
       DESKTOP_CAT_ADMIN_TOKEN: "change-me"
+      DESKTOP_CAT_ADMIN_PASSWORD: "change-me"
       DESKTOP_CAT_LICENSE_DB_PATH: "/app/data/desktop-cat.sqlite"
     ports:
       - "3001:3001"

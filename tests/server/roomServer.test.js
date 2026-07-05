@@ -7,12 +7,11 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createLicenseStore } = require('../../server/licenseStore');
 const { createRoomServer } = require('../../server/roomServer');
 
-function httpGetJson(url) {
+function httpGetJson(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    http.get(url, (response) => {
+    http.get(url, { headers }, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => {
@@ -21,6 +20,7 @@ function httpGetJson(url) {
       response.on('end', () => {
         resolve({
           statusCode: response.statusCode,
+          headers: response.headers,
           body: JSON.parse(body)
         });
       });
@@ -28,16 +28,16 @@ function httpGetJson(url) {
   });
 }
 
-function httpGetText(url) {
+function httpGetText(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    http.get(url, (response) => {
+    http.get(url, { headers }, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => {
         body += chunk;
       });
       response.on('end', () => {
-        resolve({ statusCode: response.statusCode, body });
+        resolve({ statusCode: response.statusCode, headers: response.headers, body });
       });
     }).on('error', reject);
   });
@@ -45,6 +45,97 @@ function httpGetText(url) {
 
 function tempLicenseDbPath(prefix = 'desktop-cat-license-route-') {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), prefix)), 'db.sqlite');
+}
+
+function createAdminTestLicenseStore() {
+  const licenses = [];
+  const normalizeCode = (code) => String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  function findLicense(code) {
+    return licenses.find((license) => license.normalizedCode === normalizeCode(code)) || null;
+  }
+
+  function toRows() {
+    const rows = [];
+    for (const license of licenses) {
+      if (license.devices.length === 0) {
+        rows.push({
+          licenseId: license.licenseId,
+          codePrefix: license.codePrefix,
+          status: license.status,
+          maxDevices: license.maxDevices,
+          expiresAt: license.expiresAt,
+          deviceId: null,
+          deviceLabel: null,
+          appVersion: null,
+          lastIp: null,
+          activatedAt: null
+        });
+      } else {
+        for (const device of license.devices) {
+          rows.push({
+            licenseId: license.licenseId,
+            codePrefix: license.codePrefix,
+            status: license.status,
+            maxDevices: license.maxDevices,
+            expiresAt: license.expiresAt,
+            ...device
+          });
+        }
+      }
+    }
+    return rows;
+  }
+
+  return {
+    createLicense({ code, maxDevices = 1, expiresAt = null } = {}) {
+      const id = licenses.length + 1;
+      licenses.push({
+        licenseId: id,
+        normalizedCode: normalizeCode(code),
+        codePrefix: normalizeCode(code).slice(0, 4),
+        status: 'active',
+        maxDevices,
+        expiresAt,
+        devices: []
+      });
+      return {
+        id,
+        codePrefix: licenses[licenses.length - 1].codePrefix,
+        code
+      };
+    },
+    activateLicense({ code, deviceId, deviceLabel = '', platform = '', appVersion = '', ip = '' } = {}) {
+      const license = findLicense(code);
+      if (!license) return { status: 'not_found' };
+      const existing = license.devices.find((device) => device.deviceId === deviceId);
+      if (existing) return { status: 'active', licenseId: license.licenseId, deviceId, expiresAt: license.expiresAt };
+      if (license.devices.length >= license.maxDevices) return { status: 'device_limit_reached' };
+      license.devices.push({
+        deviceId,
+        deviceLabel,
+        platform,
+        appVersion,
+        firstIp: ip,
+        lastIp: ip,
+        activatedAt: Date.now(),
+        lastSeenAt: Date.now()
+      });
+      return { status: 'active', licenseId: license.licenseId, deviceId, expiresAt: license.expiresAt };
+    },
+    checkLicense({ code, deviceId } = {}) {
+      const license = findLicense(code);
+      if (!license) return { status: 'not_found' };
+      const existing = license.devices.find((device) => device.deviceId === deviceId);
+      return existing
+        ? { status: 'active', licenseId: license.licenseId, deviceId, expiresAt: license.expiresAt }
+        : { status: 'device_limit_reached' };
+    },
+    listLicenseDevices() {
+      return toRows();
+    },
+    close() {}
+  };
 }
 
 function httpPostJson(url, body, headers = {}) {
@@ -70,6 +161,7 @@ function httpPostJson(url, body, headers = {}) {
       response.on('end', () => {
         resolve({
           statusCode: response.statusCode,
+          headers: response.headers,
           body: JSON.parse(responseBody)
         });
       });
@@ -512,16 +604,21 @@ test('room server protects admin usage json with the admin token', async () => {
   const roomServer = createRoomServer({
     port: 0,
     adminToken: 'admin-secret',
-    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-route-')
+    licenseStore: createAdminTestLicenseStore()
   });
   await roomServer.listen();
 
   try {
     const port = roomServer.address().port;
     const unauthorized = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json`);
-    const authorized = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json?token=admin-secret`);
+    const queryToken = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json?token=admin-secret`);
+    const authorized = await httpGetJson(
+      `http://127.0.0.1:${port}/admin/usage.json`,
+      { Authorization: 'Bearer admin-secret' }
+    );
 
     assert.equal(unauthorized.statusCode, 401);
+    assert.equal(queryToken.statusCode, 401);
     assert.equal(authorized.statusCode, 200);
     assert.equal(authorized.body.metrics.onlineConnections, 0);
   } finally {
@@ -533,7 +630,7 @@ test('room server records device metadata from room joins in admin usage', async
   const roomServer = createRoomServer({
     port: 0,
     adminToken: 'admin-secret',
-    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-route-')
+    licenseStore: createAdminTestLicenseStore()
   });
   await roomServer.listen();
   const port = roomServer.address().port;
@@ -552,7 +649,10 @@ test('room server records device metadata from room joins in admin usage', async
     });
     assert.equal((await alice.nextJson()).type, 'room:joined');
 
-    const usage = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json?token=admin-secret`);
+    const usage = await httpGetJson(
+      `http://127.0.0.1:${port}/admin/usage.json`,
+      { Authorization: 'Bearer admin-secret' }
+    );
 
     assert.equal(usage.statusCode, 200);
     assert.equal(usage.body.metrics.onlineConnections, 1);
@@ -566,9 +666,7 @@ test('room server records device metadata from room joins in admin usage', async
 });
 
 test('room server activates and checks a license against a device', async () => {
-  const store = createLicenseStore({
-    dbPath: tempLicenseDbPath()
-  });
+  const store = createAdminTestLicenseStore();
   store.createLicense({ code: 'DCAT-1111-2222-3333' });
   const roomServer = createRoomServer({
     port: 0,
@@ -596,15 +694,14 @@ test('room server activates and checks a license against a device', async () => 
     assert.equal(check.body.status, 'active');
   } finally {
     await roomServer.close();
-    store.close();
   }
 });
 
-test('room server creates license codes from the token-protected admin route', async () => {
+test('room server creates license codes from the bearer-protected admin api', async () => {
   const roomServer = createRoomServer({
     port: 0,
     adminToken: 'admin-secret',
-    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-create-license-')
+    licenseStore: createAdminTestLicenseStore()
   });
   await roomServer.listen();
 
@@ -622,7 +719,10 @@ test('room server creates license codes from the token-protected admin route', a
       },
       { Authorization: 'Bearer admin-secret' }
     );
-    const list = await httpGetJson(`http://127.0.0.1:${port}/admin/licenses.json?token=admin-secret`);
+    const list = await httpGetJson(
+      `http://127.0.0.1:${port}/admin/licenses.json`,
+      { Authorization: 'Bearer admin-secret' }
+    );
 
     assert.equal(unauthorized.statusCode, 401);
     assert.equal(created.statusCode, 201);
@@ -639,18 +739,53 @@ test('room server creates license codes from the token-protected admin route', a
   }
 });
 
-test('room server serves a token-protected admin dashboard page', async () => {
+test('room server protects the admin dashboard with an http-only login session', async () => {
   const roomServer = createRoomServer({
     port: 0,
     adminToken: 'admin-secret',
-    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-page-')
+    adminPassword: 'admin-password',
+    licenseStore: createAdminTestLicenseStore()
   });
   await roomServer.listen();
 
   try {
     const port = roomServer.address().port;
-    const response = await httpGetText(`http://127.0.0.1:${port}/admin?token=admin-secret`);
+    const loginPage = await httpGetText(`http://127.0.0.1:${port}/admin`);
+    const queryTokenUsage = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json?token=admin-secret`);
+    const failedLogin = await httpPostJson(`http://127.0.0.1:${port}/admin/login`, {
+      password: 'wrong-password'
+    });
+    const login = await httpPostJson(`http://127.0.0.1:${port}/admin/login`, {
+      password: 'admin-password'
+    });
 
+    assert.equal(login.statusCode, 200);
+    assert.equal(login.body.ok, true);
+    assert.ok(login.headers['set-cookie']?.length, 'login should set an admin session cookie');
+
+    const cookie = login.headers['set-cookie'][0].split(';')[0];
+    const response = await httpGetText(`http://127.0.0.1:${port}/admin`, {
+      Cookie: cookie
+    });
+    const usage = await httpGetJson(`http://127.0.0.1:${port}/admin/usage.json`, {
+      Cookie: cookie
+    });
+    const created = await httpPostJson(
+      `http://127.0.0.1:${port}/admin/licenses/create`,
+      { count: 1 },
+      { Cookie: cookie }
+    );
+
+    assert.equal(loginPage.statusCode, 200);
+    assert.match(loginPage.body, /后台登录/);
+    assert.doesNotMatch(loginPage.body, /生成授权码/);
+    assert.equal(queryTokenUsage.statusCode, 401);
+    assert.equal(failedLogin.statusCode, 401);
+    assert.equal(failedLogin.headers['set-cookie'], undefined);
+    assert.match(login.headers['set-cookie'][0], /HttpOnly/);
+    assert.match(login.headers['set-cookie'][0], /SameSite=Strict/);
+    assert.match(login.headers['set-cookie'][0], /Path=\/admin/);
+    assert.doesNotMatch(login.headers['set-cookie'][0], /admin-secret/);
     assert.equal(response.statusCode, 200);
     assert.match(response.body, /桌面猫服务后台/);
     assert.match(response.body, /生成授权码/);
@@ -658,6 +793,12 @@ test('room server serves a token-protected admin dashboard page', async () => {
     assert.match(response.body, /授权码列表/);
     assert.match(response.body, /admin\/licenses\/create/);
     assert.match(response.body, /admin\/usage\.json/);
+    assert.doesNotMatch(response.body, /admin-secret/);
+    assert.doesNotMatch(response.body, /Authorization: 'Bearer/);
+    assert.equal(usage.statusCode, 200);
+    assert.equal(usage.body.metrics.onlineConnections, 0);
+    assert.equal(created.statusCode, 201);
+    assert.match(created.body.licenses[0].code, /^DCAT-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
   } finally {
     await roomServer.close();
   }
