@@ -10,6 +10,7 @@ const {
   nativeImage,
   protocol,
   screen,
+  shell,
   ipcMain
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
@@ -788,6 +789,7 @@ if (!gotTheLock) {
     updateManager = createUpdateManager({
       app,
       dialog,
+      shell,
       autoUpdater: app.isPackaged ? autoUpdater : null,
       fetch: globalThis.fetch,
       WebSocket: globalThis.WebSocket || SimpleWebSocket,

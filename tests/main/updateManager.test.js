@@ -176,6 +176,61 @@ test('checkNow delegates installer updates to electron-updater when configured',
   assert.deepEqual(calls, ['checkForUpdates']);
 });
 
+test('installer updater uses full downloads to avoid fragile differential update requests', () => {
+  const autoUpdater = {
+    on() {},
+    checkForUpdates: async () => {}
+  };
+
+  createUpdateManager({
+    currentVersion: '0.3.0',
+    autoUpdater,
+    userDataPath: '/unused'
+  });
+
+  assert.equal(autoUpdater.autoDownload, false);
+  assert.equal(autoUpdater.autoInstallOnAppQuit, false);
+  assert.equal(autoUpdater.disableDifferentialDownload, true);
+});
+
+test('user initiated installer update errors can open the release download page', async () => {
+  const handlers = {};
+  const openedUrls = [];
+  const dialogs = [];
+  const autoUpdater = {
+    on(eventName, handler) {
+      handlers[eventName] = handler;
+    },
+    checkForUpdates: async () => {}
+  };
+
+  const manager = createUpdateManager({
+    currentVersion: '0.3.0',
+    autoUpdater,
+    userDataPath: '/unused',
+    releaseUrl: 'https://example.test/releases/latest',
+    dialog: {
+      showMessageBox: async (options) => {
+        dialogs.push(options);
+        return { response: 0 };
+      }
+    },
+    shell: {
+      openExternal: async (url) => {
+        openedUrls.push(url);
+      }
+    }
+  });
+
+  await manager.checkNow({ userInitiated: true });
+  await handlers.error(new Error('net::ERR_CONNECTION_CLOSED'));
+
+  assert.equal(dialogs[0].title, '更新失败');
+  assert.match(dialogs[0].message, /连接/);
+  assert.equal(dialogs[0].buttons[0], '打开下载页');
+  assert.deepEqual(openedUrls, ['https://example.test/releases/latest']);
+});
+
 test('checkNow rejects downloaded updates with a sha256 mismatch', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-cat-update-'));
   const executablePath = path.join(tempDir, 'desktop-cat.exe');

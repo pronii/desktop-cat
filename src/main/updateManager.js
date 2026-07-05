@@ -5,6 +5,9 @@ const path = require('node:path');
 
 const DEFAULT_INITIAL_CHECK_MS = 30 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_RELEASE_URL = 'https://github.com/pronii/desktop-cat/releases/latest';
+const NETWORK_ERROR_PATTERN =
+  /(ERR_CONNECTION_CLOSED|ERR_CONNECTION_RESET|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ETIMEDOUT|ECONNRESET|ENOTFOUND|EAI_AGAIN|fetch failed|network)/i;
 
 function parseVersion(version) {
   return String(version || '')
@@ -120,9 +123,11 @@ function createUpdateManager(options = {}) {
   const WebSocketImpl = options.WebSocket;
   const spawn = options.spawn || childProcess.spawn;
   const logger = options.logger || console;
+  const shell = options.shell || null;
   const promptForUpdate = options.promptForUpdate;
   const promptForRestart = options.promptForRestart;
   const autoUpdater = options.autoUpdater || null;
+  const releaseUrl = options.releaseUrl || DEFAULT_RELEASE_URL;
   const currentVersion = options.currentVersion || app.getVersion?.() || '0.0.0';
   const executablePath = options.executablePath || process.execPath;
   const userDataPath = options.userDataPath || app.getPath?.('userData');
@@ -152,6 +157,35 @@ function createUpdateManager(options = {}) {
       type: 'info',
       ...messageOptions
     });
+  }
+
+  function getUpdateErrorMessage(error) {
+    const message = String(error?.message || error || '').trim();
+    if (NETWORK_ERROR_PATTERN.test(message)) {
+      return '自动更新下载连接被中断，请稍后重试，或打开下载页手动下载安装包。';
+    }
+    return '自动更新没有完成，请稍后重试，或打开下载页手动下载安装包。';
+  }
+
+  async function showUpdateError(error) {
+    const canOpenReleasePage = Boolean(releaseUrl && typeof shell?.openExternal === 'function');
+    const response = await showMessageBox({
+      type: 'error',
+      title: '更新失败',
+      message: getUpdateErrorMessage(error),
+      detail: String(error?.message || error || '').trim(),
+      buttons: canOpenReleasePage ? ['打开下载页', '知道了'] : ['知道了'],
+      defaultId: 0,
+      cancelId: canOpenReleasePage ? 1 : 0
+    });
+
+    if (canOpenReleasePage && response.response === 0) {
+      try {
+        await shell.openExternal(releaseUrl);
+      } catch (openError) {
+        logger.warn?.(`Could not open release page: ${openError.message}`);
+      }
+    }
   }
 
   async function confirmUpdateDownload(manifest, { userInitiated }) {
@@ -241,6 +275,7 @@ function createUpdateManager(options = {}) {
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.disableDifferentialDownload = true;
 
     autoUpdater.on('update-available', (info = {}) => {
       confirmStandardUpdateDownload(info)
@@ -279,12 +314,7 @@ function createUpdateManager(options = {}) {
     autoUpdater.on('error', (error) => {
       logger.warn?.(`Automatic update failed: ${error.message}`);
       if (!lastStandardCheckWasUserInitiated) return;
-      showMessageBox({
-        type: 'error',
-        title: '更新失败',
-        message: error.message,
-        buttons: ['知道了']
-      }).catch?.(() => {});
+      return showUpdateError(error).catch?.(() => {});
     });
   }
 
@@ -419,12 +449,7 @@ function createUpdateManager(options = {}) {
       return result;
     } catch (error) {
       if (userInitiated) {
-        await showMessageBox({
-          type: 'error',
-          title: '更新失败',
-          message: error.message,
-          buttons: ['知道了']
-        });
+        await showUpdateError(error);
       }
       throw error;
     } finally {
