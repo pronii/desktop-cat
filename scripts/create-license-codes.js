@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-const crypto = require('node:crypto');
 const path = require('node:path');
 
-const { createLicenseStore } = require('../server/licenseStore');
+const { createLicenseCode, createLicenseStore } = require('../server/licenseStore');
 
 function readArg(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -11,12 +10,7 @@ function readArg(name, fallback = null) {
 }
 
 function createCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let body = '';
-  for (let index = 0; index < 12; index += 1) {
-    body += alphabet[crypto.randomInt(0, alphabet.length)];
-  }
-  return `DCAT-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`;
+  return createLicenseCode();
 }
 
 function main() {

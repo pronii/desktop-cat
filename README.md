@@ -1,6 +1,6 @@
 # desktop-cat
 
-当前版本：`0.3.8`
+当前版本：`0.3.9`
 
 `desktop-cat` 是一个面向 Windows 的 Electron 桌面宠物。它把一只可互动的小猫放在桌面上，既能陪伴、提醒喝水、管理剪贴板，也能切换 Live2D 形象、和朋友进入同一个房间同屏出现。
 
@@ -84,8 +84,8 @@ npm run pack
 `npm run pack` 会同时生成 Windows 安装包和免安装包。当前版本产物示例：
 
 ```text
-dist/desktop-cat-0.3.8-win-x64-setup.exe
-dist/desktop-cat-0.3.8-win-x64-portable.exe
+dist/desktop-cat-0.3.9-win-x64-setup.exe
+dist/desktop-cat-0.3.9-win-x64-portable.exe
 ```
 
 打包前请阅读 [PACKAGING.md](./PACKAGING.md)。正式发布建议优先给普通用户提供 NSIS 安装包，同时保留 portable 免安装包作为绿色版。
@@ -167,7 +167,7 @@ portable `.exe` 运行时，可以把 `live2d/` 放到 `.exe` 同级目录：
 
 ```text
 dist/
-├─ desktop-cat 0.3.8.exe
+├─ desktop-cat 0.3.9.exe
 └─ live2d/
    └─ Hiyori/
       └─ Hiyori.model3.json
@@ -244,10 +244,10 @@ npm start
 
 ```json
 {
-  "version": "0.3.8",
-  "url": "https://example.com/releases/desktop-cat-0.3.8.exe",
+  "version": "0.3.9",
+  "url": "https://example.com/releases/desktop-cat-0.3.9.exe",
   "sha256": "64位十六进制sha256",
-  "notes": "修复好友同屏固定站位和底部对齐，移除远端屏幕坐标依赖。",
+  "notes": "新增设备授权管理后台，强化 GitHub Release 全量更新发布链路。",
   "mandatory": false
 }
 ```

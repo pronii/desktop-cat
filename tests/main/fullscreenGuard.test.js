@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { shouldSuspendTopmost } = require('../../src/main/fullscreenGuard');
 
@@ -82,5 +84,19 @@ test('suspends topmost when the foreground window is Windows screen clipping', (
       petWindowId: 'pet'
     }),
     true
+  );
+});
+
+test('topmost refresh hides the pet window while fullscreen suspension is active', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'src', 'main', 'main.js'),
+    'utf8'
+  );
+
+  assert.match(source, /createFullscreenHideState/);
+  assert.match(source, /enforceFullscreenVisibility/);
+  assert.match(
+    source,
+    /if\s*\(topmostSuspended\)\s*\{[\s\S]*enforceFullscreenVisibility\(window,\s*fullscreenHideState,\s*true\);[\s\S]*return;[\s\S]*\}/
   );
 });

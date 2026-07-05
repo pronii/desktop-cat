@@ -6,6 +6,10 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV DESKTOP_CAT_LICENSE_DB_PATH=/app/data/desktop-cat.sqlite
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 

@@ -600,6 +600,45 @@ test('room server activates and checks a license against a device', async () => 
   }
 });
 
+test('room server creates license codes from the token-protected admin route', async () => {
+  const roomServer = createRoomServer({
+    port: 0,
+    adminToken: 'admin-secret',
+    licenseDbPath: tempLicenseDbPath('desktop-cat-admin-create-license-')
+  });
+  await roomServer.listen();
+
+  try {
+    const port = roomServer.address().port;
+    const unauthorized = await httpPostJson(`http://127.0.0.1:${port}/admin/licenses/create`, {
+      count: 1
+    });
+    const created = await httpPostJson(
+      `http://127.0.0.1:${port}/admin/licenses/create`,
+      {
+        count: 2,
+        maxDevices: 3,
+        expiresAt: 1893456000000
+      },
+      { Authorization: 'Bearer admin-secret' }
+    );
+    const list = await httpGetJson(`http://127.0.0.1:${port}/admin/licenses.json?token=admin-secret`);
+
+    assert.equal(unauthorized.statusCode, 401);
+    assert.equal(created.statusCode, 201);
+    assert.equal(created.body.licenses.length, 2);
+    assert.match(created.body.licenses[0].code, /^DCAT-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    assert.equal(created.body.licenses[0].maxDevices, 3);
+    assert.equal(created.body.licenses[0].expiresAt, 1893456000000);
+    assert.equal(list.body.licenses.length, 2);
+    assert.equal(list.body.licenses[0].maxDevices, 3);
+    assert.equal(list.body.licenses[0].expiresAt, 1893456000000);
+    assert.doesNotMatch(JSON.stringify(list.body), new RegExp(created.body.licenses[0].code));
+  } finally {
+    await roomServer.close();
+  }
+});
+
 test('room server serves a token-protected admin dashboard page', async () => {
   const roomServer = createRoomServer({
     port: 0,
@@ -613,9 +652,12 @@ test('room server serves a token-protected admin dashboard page', async () => {
     const response = await httpGetText(`http://127.0.0.1:${port}/admin?token=admin-secret`);
 
     assert.equal(response.statusCode, 200);
-    assert.match(response.body, /desktop-cat Admin/);
+    assert.match(response.body, /桌面猫服务后台/);
+    assert.match(response.body, /生成授权码/);
+    assert.match(response.body, /在线连接数/);
+    assert.match(response.body, /授权码列表/);
+    assert.match(response.body, /admin\/licenses\/create/);
     assert.match(response.body, /admin\/usage\.json/);
-    assert.match(response.body, /Online connections/);
   } finally {
     await roomServer.close();
   }

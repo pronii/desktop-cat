@@ -5,6 +5,15 @@ const Database = require('better-sqlite3');
 
 const DEFAULT_STATUS = 'active';
 const VALID_STATUSES = new Set(['active', 'revoked', 'expired']);
+const LICENSE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function createLicenseCode() {
+  let body = '';
+  for (let index = 0; index < 12; index += 1) {
+    body += LICENSE_CODE_ALPHABET[crypto.randomInt(0, LICENSE_CODE_ALPHABET.length)];
+  }
+  return `DCAT-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`;
+}
 
 function normalizeLicenseCode(code) {
   return String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -248,6 +257,7 @@ function createLicenseStore({ dbPath, now = Date.now } = {}) {
 }
 
 module.exports = {
+  createLicenseCode,
   createLicenseStore,
   hashLicenseCode,
   normalizeLicenseCode

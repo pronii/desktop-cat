@@ -14,6 +14,8 @@
   const roomError = document.getElementById('roomError');
   const roomPeerList = document.getElementById('roomPeerList');
 
+  const ROOM_FORM_STORAGE_KEY = 'desktopCat.roomForm';
+  const DEFAULT_NICKNAME = '\u5c0f\u732b\u597d\u53cb';
   const api = window.desktopCat?.room;
   let currentState = null;
 
@@ -21,12 +23,65 @@
     return String(Math.floor(100000 + Math.random() * 900000));
   }
 
+  function normalizeRoomCode(value) {
+    return String(value || '').replace(/\D/g, '').slice(0, 6);
+  }
+
+  function normalizeNickname(value) {
+    return String(value || '').trim().slice(0, 16);
+  }
+
+  function readStoredForm() {
+    try {
+      const raw = window.localStorage?.getItem(ROOM_FORM_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return {};
+
+      return {
+        roomCode: normalizeRoomCode(parsed.roomCode),
+        nickname: normalizeNickname(parsed.nickname)
+      };
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function saveStoredForm(patch = {}) {
+    try {
+      const next = {
+        ...readStoredForm(),
+        ...patch
+      };
+      const roomCode = normalizeRoomCode(next.roomCode);
+      const nickname = normalizeNickname(next.nickname);
+      const stored = {};
+
+      if (roomCode) stored.roomCode = roomCode;
+      if (nickname) stored.nickname = nickname;
+
+      window.localStorage?.setItem(ROOM_FORM_STORAGE_KEY, JSON.stringify(stored));
+    } catch (_error) {
+      // localStorage can be unavailable in restricted environments.
+    }
+  }
+
+  function restoreStoredForm() {
+    const stored = readStoredForm();
+    if (/^\d{6}$/.test(stored.roomCode)) {
+      roomCodeInput.value = stored.roomCode;
+    }
+    if (typeof stored.nickname === 'string') {
+      roomNicknameInput.value = stored.nickname;
+    }
+  }
+
   function getNickname() {
-    return roomNicknameInput.value.trim() || '小猫好友';
+    return normalizeNickname(roomNicknameInput.value) || DEFAULT_NICKNAME;
   }
 
   function getRoomCode() {
-    return roomCodeInput.value.replace(/\D/g, '').slice(0, 6);
+    return normalizeRoomCode(roomCodeInput.value);
   }
 
   function setError(message) {
@@ -110,6 +165,10 @@
 
     if (currentState.roomCode) {
       roomCodeInput.value = currentState.roomCode;
+      saveStoredForm({
+        roomCode: currentState.roomCode,
+        nickname: roomNicknameInput.value
+      });
     }
 
     renderPeers(peers);
@@ -147,6 +206,7 @@
     }
 
     roomCodeInput.value = normalizedCode;
+    saveStoredForm({ nickname: roomNicknameInput.value });
     setError('');
 
     try {
@@ -173,6 +233,10 @@
 
   roomCodeInput?.addEventListener('input', () => {
     roomCodeInput.value = getRoomCode();
+  });
+
+  roomNicknameInput?.addEventListener('input', () => {
+    saveStoredForm({ nickname: roomNicknameInput.value });
   });
 
   roomCreateBtn?.addEventListener('click', () => {
@@ -206,6 +270,7 @@
     closePanel();
   });
 
+  restoreStoredForm();
   api?.onStateChanged?.(renderState);
   api?.onOpenPanel?.(openPanel);
   refreshState();

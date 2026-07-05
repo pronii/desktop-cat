@@ -2,7 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktopCat', {
   dragMode: {
-    enter: () => ipcRenderer.send('drag-mode:enter'),
+    enter: (point) => ipcRenderer.send('drag-mode:enter', point),
+    move: (point) => ipcRenderer.send('drag-mode:move', point),
     exit: () => ipcRenderer.send('drag-mode:exit')
   },
   setClickThrough: (enabled) => ipcRenderer.send('window:set-click-through', enabled),

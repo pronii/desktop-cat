@@ -15,6 +15,10 @@ function readCssBlock(css, selector) {
   return css.match(new RegExp(`${escapedSelector}\\s*\\{[\\s\\S]*?\\}`))?.[0] || '';
 }
 
+function serializePoint(point) {
+  return point ? { x: point.x, y: point.y } : point;
+}
+
 class FakeClassList {
   constructor() {
     this.names = new Set();
@@ -124,9 +128,14 @@ function createRendererHarness({
     style: { setProperty() {} }
   };
   const timers = new Map();
+  const animationFrames = new Map();
   const windowListeners = new Map();
   let nextTimerId = 1;
+  let nextAnimationFrameId = 1;
   let dragEnterCount = 0;
+  let dragMoveCount = 0;
+  const dragEnterPoints = [];
+  const dragMovePoints = [];
   let dragExitCount = 0;
   let waterReminderTrigger = null;
   let now = 0;
@@ -172,8 +181,13 @@ function createRendererHarness({
     },
     desktopCat: {
       dragMode: {
-        enter() {
+        enter(point) {
           dragEnterCount += 1;
+          dragEnterPoints.push(serializePoint(point));
+        },
+        move(point) {
+          dragMoveCount += 1;
+          dragMovePoints.push(serializePoint(point));
         },
         exit() {
           dragExitCount += 1;
@@ -204,6 +218,15 @@ function createRendererHarness({
     },
     clearTimeout(id) {
       timers.delete(id);
+    },
+    requestAnimationFrame(callback) {
+      const id = nextAnimationFrameId;
+      nextAnimationFrameId += 1;
+      animationFrames.set(id, callback);
+      return id;
+    },
+    cancelAnimationFrame(id) {
+      animationFrames.delete(id);
     },
     setInterval() {
       return 0;
@@ -311,8 +334,24 @@ function createRendererHarness({
         timer.callback();
       }
     },
+    flushAnimationFrames() {
+      for (const [id, callback] of Array.from(animationFrames.entries())) {
+        animationFrames.delete(id);
+        now += 16;
+        callback(now);
+      }
+    },
     get dragEnterCount() {
       return dragEnterCount;
+    },
+    get dragMoveCount() {
+      return dragMoveCount;
+    },
+    get dragEnterPoints() {
+      return dragEnterPoints;
+    },
+    get dragMovePoints() {
+      return dragMovePoints;
     },
     get dragExitCount() {
       return dragExitCount;
@@ -328,9 +367,16 @@ test('cat drag mode survives leaving the cat element until mouseup', () => {
 
   harness.cat.dispatch('mousedown', {
     button: 0,
+    clientX: 12,
+    clientY: 12,
     preventDefault() {}
   });
   harness.flushTimers();
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 24,
+    clientY: 12
+  });
 
   assert.equal(harness.dragEnterCount, 1);
 
@@ -350,9 +396,16 @@ test('cat drag mode exits on window pointerup when mouseup is missed', () => {
 
   harness.cat.dispatch('mousedown', {
     button: 0,
+    clientX: 12,
+    clientY: 12,
     preventDefault() {}
   });
   harness.flushTimers();
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 24,
+    clientY: 12
+  });
 
   assert.equal(harness.dragEnterCount, 1);
 
@@ -367,9 +420,16 @@ test('cat drag mode exits on mousemove after the mouse button is released', () =
 
   harness.cat.dispatch('mousedown', {
     button: 0,
+    clientX: 12,
+    clientY: 12,
     preventDefault() {}
   });
   harness.flushTimers();
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 24,
+    clientY: 12
+  });
 
   assert.equal(harness.dragEnterCount, 1);
 
@@ -389,12 +449,20 @@ test('cat drag mode captures the active pointer and exits on captured pointerup'
   harness.cat.dispatch('pointerdown', {
     button: 0,
     pointerId: 42,
+    clientX: 12,
+    clientY: 12,
     preventDefault() {}
   });
 
   assert.deepEqual(harness.cat.capturedPointerIds, [42]);
 
   harness.flushTimers();
+  harness.window.dispatch('pointermove', {
+    pointerId: 42,
+    buttons: 1,
+    clientX: 24,
+    clientY: 12
+  });
   assert.equal(harness.dragEnterCount, 1);
 
   harness.cat.dispatch('pointerup', { pointerId: 42 });
@@ -410,9 +478,17 @@ test('cat drag mode exits when the captured pointer is lost', () => {
   harness.cat.dispatch('pointerdown', {
     button: 0,
     pointerId: 7,
+    clientX: 12,
+    clientY: 12,
     preventDefault() {}
   });
   harness.flushTimers();
+  harness.window.dispatch('pointermove', {
+    pointerId: 7,
+    buttons: 1,
+    clientX: 24,
+    clientY: 12
+  });
 
   assert.equal(harness.dragEnterCount, 1);
 
@@ -517,7 +593,7 @@ test('cat mouse press without click does not show encouragement text', () => {
   assert.equal(harness.window.desktopCatDebug.happyCount, 0);
 });
 
-test('cat long press drag suppresses the following click encouragement', () => {
+test('cat long press suppresses the following click encouragement', () => {
   const harness = createRendererHarness();
 
   harness.cat.dispatch('mousedown', {
@@ -530,6 +606,188 @@ test('cat long press drag suppresses the following click encouragement', () => {
 
   assert.equal(harness.happyBubble.textContent, '');
   assert.equal(harness.window.desktopCatDebug.happyCount, 0);
+});
+
+test('cat long press does not enter drag mode until the pointer moves', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  assert.equal(harness.dragEnterCount, 0);
+  assert.equal(harness.dragMoveCount, 0);
+  assert.equal(harness.cat.classList.contains('is-dragging'), false);
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 22,
+    clientY: 12
+  });
+
+  assert.equal(harness.dragEnterCount, 1);
+  assert.equal(harness.dragMoveCount, 1);
+  assert.equal(harness.cat.classList.contains('is-dragging'), true);
+});
+
+test('cat drag mode only requests movement when pointer move events arrive', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    screenX: 100,
+    screenY: 100,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 22,
+    clientY: 12,
+    screenX: 110,
+    screenY: 100
+  });
+  assert.equal(harness.dragEnterCount, 1);
+  assert.equal(harness.dragMoveCount, 1);
+
+  harness.flushTimers();
+  assert.equal(harness.dragMoveCount, 1);
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 26,
+    clientY: 12,
+    screenX: 114,
+    screenY: 100
+  });
+  assert.equal(harness.dragMoveCount, 2);
+});
+
+test('cat drag mode sends real moves immediately so main can animate at 60fps', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    screenX: 100,
+    screenY: 100,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 22,
+    clientY: 12,
+    screenX: 110,
+    screenY: 100
+  });
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 28,
+    clientY: 14,
+    screenX: 116,
+    screenY: 102
+  });
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 36,
+    clientY: 18,
+    screenX: 124,
+    screenY: 106
+  });
+
+  assert.equal(harness.dragEnterCount, 1);
+  assert.equal(harness.dragMoveCount, 3);
+  assert.deepEqual(harness.dragMovePoints, [
+    { x: 110, y: 100 },
+    { x: 116, y: 102 },
+    { x: 124, y: 106 }
+  ]);
+});
+
+test('cat drag mode ignores mousemove events caused by the window moving under a held cursor', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    screenX: 100,
+    screenY: 100,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 22,
+    clientY: 12,
+    screenX: 110,
+    screenY: 100
+  });
+  assert.equal(harness.dragMoveCount, 1);
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 30,
+    clientY: 12,
+    screenX: 110,
+    screenY: 100
+  });
+  assert.equal(harness.dragMoveCount, 1);
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 34,
+    clientY: 12,
+    screenX: 114,
+    screenY: 100
+  });
+  assert.equal(harness.dragMoveCount, 2);
+});
+
+test('cat drag mode sends the original press point and each real move point', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    screenX: 100,
+    screenY: 100,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 22,
+    clientY: 12,
+    screenX: 110,
+    screenY: 100
+  });
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 32,
+    clientY: 18,
+    screenX: 120,
+    screenY: 106
+  });
+
+  assert.deepEqual(harness.dragEnterPoints, [{ x: 100, y: 100 }]);
+  assert.deepEqual(harness.dragMovePoints, [
+    { x: 110, y: 100 },
+    { x: 120, y: 106 }
+  ]);
 });
 
 test('live2d canvas click uses the same encouragement cycle as the default cat', () => {
@@ -546,9 +804,16 @@ test('live2d canvas uses the same long press drag mode as the default cat', () =
 
   harness.live2dCanvas.dispatch('mousedown', {
     button: 0,
+    clientX: 12,
+    clientY: 12,
     preventDefault() {}
   });
   harness.flushTimers();
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 24,
+    clientY: 12
+  });
 
   assert.equal(harness.dragEnterCount, 1);
   assert.equal(harness.cat.classList.contains('is-dragging'), true);

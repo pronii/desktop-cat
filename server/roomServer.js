@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 
 const { createAdminPage } = require('./adminPage');
-const { createLicenseStore } = require('./licenseStore');
+const { createLicenseCode, createLicenseStore } = require('./licenseStore');
 const { createRoomManager } = require('./roomManager');
 const { createUsageTracker } = require('./usageTracker');
 
@@ -261,6 +261,35 @@ function normalizeDeviceMetadata(data) {
   };
 }
 
+function normalizeBoundedInteger(value, fallback, min, max, label) {
+  const number = value == null || value === ''
+    ? fallback
+    : Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) {
+    throw new Error(`${label}必须在 ${min} 到 ${max} 之间`);
+  }
+  return number;
+}
+
+function normalizeOptionalTimestamp(value, label) {
+  if (value == null || value === '') return null;
+  const timestamp = typeof value === 'string' && !/^\d+$/.test(value)
+    ? Date.parse(value)
+    : Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    throw new Error(`${label}无效`);
+  }
+  return timestamp;
+}
+
+function normalizeAdminLicenseCreateRequest(body) {
+  return {
+    count: normalizeBoundedInteger(body.count, 1, 1, 100, '生成数量'),
+    maxDevices: normalizeBoundedInteger(body.maxDevices, 1, 1, 100, '每码设备数'),
+    expiresAt: normalizeOptionalTimestamp(body.expiresAt, '过期时间')
+  };
+}
+
 function sanitizePet(pet) {
   if (pet == null) {
     return null;
@@ -378,6 +407,29 @@ function createRoomServer(options = {}) {
     return statuses;
   }
 
+  function createAdminLicenses({ count, maxDevices, expiresAt }) {
+    const store = getLicenseStore();
+    const licenses = [];
+
+    for (let index = 0; index < count; index += 1) {
+      const code = createLicenseCode();
+      const created = store.createLicense({
+        code,
+        maxDevices,
+        expiresAt
+      });
+      licenses.push({
+        licenseId: created.id,
+        code: created.code,
+        codePrefix: created.codePrefix,
+        maxDevices,
+        expiresAt
+      });
+    }
+
+    return licenses;
+  }
+
   const server = http.createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/health') {
       sendJsonResponse(response, 200, { ok: true });
@@ -417,6 +469,23 @@ function createRoomServer(options = {}) {
         return;
       }
       sendJsonResponse(response, 200, { licenses: getLicenseStore().listLicenseDevices() });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/admin/licenses/create') {
+      if (!isAdminAuthorized(requestUrl, request)) {
+        sendAdminUnauthorized(response);
+        return;
+      }
+      try {
+        const body = await readJsonBody(request);
+        const requestBody = normalizeAdminLicenseCreateRequest(body);
+        sendJsonResponse(response, 201, {
+          licenses: createAdminLicenses(requestBody)
+        });
+      } catch (error) {
+        sendJsonResponse(response, 400, { error: 'invalid_request', message: error.message });
+      }
       return;
     }
 

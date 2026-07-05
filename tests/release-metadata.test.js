@@ -11,33 +11,33 @@ function readText(...parts) {
   return fs.readFileSync(path.join(__dirname, '..', ...parts), 'utf-8');
 }
 
-test('release metadata describes the 0.3.8 fixed peer side layout release', () => {
+test('release metadata describes the 0.3.9 license admin and full update release', () => {
   const packageJson = readJson('package.json');
   const packageLock = readJson('package-lock.json');
   const readme = readText('README.md');
   const packaging = readText('PACKAGING.md');
   const changelog = readText('CHANGELOG.md');
 
-  assert.equal(packageJson.version, '0.3.8');
-  assert.equal(packageLock.version, '0.3.8');
-  assert.equal(packageLock.packages[''].version, '0.3.8');
+  assert.equal(packageJson.version, '0.3.9');
+  assert.equal(packageLock.version, '0.3.9');
+  assert.equal(packageLock.packages[''].version, '0.3.9');
 
-  assert.match(readme, /`0\.3\.8`/);
-  assert.match(readme, /desktop-cat-0\.3\.8-win-x64-setup\.exe/);
-  assert.match(readme, /desktop-cat-0\.3\.8-win-x64-portable\.exe/);
+  assert.match(readme, /`0\.3\.9`/);
+  assert.match(readme, /desktop-cat-0\.3\.9-win-x64-setup\.exe/);
+  assert.match(readme, /desktop-cat-0\.3\.9-win-x64-portable\.exe/);
 
-  assert.match(packaging, /`0\.3\.8`/);
-  assert.match(packaging, /desktop-cat-0\.3\.8-win-x64-setup\.exe/);
-  assert.match(packaging, /desktop-cat-0\.3\.8-win-x64-portable\.exe/);
+  assert.match(packaging, /`0\.3\.9`/);
+  assert.match(packaging, /desktop-cat-0\.3\.9-win-x64-setup\.exe/);
+  assert.match(packaging, /desktop-cat-0\.3\.9-win-x64-portable\.exe/);
   assert.match(packaging, /npm run release:github/);
   assert.match(packaging, /preferred publishing path/i);
 
-  assert.match(changelog, /## 0\.3\.8/);
-  assert.match(changelog, /好友同屏/);
-  assert.match(changelog, /Live2D/);
-  assert.match(changelog, /固定/);
-  assert.match(changelog, /底部对齐/);
-  assert.match(changelog, /屏幕坐标/);
+  assert.match(changelog, /## 0\.3\.9/);
+  assert.match(changelog, /设备授权/);
+  assert.match(changelog, /管理后台/);
+  assert.match(changelog, /环境变量注入/);
+  assert.match(changelog, /latest\.yml/);
+  assert.match(changelog, /全量更新/);
 });
 
 test('package metadata enables GitHub installer auto updates', () => {

@@ -278,6 +278,7 @@
   }
 
   const LONG_PRESS_MS = 250;
+  const LONG_PRESS_MOVE_THRESHOLD = 4;
   let longPressTimer = null;
   let pressActive = false;
   let isLongPress = false;
@@ -285,6 +286,9 @@
   let suppressNextCatClick = false;
   let activePressTarget = null;
   let activePointerId = null;
+  let pressStartPoint = null;
+  let pressStartScreenPoint = null;
+  let lastDragMovePoint = null;
 
   function clearPendingLongPress() {
     if (!longPressTimer) return;
@@ -322,9 +326,58 @@
     return activePointerId === null || event?.pointerId === undefined || event.pointerId === activePointerId;
   }
 
+  function getPointerScreenPoint(event) {
+    const screenX = Number(event.screenX);
+    const screenY = Number(event.screenY);
+    if (Number.isFinite(screenX) && Number.isFinite(screenY)) {
+      return { x: screenX, y: screenY };
+    }
+
+    const clientX = Number(event.clientX);
+    const clientY = Number(event.clientY);
+    return Number.isFinite(clientX) && Number.isFinite(clientY) ? { x: clientX, y: clientY } : null;
+  }
+
+  function getEventScreenPoint(event) {
+    const screenX = Number(event.screenX);
+    const screenY = Number(event.screenY);
+    return Number.isFinite(screenX) && Number.isFinite(screenY) ? { x: screenX, y: screenY } : null;
+  }
+
+  function isSamePointerPoint(a, b) {
+    return Boolean(a && b && a.x === b.x && a.y === b.y);
+  }
+
+  function rememberPressStartPoint(event) {
+    pressStartPoint = getPointerScreenPoint(event);
+    pressStartScreenPoint = getEventScreenPoint(event) || pressStartPoint;
+  }
+
+  function hasMovedPastLongPressThreshold(event) {
+    if (!pressStartPoint) return true;
+
+    const point = getPointerScreenPoint(event);
+    if (!point) return true;
+
+    return Math.hypot(point.x - pressStartPoint.x, point.y - pressStartPoint.y) >= LONG_PRESS_MOVE_THRESHOLD;
+  }
+
+  function enterCatDragMode() {
+    if (!isLongPress || dragEntered) return;
+
+    cat.classList.add('is-dragging');
+    if (window.desktopCat?.dragMode) {
+      window.desktopCat.dragMode.enter(pressStartScreenPoint || undefined);
+      dragEntered = true;
+    }
+  }
+
   function finishCatPress() {
     if (!pressActive && !isLongPress) {
       releasePressPointer();
+      pressStartPoint = null;
+      pressStartScreenPoint = null;
+      lastDragMovePoint = null;
       return;
     }
 
@@ -341,6 +394,9 @@
 
     pressActive = false;
     isLongPress = false;
+    pressStartPoint = null;
+    pressStartScreenPoint = null;
+    lastDragMovePoint = null;
     releasePressPointer();
   }
 
@@ -353,15 +409,12 @@
     pressActive = true;
     isLongPress = false;
     dragEntered = false;
+    rememberPressStartPoint(event);
+    lastDragMovePoint = null;
 
     longPressTimer = window.setTimeout(() => {
       longPressTimer = null;
       isLongPress = true;
-      cat.classList.add('is-dragging');
-      if (window.desktopCat?.dragMode) {
-        window.desktopCat.dragMode.enter();
-        dragEntered = true;
-      }
     }, LONG_PRESS_MS);
 
     event.preventDefault();
@@ -370,6 +423,24 @@
   function handleCatPressEnd(event) {
     if (!isActivePressPointer(event)) return;
     finishCatPress();
+  }
+
+  function handleCatPressMove(event) {
+    if (!pressActive || !isLongPress) return;
+    if (!isActivePressPointer(event)) return;
+    if (event.buttons === 0) {
+      finishCatPress();
+      return;
+    }
+    if (!dragEntered && hasMovedPastLongPressThreshold(event)) {
+      enterCatDragMode();
+    }
+    if (dragEntered && window.desktopCat?.dragMode) {
+      const point = getPointerScreenPoint(event);
+      if (isSamePointerPoint(point, lastDragMovePoint)) return;
+      lastDragMovePoint = point;
+      window.desktopCat.dragMode.move?.(getEventScreenPoint(event) || point || undefined);
+    }
   }
 
   function handleCatClick(event) {
@@ -386,6 +457,9 @@
     if (!isLongPress) {
       clearPendingLongPress();
       pressActive = false;
+      pressStartPoint = null;
+      pressStartScreenPoint = null;
+      lastDragMovePoint = null;
       releasePressPointer();
     }
   }
@@ -503,6 +577,8 @@
   document.addEventListener('mousemove', (event) => {
     if (pressActive && event.buttons === 0) {
       finishCatPress();
+    } else {
+      handleCatPressMove(event);
     }
     updateBottomControlsForPointer(event.clientX, event.clientY);
     updateClickThrough(event.clientX, event.clientY);
@@ -521,6 +597,8 @@
   window.addEventListener('mouseup', () => {
     finishCatPress();
   });
+
+  window.addEventListener('pointermove', handleCatPressMove);
 
   window.addEventListener('blur', () => {
     finishCatPress();
