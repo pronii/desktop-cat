@@ -176,6 +176,187 @@ test('peer Live2D helper ignores a stale model load after CSS fallback', async (
   assert.deepEqual(createdApp.stage.children, []);
 });
 
+test('peer renderer loads matching Live2D model and falls back to CSS cat', async () => {
+  const script = readSource('src', 'renderer', 'peerPet.js');
+  let updateHandler = null;
+  const classNames = new Set();
+  const peerName = { textContent: '' };
+  const peerCat = {
+    classList: {
+      toggle(name, value) {
+        if (value) classNames.add(`cat:${name}`);
+        else classNames.delete(`cat:${name}`);
+      }
+    }
+  };
+  const stage = {
+    classList: {
+      add(name) {
+        classNames.add(`stage:${name}`);
+      },
+      remove(name) {
+        classNames.delete(`stage:${name}`);
+      },
+      toggle(name, value) {
+        if (value) classNames.add(`stage:${name}`);
+        else classNames.delete(`stage:${name}`);
+      }
+    }
+  };
+  const canvas = {};
+  const loadedModels = [];
+  let cssFallbacks = 0;
+  const fakeWindow = {
+    peerPet: {
+      onUpdate(callback) {
+        updateHandler = callback;
+      },
+      getLive2DModelById: async (modelId) => (
+        modelId === 'Haru'
+          ? { available: true, id: 'Haru', name: 'Haru', modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json' }
+          : { available: false }
+      ),
+      getDefaultLive2DModel: async () => ({ available: false })
+    },
+    peerLive2D: {
+      createPeerLive2D: () => ({
+        loadModel: async (model) => {
+          loadedModels.push(model.id);
+          return true;
+        },
+        showCssCat: () => {
+          cssFallbacks += 1;
+          stage.classList.remove('has-live2d');
+        }
+      })
+    }
+  };
+  const fakeDocument = {
+    getElementById(id) {
+      if (id === 'peerName') return peerName;
+      if (id === 'peerCat') return peerCat;
+      if (id === 'peerLive2DCanvas') return canvas;
+      return null;
+    },
+    querySelector(selector) {
+      return selector === '.peer-stage' ? stage : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console
+  });
+
+  assert.ok(updateHandler, 'peer update handler should be registered');
+  await updateHandler({
+    userId: 'bob',
+    nickname: 'Bob',
+    renderMode: 'live2d',
+    pet: {
+      action: 'drag',
+      appearanceType: 'live2d',
+      modelId: 'Haru',
+      modelName: 'Haru'
+    }
+  });
+
+  assert.equal(peerName.textContent, 'Bob');
+  assert.deepEqual(loadedModels, ['Haru']);
+  assert.equal(classNames.has('stage:is-drag'), true);
+
+  await updateHandler({
+    userId: 'cora',
+    nickname: 'Cora',
+    renderMode: 'css-cat',
+    pet: { action: 'idle' }
+  });
+
+  assert.equal(peerName.textContent, 'Cora');
+  assert.equal(cssFallbacks, 1);
+  assert.equal(classNames.has('stage:is-drag'), false);
+});
+
+test('peer renderer ignores stale Live2D lookup after a newer CSS update', async () => {
+  const script = readSource('src', 'renderer', 'peerPet.js');
+  let updateHandler = null;
+  let resolveLookup = null;
+  const peerName = { textContent: '' };
+  const peerCat = { classList: { toggle() {} } };
+  const stage = { classList: { toggle() {}, remove() {} } };
+  const loadedModels = [];
+  let cssFallbacks = 0;
+  const fakeWindow = {
+    peerPet: {
+      onUpdate(callback) {
+        updateHandler = callback;
+      },
+      getLive2DModelById: async () => new Promise((resolve) => {
+        resolveLookup = resolve;
+      }),
+      getDefaultLive2DModel: async () => ({ available: false })
+    },
+    peerLive2D: {
+      createPeerLive2D: () => ({
+        loadModel: async (model) => {
+          loadedModels.push(model.id);
+          return true;
+        },
+        showCssCat: () => {
+          cssFallbacks += 1;
+        }
+      })
+    }
+  };
+  const fakeDocument = {
+    getElementById(id) {
+      if (id === 'peerName') return peerName;
+      if (id === 'peerCat') return peerCat;
+      if (id === 'peerLive2DCanvas') return {};
+      return null;
+    },
+    querySelector(selector) {
+      return selector === '.peer-stage' ? stage : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console
+  });
+
+  const firstUpdate = updateHandler({
+    userId: 'bob',
+    nickname: 'Bob',
+    renderMode: 'live2d',
+    pet: {
+      appearanceType: 'live2d',
+      modelId: 'Haru'
+    }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  await updateHandler({
+    userId: 'cora',
+    nickname: 'Cora',
+    renderMode: 'css-cat',
+    pet: { action: 'idle' }
+  });
+  resolveLookup({
+    available: true,
+    id: 'Haru',
+    name: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json'
+  });
+  await firstUpdate;
+
+  assert.equal(peerName.textContent, 'Cora');
+  assert.deepEqual(loadedModels, []);
+  assert.equal(cssFallbacks, 1);
+});
+
 test('live2d renderer script keeps the default cat when no model is configured', () => {
   const script = readSource('src', 'renderer', 'live2dAppearance.js');
 
