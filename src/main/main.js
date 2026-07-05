@@ -46,6 +46,7 @@ const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = re
 const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
 const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
+const { buildLocalPetState: createLocalPetState } = require('./petState');
 const { SimpleWebSocket } = require('./simpleWebSocket');
 const {
   createUpdateManager,
@@ -528,27 +529,12 @@ function handleRoomStateChanged(state) {
 }
 
 function buildLocalPetState() {
-  if (!petWindow || petWindow.isDestroyed()) return null;
-  const bounds = petWindow.getBounds();
-  const display = screen.getDisplayMatching(bounds);
-  const workArea = display.workArea;
-  const relativeX = workArea.width > 0
-    ? (bounds.x - workArea.x) / workArea.width
-    : 0;
-  const relativeY = workArea.height > 0
-    ? (bounds.y - workArea.y) / workArea.height
-    : 0;
-
-  return {
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    relativeX: Math.min(Math.max(relativeX, 0), 1),
-    relativeY: Math.min(Math.max(relativeY, 0), 1),
-    action: dragModeActive ? 'drag' : 'idle',
-    facing: 'right'
-  };
+  return createLocalPetState({
+    petWindow,
+    screen,
+    dragModeActive,
+    live2DAppearance
+  });
 }
 
 function startRoomPetStateReporting() {
