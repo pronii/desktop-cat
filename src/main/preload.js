@@ -65,6 +65,11 @@ contextBridge.exposeInMainWorld('desktopCat', {
       return () => ipcRenderer.removeListener('room:open-panel', handler);
     }
   },
+  license: {
+    getState: () => ipcRenderer.invoke('license:get-state'),
+    activate: (licenseKey) => ipcRenderer.invoke('license:activate', licenseKey),
+    check: () => ipcRenderer.invoke('license:check')
+  },
   updates: {
     respond: (id, response) => ipcRenderer.invoke('update:respond', { id, response }),
     onPrompt: (callback) => {

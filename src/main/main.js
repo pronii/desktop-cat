@@ -47,6 +47,10 @@ const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
 const { createDeviceIdentity } = require('./deviceIdentity');
 const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
+const {
+  createLicenseClient,
+  resolveLicenseEndpoint
+} = require('./licenseClient');
 const { buildLocalPetState: createLocalPetState } = require('./petState');
 const { SimpleWebSocket } = require('./simpleWebSocket');
 const {
@@ -100,6 +104,7 @@ let roomStateTeardown = null;
 let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let deviceIdentity = null;
+let licenseClient = null;
 let peerPetWindowManager = null;
 let updateManager = null;
 let currentCatScale = CAT_SCALE_DEFAULT;
@@ -603,6 +608,16 @@ function setupRoomClient() {
   startRoomPetStateReporting();
 }
 
+function setupLicenseClient() {
+  if (licenseClient) return;
+  licenseClient = createLicenseClient({
+    endpoint: resolveLicenseEndpoint(process.env, resolveRoomEndpoint()),
+    userDataPath: app.getPath('userData'),
+    deviceInfo: deviceIdentity || {},
+    fetch: globalThis.fetch
+  });
+}
+
 function teardownRoomClient() {
   stopRoomPetStateReporting();
   if (roomStateTeardown) {
@@ -740,6 +755,21 @@ ipcMain.handle('room:leave', () => {
   return roomClient.leave();
 });
 
+ipcMain.handle('license:get-state', () => {
+  setupLicenseClient();
+  return licenseClient.getState();
+});
+
+ipcMain.handle('license:activate', async (_event, licenseKey) => {
+  setupLicenseClient();
+  return licenseClient.activate(licenseKey);
+});
+
+ipcMain.handle('license:check', async () => {
+  setupLicenseClient();
+  return licenseClient.check();
+});
+
 /* --- 长按拖动 IPC --- */
 
 let dragModeActive = false;
@@ -811,6 +841,7 @@ if (!gotTheLock) {
       userDataPath: app.getPath('userData'),
       appVersion: app.getVersion()
     });
+    setupLicenseClient();
     setupRoomClient();
     updateManager = createUpdateManager({
       app,
