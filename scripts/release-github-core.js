@@ -78,6 +78,10 @@ function parseGitCredentialOutput(output) {
   return match[1];
 }
 
+function resolveNpmCommand(platform = process.platform) {
+  return platform === 'win32' ? 'npm.cmd' : 'npm';
+}
+
 module.exports = {
   assertReleaseBodySafe,
   createReleaseBody,
@@ -85,5 +89,6 @@ module.exports = {
   extractChangelogSection,
   getReleaseMetadata,
   parseGitCredentialOutput,
-  resolveRequiredAssets
+  resolveRequiredAssets,
+  resolveNpmCommand
 };

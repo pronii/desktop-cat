@@ -12,7 +12,8 @@ const {
   extractChangelogSection,
   getReleaseMetadata,
   parseGitCredentialOutput,
-  resolveRequiredAssets
+  resolveRequiredAssets,
+  resolveNpmCommand
 } = require('../../scripts/release-github-core');
 
 const chineseMojibakeFix = '\u4fee\u590d\u53d1\u5e03\u8bf4\u660e\u4e2d\u6587\u4e71\u7801\u3002';
@@ -108,4 +109,10 @@ test('parseGitCredentialOutput returns only the password token', () => {
     'secret-token'
   );
   assert.throws(() => parseGitCredentialOutput('protocol=https\n'), /token/i);
+});
+
+test('resolveNpmCommand uses npm.cmd on Windows for execFileSync', () => {
+  assert.equal(resolveNpmCommand('win32'), 'npm.cmd');
+  assert.equal(resolveNpmCommand('linux'), 'npm');
+  assert.equal(resolveNpmCommand('darwin'), 'npm');
 });
