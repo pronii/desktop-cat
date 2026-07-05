@@ -60,6 +60,10 @@ const {
   createPeerPetWindowManager,
   resolveLocalPetAnchorBounds
 } = require('./peerPetWindows');
+const {
+  CAT_SCALE_DEFAULT,
+  normalizeCatScale
+} = require('../renderer/petBehavior');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -96,6 +100,7 @@ let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let peerPetWindowManager = null;
 let updateManager = null;
+let currentCatScale = CAT_SCALE_DEFAULT;
 const pendingUpdatePrompts = new Map();
 const live2DAppearance = createLive2DAppearance({ app, protocol });
 
@@ -504,6 +509,14 @@ function sendRoomStateToRenderer(state) {
   petWindow.webContents.send('room:state-changed', state);
 }
 
+function getLocalPetLayoutBounds() {
+  if (!petWindow || petWindow.isDestroyed()) return null;
+  return {
+    ...petWindow.getBounds(),
+    scale: currentCatScale
+  };
+}
+
 function syncPeerPetsBesideLocal(peers, localBounds) {
   if (!peerPetWindowManager) return;
   const localPetAnchorBounds = resolveLocalPetAnchorBounds(localBounds);
@@ -522,7 +535,7 @@ function handleRoomStateChanged(state) {
       syncPeerPetsBesideLocal([], null);
       return;
     }
-    syncPeerPetsBesideLocal(state.peers || [], petWindow.getBounds());
+    syncPeerPetsBesideLocal(state.peers || [], getLocalPetLayoutBounds());
     return;
   }
   peerPetWindowManager.destroyAll();
@@ -533,8 +546,14 @@ function buildLocalPetState() {
     petWindow,
     screen,
     dragModeActive,
+    catScale: currentCatScale,
     live2DAppearance
   });
+}
+
+function syncCurrentRoomPeersBesideLocal() {
+  if (!roomClient || roomClient.getState().status !== 'connected') return;
+  syncPeerPetsBesideLocal(roomClient.getState().peers || [], getLocalPetLayoutBounds());
 }
 
 function startRoomPetStateReporting() {
@@ -752,6 +771,11 @@ ipcMain.on('drag-mode:enter', () => {
 });
 
 ipcMain.on('drag-mode:exit', stopDragMode);
+
+ipcMain.on('pet:set-scale', (_event, scale) => {
+  currentCatScale = normalizeCatScale(scale);
+  syncCurrentRoomPeersBesideLocal();
+});
 
 /* --- 透明区域点击穿透 --- */
 

@@ -15,6 +15,7 @@ const PET_NUMBER_FIELDS = new Set([
   'y',
   'width',
   'height',
+  'scale',
   'relativeX',
   'relativeY'
 ]);

@@ -17,6 +17,9 @@
     shouldUseCompactControls,
     stepCatScale
   } = window.petBehavior;
+  const {
+    formatUpdatePromptNotes = (notes) => notes || 'desktop-cat 有新版本可用。'
+  } = window.updatePromptText || {};
 
   const stage = document.querySelector('.stage');
   const cat = document.querySelector('.cat');
@@ -163,6 +166,7 @@
     bottomBar?.classList.toggle('is-compact', shouldUseCompactControls(catScale));
     catSizeBtn?.setAttribute('title', `拖动调整小猫大小 · ${formatCatScale(catScale)}`);
     window.desktopCatDebug.catScale = catScale;
+    window.desktopCat?.setCatScale?.(catScale);
   }
 
   function setCatScale(scale, { persist = true } = {}) {
@@ -654,7 +658,7 @@
           : '发现新版本';
       }
       if (updatePromptText) {
-        updatePromptText.textContent = prompt?.notes || 'desktop-cat 有新版本可用。';
+        updatePromptText.textContent = formatUpdatePromptNotes(prompt?.notes);
       }
       if (updatePromptPrimary) updatePromptPrimary.textContent = '下载更新';
       if (updatePromptSecondary) updatePromptSecondary.textContent = '稍后';

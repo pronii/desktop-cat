@@ -76,6 +76,21 @@ test('local pet anchor resolves to the visible cat area inside the main window',
   });
 });
 
+test('local pet anchor follows the scaled visible cat area from the bottom center', () => {
+  assert.deepEqual(resolveLocalPetAnchorBounds({
+    x: 700,
+    y: 80,
+    width: 300,
+    height: 360,
+    scale: 0.5
+  }), {
+    x: 806,
+    y: 325,
+    width: 89,
+    height: 95
+  });
+});
+
 test('peer pet manager creates a transparent window for each peer', () => {
   const manager = createManager();
 

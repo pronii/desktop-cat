@@ -1,3 +1,5 @@
+const { normalizeCatScale } = require('../renderer/petBehavior');
+
 const PEER_WINDOW_WIDTH = 160;
 const PEER_WINDOW_HEIGHT = 150;
 const PEER_WINDOW_GAP = 4;
@@ -26,14 +28,17 @@ function getAnchorDisplay(screen, anchorBounds) {
 
 function resolveLocalPetAnchorBounds(windowBounds) {
   if (!windowBounds) return null;
+  const scale = normalizeCatScale(windowBounds.scale);
   const stageX = windowBounds.x + Math.round((windowBounds.width - LOCAL_STAGE_WIDTH) / 2);
   const stageY = windowBounds.y + windowBounds.height - LOCAL_STAGE_BOTTOM_PADDING - LOCAL_STAGE_HEIGHT;
+  const scaledStageX = stageX + (LOCAL_STAGE_WIDTH - LOCAL_STAGE_WIDTH * scale) / 2;
+  const scaledStageY = stageY + LOCAL_STAGE_HEIGHT - LOCAL_STAGE_HEIGHT * scale;
 
   return {
-    x: stageX + LOCAL_CAT_OFFSET_X_IN_STAGE,
-    y: stageY + LOCAL_CAT_OFFSET_Y_IN_STAGE,
-    width: LOCAL_CAT_WIDTH,
-    height: LOCAL_CAT_HEIGHT
+    x: Math.round(scaledStageX + LOCAL_CAT_OFFSET_X_IN_STAGE * scale),
+    y: Math.round(scaledStageY + LOCAL_CAT_OFFSET_Y_IN_STAGE * scale),
+    width: Math.round(LOCAL_CAT_WIDTH * scale),
+    height: Math.round(LOCAL_CAT_HEIGHT * scale)
   };
 }
 

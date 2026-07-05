@@ -23,6 +23,7 @@ test('buildLocalPetState includes Live2D appearance when current model is availa
     petWindow: createWindow({ x: 350, y: 450, width: 300, height: 360 }),
     screen: fakeScreen,
     dragModeActive: true,
+    catScale: 0.5,
     live2DAppearance: {
       getCurrentModel: () => ({
         available: true,
@@ -38,6 +39,7 @@ test('buildLocalPetState includes Live2D appearance when current model is availa
     y: 450,
     width: 300,
     height: 360,
+    scale: 0.5,
     relativeX: 0.25,
     relativeY: 0.5,
     action: 'drag',

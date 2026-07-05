@@ -403,6 +403,7 @@ test('room server relays sanitized Live2D appearance fields', async () => {
       pet: {
         x: 0.2,
         y: 0.8,
+        scale: 0.5,
         action: 'idle',
         facing: 'right',
         appearanceType: 'live2d',
@@ -423,6 +424,7 @@ test('room server relays sanitized Live2D appearance fields', async () => {
     assert.deepEqual(bobJoined.peers[0].pet, {
       x: 0.2,
       y: 0.8,
+      scale: 0.5,
       action: 'idle',
       facing: 'right',
       appearanceType: 'live2d',

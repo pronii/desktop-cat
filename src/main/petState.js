@@ -1,3 +1,5 @@
+const { normalizeCatScale } = require('../renderer/petBehavior');
+
 function clamp01(value) {
   return Math.min(Math.max(value, 0), 1);
 }
@@ -25,6 +27,7 @@ function buildLocalPetState({
   petWindow,
   screen,
   dragModeActive = false,
+  catScale = 1,
   live2DAppearance
 } = {}) {
   if (!petWindow || petWindow.isDestroyed()) return null;
@@ -44,6 +47,7 @@ function buildLocalPetState({
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
+    scale: normalizeCatScale(catScale),
     relativeX: clamp01(relativeX),
     relativeY: clamp01(relativeY),
     action: dragModeActive ? 'drag' : 'idle',

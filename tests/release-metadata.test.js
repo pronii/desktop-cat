@@ -11,33 +11,33 @@ function readText(...parts) {
   return fs.readFileSync(path.join(__dirname, '..', ...parts), 'utf-8');
 }
 
-test('release metadata describes the 0.3.6 peer Live2D sync release', () => {
+test('release metadata describes the 0.3.7 peer scale layout release', () => {
   const packageJson = readJson('package.json');
   const packageLock = readJson('package-lock.json');
   const readme = readText('README.md');
   const packaging = readText('PACKAGING.md');
   const changelog = readText('CHANGELOG.md');
 
-  assert.equal(packageJson.version, '0.3.6');
-  assert.equal(packageLock.version, '0.3.6');
-  assert.equal(packageLock.packages[''].version, '0.3.6');
+  assert.equal(packageJson.version, '0.3.7');
+  assert.equal(packageLock.version, '0.3.7');
+  assert.equal(packageLock.packages[''].version, '0.3.7');
 
-  assert.match(readme, /`0\.3\.6`/);
-  assert.match(readme, /desktop-cat-0\.3\.6-win-x64-setup\.exe/);
-  assert.match(readme, /desktop-cat-0\.3\.6-win-x64-portable\.exe/);
+  assert.match(readme, /`0\.3\.7`/);
+  assert.match(readme, /desktop-cat-0\.3\.7-win-x64-setup\.exe/);
+  assert.match(readme, /desktop-cat-0\.3\.7-win-x64-portable\.exe/);
 
-  assert.match(packaging, /`0\.3\.6`/);
-  assert.match(packaging, /desktop-cat-0\.3\.6-win-x64-setup\.exe/);
-  assert.match(packaging, /desktop-cat-0\.3\.6-win-x64-portable\.exe/);
+  assert.match(packaging, /`0\.3\.7`/);
+  assert.match(packaging, /desktop-cat-0\.3\.7-win-x64-setup\.exe/);
+  assert.match(packaging, /desktop-cat-0\.3\.7-win-x64-portable\.exe/);
   assert.match(packaging, /npm run release:github/);
   assert.match(packaging, /preferred publishing path/i);
 
-  assert.match(changelog, /## 0\.3\.6/);
+  assert.match(changelog, /## 0\.3\.7/);
   assert.match(changelog, /好友同屏/);
   assert.match(changelog, /Live2D/);
-  assert.match(changelog, /形象/);
-  assert.match(changelog, /appearanceType/);
-  assert.match(changelog, /modelId/);
+  assert.match(changelog, /缩小/);
+  assert.match(changelog, /scale/);
+  assert.match(changelog, /更新提示/);
 });
 
 test('package metadata enables GitHub installer auto updates', () => {

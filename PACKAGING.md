@@ -24,8 +24,8 @@ npm run pack
 `npm run pack` 会同时生成：
 
 ```text
-dist/desktop-cat-0.3.6-win-x64-setup.exe
-dist/desktop-cat-0.3.6-win-x64-portable.exe
+dist/desktop-cat-0.3.7-win-x64-setup.exe
+dist/desktop-cat-0.3.7-win-x64-portable.exe
 ```
 
 如果只需要单独产物，可以使用：
@@ -67,7 +67,7 @@ Get-ChildItem -LiteralPath 'dist' -Filter '*.exe' |
 
 ## 发布检查
 
-发布 `0.3.6` 时至少确认：
+发布 `0.3.7` 时至少确认：
 
 - `package.json` 版本号正确。
 - `npm test` 通过。
