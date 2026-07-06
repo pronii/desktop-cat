@@ -42,6 +42,44 @@ test('usage tracker counts active software clients by device heartbeat', () => {
   assert.equal(snapshot.connections[0].roomCode, '654321');
 });
 
+test('usage tracker includes room websocket connections when heartbeat is missing', () => {
+  let timestamp = 1000;
+  const tracker = createUsageTracker({
+    now: () => timestamp,
+    makeId: () => 'connection-1'
+  });
+  const connection = tracker.registerConnection({
+    path: '/room',
+    ip: '127.0.0.1',
+    userAgent: 'DesktopCat/0.3.8'
+  });
+
+  timestamp = 1200;
+  tracker.updateConnection(connection.connectionId, {
+    roomCode: '123456',
+    userId: 'alice',
+    nickname: 'Alice',
+    deviceId: 'device-1',
+    deviceLabel: 'Office PC',
+    appVersion: '0.3.8',
+    platform: 'win32'
+  });
+
+  const snapshot = tracker.snapshot({
+    getLicenseStatusForDevice: (deviceId) => deviceId === 'device-1' ? 'active' : 'unlicensed'
+  });
+
+  assert.equal(snapshot.metrics.onlineConnections, 1);
+  assert.equal(snapshot.metrics.onlineDevices, 1);
+  assert.equal(snapshot.metrics.authorizedOnlineDevices, 1);
+  assert.equal(snapshot.metrics.unauthorizedOnlineDevices, 0);
+  assert.equal(snapshot.connections[0].connectionId, 'connection-1');
+  assert.equal(snapshot.connections[0].path, '/room');
+  assert.equal(snapshot.connections[0].deviceId, 'device-1');
+  assert.equal(snapshot.connections[0].nickname, 'Alice');
+  assert.equal(snapshot.connections[0].licenseStatus, 'active');
+});
+
 test('usage tracker normalizes IPv4-mapped IPv6 addresses for display', () => {
   const tracker = createUsageTracker({ now: () => 1000, makeId: () => 'connection-1' });
 

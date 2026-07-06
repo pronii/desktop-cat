@@ -19,6 +19,10 @@ function serializePoint(point) {
   return point ? { x: point.x, y: point.y } : point;
 }
 
+function waitForAsyncWork() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 class FakeClassList {
   constructor() {
     this.names = new Set();
@@ -104,7 +108,8 @@ function createRendererHarness({
   live2dCanvasRect,
   live2dDisplay = 'none',
   live2dAppearance,
-  elementFromPoint
+  elementFromPoint,
+  autoLaunchEnabled = true
 } = {}) {
   const source = readSource('src', 'renderer', 'renderer.js');
   const cat = new FakeElement();
@@ -120,6 +125,7 @@ function createRendererHarness({
   const settingsPanel = new FakeElement();
   const settingsPanelClose = new FakeElement();
   const randomSpeechToggle = new FakeElement();
+  const autoLaunchToggle = new FakeElement();
   const clipboardBtn = new FakeElement();
   const roomBtn = new FakeElement();
   const live2dSwitcherBtn = new FakeElement();
@@ -138,6 +144,9 @@ function createRendererHarness({
   const dragMovePoints = [];
   let dragExitCount = 0;
   let waterReminderTrigger = null;
+  let currentAutoLaunchEnabled = autoLaunchEnabled;
+  let autoLaunchGetCount = 0;
+  const autoLaunchSetCalls = [];
   let now = 0;
 
   class FakeDate extends Date {
@@ -201,6 +210,17 @@ function createRendererHarness({
         onTrigger(callback) {
           waterReminderTrigger = callback;
           return () => {};
+        }
+      },
+      autoLaunch: {
+        getState() {
+          autoLaunchGetCount += 1;
+          return Promise.resolve({ enabled: currentAutoLaunchEnabled });
+        },
+        setEnabled(enabled) {
+          currentAutoLaunchEnabled = enabled === true;
+          autoLaunchSetCalls.push(currentAutoLaunchEnabled);
+          return Promise.resolve({ enabled: currentAutoLaunchEnabled });
         }
       }
     },
@@ -286,6 +306,7 @@ function createRendererHarness({
       if (id === 'settingsPanel') return settingsPanel;
       if (id === 'settingsPanelClose') return settingsPanelClose;
       if (id === 'randomSpeechToggle') return randomSpeechToggle;
+      if (id === 'autoLaunchToggle') return autoLaunchToggle;
       if (id === 'clipboardBtn') return clipboardBtn;
       if (id === 'roomBtn') return roomBtn;
       if (id === 'live2dSwitcherBtn') return live2dSwitcherBtn;
@@ -324,6 +345,7 @@ function createRendererHarness({
     settingsBtn,
     settingsPanel,
     randomSpeechToggle,
+    autoLaunchToggle,
     documentElement,
     window: fakeWindow,
     flushTimers({ minDelay = 0, maxDelay = 1000 } = {}) {
@@ -358,6 +380,12 @@ function createRendererHarness({
     },
     get waterReminderTrigger() {
       return waterReminderTrigger;
+    },
+    get autoLaunchGetCount() {
+      return autoLaunchGetCount;
+    },
+    get autoLaunchSetCalls() {
+      return autoLaunchSetCalls;
     },
   };
 }
@@ -1009,4 +1037,21 @@ test('settings can hide and restore bottom toolbar buttons without hiding settin
 
   assert.equal(harness.waterCounter.classList.contains('is-hidden-by-settings'), false);
   assert.equal(harness.catSizeBtn.classList.contains('is-hidden-by-settings'), false);
+});
+
+test('settings auto launch toggle reads and updates the main-process setting', async () => {
+  const harness = createRendererHarness({ autoLaunchEnabled: true });
+
+  await waitForAsyncWork();
+
+  assert.equal(harness.autoLaunchGetCount, 1);
+  assert.equal(harness.autoLaunchToggle.checked, true);
+
+  harness.autoLaunchToggle.checked = false;
+  harness.autoLaunchToggle.dispatch('change');
+
+  await waitForAsyncWork();
+
+  assert.deepEqual(harness.autoLaunchSetCalls, [false]);
+  assert.equal(harness.autoLaunchToggle.checked, false);
 });

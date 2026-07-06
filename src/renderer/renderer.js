@@ -35,6 +35,7 @@
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsPanelClose = document.getElementById('settingsPanelClose');
   const randomSpeechToggle = document.getElementById('randomSpeechToggle');
+  const autoLaunchToggle = document.getElementById('autoLaunchToggle');
   const bottomButtonToggles = Array.from(document.querySelectorAll?.('[data-bottom-button-toggle]') || []);
   const updatePrompt = document.getElementById('updatePrompt');
   const updatePromptTitle = document.getElementById('updatePromptTitle');
@@ -129,6 +130,36 @@
 
   window.__desktopCatApplySettings = (nextSettings) => applySettings(nextSettings);
 
+  function applyAutoLaunchState(state = {}) {
+    if (!autoLaunchToggle) return;
+    autoLaunchToggle.checked = state.enabled === true;
+  }
+
+  async function refreshAutoLaunchToggle() {
+    if (!autoLaunchToggle || !window.desktopCat?.autoLaunch?.getState) return;
+    autoLaunchToggle.disabled = true;
+    try {
+      applyAutoLaunchState(await window.desktopCat.autoLaunch.getState());
+    } catch (_error) {
+      // Non-critical.
+    } finally {
+      autoLaunchToggle.disabled = false;
+    }
+  }
+
+  async function setAutoLaunchEnabled(enabled) {
+    if (!autoLaunchToggle || !window.desktopCat?.autoLaunch?.setEnabled) return;
+    const previous = !enabled;
+    autoLaunchToggle.disabled = true;
+    try {
+      applyAutoLaunchState(await window.desktopCat.autoLaunch.setEnabled(enabled));
+    } catch (_error) {
+      autoLaunchToggle.checked = previous;
+    } finally {
+      autoLaunchToggle.disabled = false;
+    }
+  }
+
   function focusFirstPromptControl(container) {
     const target = container?.querySelector?.(
       'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -218,6 +249,7 @@
 
   applyCatScale(readStoredCatScale());
   applySettings(petSettings);
+  refreshAutoLaunchToggle();
 
   function setHappy({ visibleMs = HAPPY_BUBBLE_VISIBLE_MS } = {}) {
     if (ENCOURAGEMENT_MESSAGES?.length) {
@@ -768,6 +800,10 @@
       randomSpeechEnabled: Boolean(randomSpeechToggle.checked)
     }, { persist: true });
     scheduleRandomSpeech();
+  });
+
+  autoLaunchToggle?.addEventListener('change', () => {
+    setAutoLaunchEnabled(Boolean(autoLaunchToggle.checked));
   });
 
   for (const toggle of bottomButtonToggles) {

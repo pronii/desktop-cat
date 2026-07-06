@@ -17,12 +17,15 @@ test('settings panel controls random speech and bottom button visibility', () =>
   const css = readSource('src', 'renderer', 'styles.css');
   const renderer = readSource('src', 'renderer', 'renderer.js');
   const petBehavior = readSource('src', 'renderer', 'petBehavior.js');
+  const preload = readSource('src', 'main', 'preload.js');
+  const main = readSource('src', 'main', 'main.js');
 
   assert.match(html, /id="settingsBtn"/);
   assert.match(html, /aria-controls="settingsPanel"/);
   assert.match(html, /id="settingsPanel"/);
   assert.match(html, /id="settingsPanelClose"/);
   assert.match(html, /id="randomSpeechToggle"/);
+  assert.match(html, /id="autoLaunchToggle"/);
   assert.match(html, /话痨模式/);
   assert.doesNotMatch(html, /随机说话/);
   assert.match(html, /data-bottom-button-toggle="water"/);
@@ -44,8 +47,15 @@ test('settings panel controls random speech and bottom button visibility', () =>
 
   assert.match(renderer, /PET_SETTINGS_STORAGE_KEY/);
   assert.match(renderer, /randomSpeechToggle/);
+  assert.match(renderer, /autoLaunchToggle/);
   assert.match(renderer, /bottomButtonControls/);
   assert.match(renderer, /scheduleRandomSpeech/);
   assert.match(renderer, /__desktopCatApplySettings/);
   assert.match(renderer, /ensureCurrentModelVisible/);
+
+  assert.match(preload, /autoLaunch:\s*\{/);
+  assert.match(preload, /auto-launch:get-state/);
+  assert.match(preload, /auto-launch:set-enabled/);
+  assert.match(main, /auto-launch:get-state/);
+  assert.match(main, /auto-launch:set-enabled/);
 });

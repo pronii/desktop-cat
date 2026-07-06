@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('desktopCat', {
   },
   setClickThrough: (enabled) => ipcRenderer.send('window:set-click-through', enabled),
   setCatScale: (scale) => ipcRenderer.send('pet:set-scale', scale),
+  autoLaunch: {
+    getState: () => ipcRenderer.invoke('auto-launch:get-state'),
+    setEnabled: (enabled) => ipcRenderer.invoke('auto-launch:set-enabled', enabled)
+  },
   appearance: {
     getLive2DModel: () => ipcRenderer.invoke('appearance:get-live2d-model'),
     getLive2DModels: () => ipcRenderer.invoke('appearance:get-live2d-models'),

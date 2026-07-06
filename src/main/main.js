@@ -46,6 +46,7 @@ const {
 const { initClipboardHistory, openHistoryWindow, teardownClipboardHistory } = require('../clipboard-history/main');
 const { getForegroundProbeWorker } = require('./foregroundWorker');
 const { createWaterReminder } = require('./waterReminder');
+const { createAutoLaunchController } = require('./autoLaunch');
 const { createDeviceIdentity } = require('./deviceIdentity');
 const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
 const {
@@ -102,6 +103,7 @@ let temporaryHideState = createTemporaryHideState();
 let fullscreenHideState = createFullscreenHideState();
 let topmostSuspendState = createTopmostSuspendState();
 let waterReminder = createWaterReminder();
+let autoLaunchController = null;
 let roomClient = null;
 let roomStateTeardown = null;
 let roomPetStateTimer = null;
@@ -634,6 +636,20 @@ function setupOnlineClient() {
   onlineClient.start().catch(() => {});
 }
 
+function getAutoLaunchController() {
+  if (!autoLaunchController) {
+    autoLaunchController = createAutoLaunchController({
+      app,
+      userDataPath: app.getPath('userData')
+    });
+  }
+  return autoLaunchController;
+}
+
+function setupAutoLaunch() {
+  getAutoLaunchController().ensureDefaultEnabled();
+}
+
 function teardownRoomClient() {
   stopRoomPetStateReporting();
   if (roomStateTeardown) {
@@ -792,6 +808,14 @@ ipcMain.handle('license:check', async () => {
   return licenseClient.check();
 });
 
+ipcMain.handle('auto-launch:get-state', () => {
+  return getAutoLaunchController().getState();
+});
+
+ipcMain.handle('auto-launch:set-enabled', (_event, enabled) => {
+  return getAutoLaunchController().setEnabled(enabled);
+});
+
 /* --- 长按拖动 IPC --- */
 
 let dragModeActive = false;
@@ -943,6 +967,7 @@ if (!gotTheLock) {
     });
     setupOnlineClient();
     setupLicenseClient();
+    setupAutoLaunch();
     setupRoomClient();
     updateManager = createUpdateManager({
       app,

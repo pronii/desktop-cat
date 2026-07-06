@@ -103,11 +103,30 @@ function createUsageTracker({
     return true;
   }
 
+  function getSnapshotRowKey(row) {
+    return row.deviceId
+      ? `device:${row.deviceId}`
+      : `connection:${row.connectionId}`;
+  }
+
   function snapshot({ getLicenseStatusForDevice = () => 'unlicensed' } = {}) {
     const timestamp = now();
-    const activeClients = Array.from(softwareClients.values())
+    const activeHeartbeatClients = Array.from(softwareClients.values())
       .filter((client) => timestamp - Number(client.lastSeenAt || 0) <= clientTtlMs);
-    const rows = activeClients.map((connection) => ({
+
+    const rowsByKey = new Map();
+    for (const client of activeHeartbeatClients) {
+      rowsByKey.set(getSnapshotRowKey(client), client);
+    }
+    for (const connection of connections.values()) {
+      if (connection.path !== '/room') continue;
+      const key = getSnapshotRowKey(connection);
+      if (!rowsByKey.has(key)) {
+        rowsByKey.set(key, connection);
+      }
+    }
+
+    const rows = Array.from(rowsByKey.values()).map((connection) => ({
       ...connection,
       licenseStatus: connection.deviceId
         ? getLicenseStatusForDevice(connection.deviceId)
