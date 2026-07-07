@@ -9,9 +9,10 @@ function readSource(...parts) {
 
 test('main drag mode has blur and close fallbacks for stopping the follow loop', () => {
   const source = readSource('src', 'main', 'main.js');
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
 
   assert.match(source, /function stopDragMode\(\)\s*\{/);
-  assert.match(source, /ipcMain\.on\('drag-mode:exit',\s*\(\)\s*=>\s*\{[\s\S]*flushPendingDragMove\(\);[\s\S]*stopDragMode\(\);[\s\S]*\}\)/);
+  assert.match(ipcHandlers, /ipcMain\.on\('drag-mode:exit',\s*\(\)\s*=>\s*\{[\s\S]*onDragModeExit\?\.\(\);[\s\S]*\}\)/);
   assert.match(source, /window\.on\('blur',\s*\(\)\s*=>\s*\{[\s\S]*stopDragMode\(\);[\s\S]*refreshTopmost\(window\);[\s\S]*\}\)/);
   assert.match(source, /petWindow\.on\('closed',\s*\(\)\s*=>\s*\{[\s\S]*stopDragMode\(\);/);
 });
@@ -19,14 +20,16 @@ test('main drag mode has blur and close fallbacks for stopping the follow loop',
 test('main drag mode moves only when the renderer sends move events', () => {
   const main = readSource('src', 'main', 'main.js');
   const preload = readSource('src', 'main', 'preload.js');
-  const enterHandler = main.match(/ipcMain\.on\('drag-mode:enter'[\s\S]*?\n\}\);/)?.[0] || '';
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
+  const dragMoveHandler = ipcHandlers.match(/ipcMain\.on\('drag-mode:move'[\s\S]*?\n  \}\);/)?.[0] || '';
 
   assert.match(preload, /enter:\s*\(point\)\s*=>\s*ipcRenderer\.send\('drag-mode:enter',\s*point\)/);
   assert.match(preload, /move:\s*\(point\)\s*=>\s*ipcRenderer\.send\('drag-mode:move',\s*point\)/);
   assert.match(main, /function normalizeDragPoint\(point\)/);
-  assert.match(main, /ipcMain\.on\('drag-mode:move'/);
+  assert.match(ipcHandlers, /ipcMain\.on\('drag-mode:move'/);
   assert.match(main, /normalizeDragPoint\(point\)/);
-  assert.doesNotMatch(enterHandler, /setInterval/);
+  assert.match(main, /onDragModeMove:/);
+  assert.doesNotMatch(dragMoveHandler, /setInterval/);
 });
 
 test('main drag mode rounds window coordinates before moving the window', () => {
@@ -51,7 +54,8 @@ test('main drag mode ignores invalid window coordinates before setPosition', () 
 
 test('main drag mode coalesces window moves on a 60fps timer', () => {
   const main = readSource('src', 'main', 'main.js');
-  const moveHandler = main.match(/ipcMain\.on\('drag-mode:move'[\s\S]*?\n\}\);/)?.[0] || '';
+  const moveHandler = main.match(/onDragModeMove:\s*\(point\)\s*=>\s*\{[\s\S]*?\n\s*\},/)?.[0] || '';
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
 
   assert.match(main, /const DRAG_MOVE_FRAME_MS = 1000 \/ 60/);
   assert.match(main, /let pendingDragMovePoint = null/);
@@ -59,7 +63,8 @@ test('main drag mode coalesces window moves on a 60fps timer', () => {
   assert.match(main, /function scheduleDragMoveFrame\(\)/);
   assert.match(main, /function flushPendingDragMove\(\)/);
   assert.match(main, /setTimeout\(flushPendingDragMove,\s*DRAG_MOVE_FRAME_MS\)/);
-  assert.match(moveHandler, /pendingDragMovePoint = normalizeDragPoint\(point\)/);
-  assert.match(moveHandler, /scheduleDragMoveFrame\(\)/);
-  assert.doesNotMatch(moveHandler, /petWindow\.setPosition\(next\.x,\s*next\.y\)/);
+  assert.match(main, /pendingDragMovePoint = normalizeDragPoint\(point\)/);
+  assert.match(main, /scheduleDragMoveFrame\(\)/);
+  assert.match(ipcHandlers, /ipcMain\.on\('drag-mode:move'/);
+  assert.doesNotMatch(ipcHandlers, /petWindow\.setPosition\(next\.x,\s*next\.y\)/);
 });

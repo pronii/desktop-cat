@@ -70,8 +70,8 @@ const {
 } = require('./peerPetWindows');
 const {
   CAT_SCALE_DEFAULT,
-  normalizeCatScale
 } = require('../renderer/petBehavior');
+const { registerMainIpcHandlers } = require('./ipcHandlers');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -677,146 +677,7 @@ function suspendWindowTopmost(window) {
   window.setAlwaysOnTop(false);
 }
 
-/* --- 喝水提醒 IPC --- */
-
-ipcMain.handle('water-reminder:get-config', () => waterReminder.getConfig());
-
-ipcMain.handle('water-reminder:toggle', () => {
-  const enabled = waterReminder.toggleEnabled();
-  updateTrayMenu(petWindow);
-  return enabled;
-});
-
-ipcMain.handle('water-reminder:add-task', (_event, task) => {
-  return waterReminder.addTaskReminder(task);
-});
-
-ipcMain.handle('water-reminder:remove-task', (_event, taskId) => {
-  return waterReminder.removeTaskReminder(taskId);
-});
-
-ipcMain.handle('water-reminder:toggle-task', (_event, taskId) => {
-  return waterReminder.toggleTaskEnabled(taskId);
-});
-
-ipcMain.handle('water-reminder:set-interval', (_event, minutes) => {
-  return waterReminder.setIntervalMinutes(minutes);
-});
-
-ipcMain.handle('water-reminder:set-task-interval', (_event, taskId, minutes) => {
-  return waterReminder.setTaskIntervalMinutes(taskId, minutes);
-});
-
-ipcMain.handle('water-reminder:set-task-scheduled-at', (_event, taskId, scheduledAt) => {
-  return waterReminder.setTaskScheduledAt(taskId, scheduledAt);
-});
-
-ipcMain.handle('water-reminder:set-task-name', (_event, taskId, taskName) => {
-  return waterReminder.setTaskName(taskId, taskName);
-});
-
-ipcMain.handle('water-reminder:record-drink', () => waterReminder.recordDrink());
-
-ipcMain.handle('water-reminder:snooze', () => {
-  // "下次再提醒"：停止了重试提醒，阻止 fire 重新调度
-  return waterReminder.snooze();
-});
-
-ipcMain.handle('water-reminder:snooze-task', (_event, taskId) => {
-  return waterReminder.snoozeTask(taskId);
-});
-
-ipcMain.handle('water-reminder:complete-task', (_event, taskId) => {
-  return waterReminder.completeTask(taskId);
-});
-
-ipcMain.handle('water-reminder:test-trigger', () => {
-  waterReminder.fire();
-  return true;
-});
-
-/* --- Live2D appearance IPC --- */
-
-ipcMain.handle('appearance:get-live2d-model', () => {
-  return live2DAppearance.getCurrentModel();
-});
-
-ipcMain.handle('appearance:get-live2d-models', () => {
-  return live2DAppearance.getAvailableModels();
-});
-
-ipcMain.handle('appearance:set-live2d-model', (_event, modelId) => {
-  return live2DAppearance.setCurrentModel(modelId);
-});
-
-ipcMain.handle('peer-live2d:get-model-by-id', (_event, modelId) => {
-  return live2DAppearance.getModelById(modelId);
-});
-
-ipcMain.handle('peer-live2d:get-default-model', () => {
-  return live2DAppearance.getCurrentModel();
-});
-
-ipcMain.on('diagnostics:live2d-log', (_event, entry = {}) => {
-  appendLive2DDiagnostic(entry);
-});
-
-/* --- Update prompt IPC --- */
-
-ipcMain.handle('update:respond', (_event, payload = {}) => {
-  const prompt = pendingUpdatePrompts.get(payload.id);
-  if (!prompt) {
-    return false;
-  }
-  pendingUpdatePrompts.delete(payload.id);
-  prompt.resolve(payload.response === 'primary');
-  return true;
-});
-
-/* --- 好友同屏 IPC --- */
-
-ipcMain.handle('room:get-state', () => {
-  setupRoomClient();
-  return roomClient.getState();
-});
-
-ipcMain.handle('room:join', (_event, payload = {}) => {
-  setupRoomClient();
-  return roomClient.join({
-    roomCode: payload.roomCode,
-    nickname: payload.nickname
-  });
-});
-
-ipcMain.handle('room:leave', () => {
-  setupRoomClient();
-  return roomClient.leave();
-});
-
-ipcMain.handle('license:get-state', () => {
-  setupLicenseClient();
-  return licenseClient.getState();
-});
-
-ipcMain.handle('license:activate', async (_event, licenseKey) => {
-  setupLicenseClient();
-  return licenseClient.activate(licenseKey);
-});
-
-ipcMain.handle('license:check', async () => {
-  setupLicenseClient();
-  return licenseClient.check();
-});
-
-ipcMain.handle('auto-launch:get-state', () => {
-  return getAutoLaunchController().getState();
-});
-
-ipcMain.handle('auto-launch:set-enabled', (_event, enabled) => {
-  return getAutoLaunchController().setEnabled(enabled);
-});
-
-/* --- 长按拖动 IPC --- */
+/* --- 闀挎寜鎷栧姩 IPC --- */
 
 let dragModeActive = false;
 let dragOffset = { x: 0, y: 0 };
@@ -905,41 +766,52 @@ function flushPendingDragMove() {
   petWindow.setPosition(next.x, next.y);
 }
 
-ipcMain.on('drag-mode:enter', (_event, point) => {
-  if (!petWindow || petWindow.isDestroyed()) return;
-  stopDragMode();
-
-  const cursor = normalizeDragPoint(point);
-  const winBounds = petWindow.getBounds();
-  dragOffset = { x: cursor.x - winBounds.x, y: cursor.y - winBounds.y };
-  dragModeActive = true;
-});
-
-ipcMain.on('drag-mode:move', (_event, point) => {
-  if (!dragModeActive || !petWindow || petWindow.isDestroyed()) {
+registerMainIpcHandlers({
+  ipcMain,
+  waterReminder,
+  live2DAppearance,
+  pendingUpdatePrompts,
+  setupRoomClient: () => {
+    setupRoomClient();
+    return roomClient;
+  },
+  setupLicenseClient: () => {
+    setupLicenseClient();
+    return licenseClient;
+  },
+  getAutoLaunchController,
+  getPetWindow: () => petWindow,
+  updateTrayMenu,
+  appendLive2DDiagnostic,
+  onDragModeEnter: (point) => {
+    if (!petWindow || petWindow.isDestroyed()) return;
     stopDragMode();
-    return;
-  }
 
-  pendingDragMovePoint = normalizeDragPoint(point);
-  scheduleDragMoveFrame();
-});
+    const cursor = normalizeDragPoint(point);
+    const winBounds = petWindow.getBounds();
+    dragOffset = { x: cursor.x - winBounds.x, y: cursor.y - winBounds.y };
+    dragModeActive = true;
+  },
+  onDragModeMove: (point) => {
+    if (!dragModeActive || !petWindow || petWindow.isDestroyed()) {
+      stopDragMode();
+      return;
+    }
 
-ipcMain.on('drag-mode:exit', () => {
-  flushPendingDragMove();
-  stopDragMode();
-});
-
-ipcMain.on('pet:set-scale', (_event, scale) => {
-  currentCatScale = normalizeCatScale(scale);
-  syncCurrentRoomPeersBesideLocal();
-});
-
-/* --- 透明区域点击穿透 --- */
-
-ipcMain.on('window:set-click-through', (_event, enabled) => {
-  if (!petWindow || petWindow.isDestroyed()) return;
-  petWindow.setIgnoreMouseEvents(enabled, { forward: true });
+    pendingDragMovePoint = normalizeDragPoint(point);
+    scheduleDragMoveFrame();
+  },
+  onDragModeExit: () => {
+    flushPendingDragMove();
+    stopDragMode();
+  },
+  setClickThrough: (window, enabled) => {
+    window.setIgnoreMouseEvents(enabled, { forward: true });
+  },
+  setCurrentCatScale: (scale) => {
+    currentCatScale = scale;
+  },
+  syncCurrentRoomPeersBesideLocal
 });
 
 const gotTheLock = app.requestSingleInstanceLock();
