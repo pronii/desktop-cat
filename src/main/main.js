@@ -71,6 +71,7 @@ const {
 const { CAT_SCALE_DEFAULT } = require('../renderer/petBehavior');
 const { registerMainIpcHandlers } = require('./ipcHandlers');
 const { createDragModeController } = require('./dragMode');
+const { createRoomPetSyncController } = require('./roomPetSync');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -103,14 +104,10 @@ let fullscreenHideState = createFullscreenHideState();
 let topmostSuspendState = createTopmostSuspendState();
 let waterReminder = createWaterReminder();
 let autoLaunchController = null;
-let roomClient = null;
-let roomStateTeardown = null;
-let roomPetStateTimer = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let deviceIdentity = null;
 let licenseClient = null;
 let onlineClient = null;
-let peerPetWindowManager = null;
 let updateManager = null;
 let currentCatScale = CAT_SCALE_DEFAULT;
 const pendingUpdatePrompts = new Map();
@@ -118,6 +115,24 @@ const live2DAppearance = createLive2DAppearance({ app, protocol });
 const dragMode = createDragModeController({
   getPetWindow: () => petWindow,
   getCursorScreenPoint: () => screen.getCursorScreenPoint()
+});
+const roomPetSync = createRoomPetSyncController({
+  BrowserWindow,
+  screen,
+  peerPetFile: path.join(__dirname, '..', 'renderer', 'peerPet.html'),
+  peerPetPreload: path.join(__dirname, 'peerPreload.js'),
+  createRoomClient: () => createRoomClient({
+    WebSocket: globalThis.WebSocket || SimpleWebSocket,
+    endpoint: resolveRoomEndpoint(),
+    userId: roomUserId,
+    deviceInfo: deviceIdentity || {}
+  }),
+  createPeerPetWindowManager,
+  resolveLocalPetAnchorBounds,
+  buildLocalPetState,
+  getPetWindow: () => petWindow,
+  getLocalPetLayoutBounds,
+  sendRoomStateToRenderer
 });
 
 function appendLive2DDiagnostic(entry = {}) {
@@ -535,30 +550,6 @@ function getLocalPetLayoutBounds() {
   };
 }
 
-function syncPeerPetsBesideLocal(peers, localBounds) {
-  if (!peerPetWindowManager) return;
-  const localPetAnchorBounds = resolveLocalPetAnchorBounds(localBounds);
-  if (!localPetAnchorBounds) {
-    peerPetWindowManager.destroyAll();
-    return;
-  }
-  peerPetWindowManager.syncPeers(peers || [], localPetAnchorBounds);
-}
-
-function handleRoomStateChanged(state) {
-  sendRoomStateToRenderer(state);
-  if (!peerPetWindowManager) return;
-  if (state.status === 'connected') {
-    if (!petWindow || petWindow.isDestroyed()) {
-      syncPeerPetsBesideLocal([], null);
-      return;
-    }
-    syncPeerPetsBesideLocal(state.peers || [], getLocalPetLayoutBounds());
-    return;
-  }
-  peerPetWindowManager.destroyAll();
-}
-
 function buildLocalPetState() {
   return createLocalPetState({
     petWindow,
@@ -567,56 +558,6 @@ function buildLocalPetState() {
     catScale: currentCatScale,
     live2DAppearance
   });
-}
-
-function syncCurrentRoomPeersBesideLocal() {
-  if (!roomClient || roomClient.getState().status !== 'connected') return;
-  syncPeerPetsBesideLocal(roomClient.getState().peers || [], getLocalPetLayoutBounds());
-}
-
-function startRoomPetStateReporting() {
-  if (roomPetStateTimer) return;
-  roomPetStateTimer = setInterval(() => {
-    if (!roomClient) return;
-    const localLayoutBounds = getLocalPetLayoutBounds();
-    const petState = buildLocalPetState();
-    if (petState) {
-      roomClient.sendPetState(petState);
-      const roomState = roomClient.getState();
-      if (roomState.status === 'connected') {
-        syncPeerPetsBesideLocal(roomState.peers, localLayoutBounds);
-      }
-    }
-  }, 1000);
-  if (typeof roomPetStateTimer.unref === 'function') {
-    roomPetStateTimer.unref();
-  }
-}
-
-function stopRoomPetStateReporting() {
-  if (!roomPetStateTimer) return;
-  clearInterval(roomPetStateTimer);
-  roomPetStateTimer = null;
-}
-
-function setupRoomClient() {
-  if (roomClient) return;
-  if (!peerPetWindowManager) {
-    peerPetWindowManager = createPeerPetWindowManager({
-      BrowserWindow,
-      screen,
-      peerPetFile: path.join(__dirname, '..', 'renderer', 'peerPet.html'),
-      peerPetPreload: path.join(__dirname, 'peerPreload.js')
-    });
-  }
-  roomClient = createRoomClient({
-    WebSocket: globalThis.WebSocket || SimpleWebSocket,
-    endpoint: resolveRoomEndpoint(),
-    userId: roomUserId,
-    deviceInfo: deviceIdentity || {}
-  });
-  roomStateTeardown = roomClient.onStateChanged(handleRoomStateChanged);
-  startRoomPetStateReporting();
 }
 
 function setupLicenseClient() {
@@ -653,22 +594,6 @@ function setupAutoLaunch() {
   getAutoLaunchController().ensureDefaultEnabled();
 }
 
-function teardownRoomClient() {
-  stopRoomPetStateReporting();
-  if (roomStateTeardown) {
-    roomStateTeardown();
-    roomStateTeardown = null;
-  }
-  if (roomClient) {
-    roomClient.leave();
-    roomClient = null;
-  }
-  if (peerPetWindowManager) {
-    peerPetWindowManager.destroyAll();
-    peerPetWindowManager = null;
-  }
-}
-
 function teardownOnlineClient() {
   if (!onlineClient) return;
   onlineClient.stop();
@@ -688,8 +613,7 @@ registerMainIpcHandlers({
   live2DAppearance,
   pendingUpdatePrompts,
   setupRoomClient: () => {
-    setupRoomClient();
-    return roomClient;
+    return roomPetSync.setup();
   },
   setupLicenseClient: () => {
     setupLicenseClient();
@@ -708,7 +632,7 @@ registerMainIpcHandlers({
   setCurrentCatScale: (scale) => {
     currentCatScale = scale;
   },
-  syncCurrentRoomPeersBesideLocal
+  syncCurrentRoomPeersBesideLocal: roomPetSync.syncCurrentPeers
 });
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -737,7 +661,7 @@ if (!gotTheLock) {
     setupOnlineClient();
     setupLicenseClient();
     setupAutoLaunch();
-    setupRoomClient();
+    roomPetSync.setup();
     updateManager = createUpdateManager({
       app,
       dialog,
@@ -771,7 +695,7 @@ app.on('before-quit', () => {
     updateManager.stop();
     updateManager = null;
   }
-  teardownRoomClient();
+  roomPetSync.teardown();
   teardownOnlineClient();
   teardownClipboardHistory();
   getForegroundProbeWorker().stop();
