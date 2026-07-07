@@ -1,6 +1,6 @@
 {
   "name": "desktop-cat",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "A tiny Electron desktop cat pet for Windows.",
   "main": "src/main/main.js",
   "type": "commonjs",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node scripts/start.js",
     "room:server": "node server/roomServer.js",
-    "test": "node --test",
+    "test": "node --test tests",
     "build:config": "node scripts/write-build-config.js",
     "pack": "npm run pack:release",
     "pack:portable": "npm run build:config && electron-builder --win portable",
