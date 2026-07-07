@@ -68,10 +68,9 @@ const {
   createPeerPetWindowManager,
   resolveLocalPetAnchorBounds
 } = require('./peerPetWindows');
-const {
-  CAT_SCALE_DEFAULT,
-} = require('../renderer/petBehavior');
+const { CAT_SCALE_DEFAULT } = require('../renderer/petBehavior');
 const { registerMainIpcHandlers } = require('./ipcHandlers');
+const { createDragModeController } = require('./dragMode');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -116,6 +115,10 @@ let updateManager = null;
 let currentCatScale = CAT_SCALE_DEFAULT;
 const pendingUpdatePrompts = new Map();
 const live2DAppearance = createLive2DAppearance({ app, protocol });
+const dragMode = createDragModeController({
+  getPetWindow: () => petWindow,
+  getCursorScreenPoint: () => screen.getCursorScreenPoint()
+});
 
 function appendLive2DDiagnostic(entry = {}) {
   try {
@@ -297,7 +300,7 @@ function startTopmostWatch(window) {
     refreshTopmost(window);
   });
   window.on('blur', () => {
-    stopDragMode();
+    dragMode.stop();
     refreshTopmost(window);
   });
   window.on('restore', () => {
@@ -489,7 +492,7 @@ function createPetWindow() {
   });
 
   petWindow.on('closed', () => {
-    stopDragMode();
+    dragMode.stop();
     clearInterval(topmostTimer);
     clearTimeout(hideTimer);
     if (displayRecoveryTimer) {
@@ -560,7 +563,7 @@ function buildLocalPetState() {
   return createLocalPetState({
     petWindow,
     screen,
-    dragModeActive,
+    dragModeActive: dragMode.isActive(),
     catScale: currentCatScale,
     live2DAppearance
   });
@@ -677,94 +680,7 @@ function suspendWindowTopmost(window) {
   window.setAlwaysOnTop(false);
 }
 
-/* --- 闀挎寜鎷栧姩 IPC --- */
-
-let dragModeActive = false;
-let dragOffset = { x: 0, y: 0 };
-let pendingDragMovePoint = null;
-let dragMoveTimer = null;
-const MIN_DRAG_WINDOW_POSITION = -2147483648;
-const MAX_DRAG_WINDOW_POSITION = 2147483647;
-const DRAG_MOVE_FRAME_MS = 1000 / 60;
-
-function stopDragMode() {
-  dragModeActive = false;
-  pendingDragMovePoint = null;
-
-  if (dragMoveTimer) {
-    clearTimeout(dragMoveTimer);
-    dragMoveTimer = null;
-  }
-}
-
-function normalizeDragPoint(point) {
-  const x = Number(point?.x);
-  const y = Number(point?.y);
-
-  if (Number.isFinite(x) && Number.isFinite(y)) {
-    return { x, y };
-  }
-
-  return screen.getCursorScreenPoint();
-}
-
-function normalizeDragWindowCoordinate(value) {
-  const rounded = Math.round(Number(value));
-  if (!Number.isFinite(rounded)) return null;
-  return Math.max(
-    MIN_DRAG_WINDOW_POSITION,
-    Math.min(MAX_DRAG_WINDOW_POSITION, rounded)
-  );
-}
-
-function normalizeDragWindowPosition(point) {
-  const x = normalizeDragWindowCoordinate(point?.x);
-  const y = normalizeDragWindowCoordinate(point?.y);
-
-  if (x === null || y === null) return null;
-
-  return {
-    x,
-    y
-  };
-}
-
-function scheduleDragMoveFrame() {
-  if (dragMoveTimer) return;
-
-  dragMoveTimer = setTimeout(flushPendingDragMove, DRAG_MOVE_FRAME_MS);
-  if (typeof dragMoveTimer.unref === 'function') {
-    dragMoveTimer.unref();
-  }
-}
-
-function flushPendingDragMove() {
-  if (dragMoveTimer) {
-    clearTimeout(dragMoveTimer);
-  }
-  dragMoveTimer = null;
-
-  if (!dragModeActive || !petWindow || petWindow.isDestroyed()) {
-    stopDragMode();
-    return;
-  }
-
-  const cursor = pendingDragMovePoint;
-  pendingDragMovePoint = null;
-
-  if (!cursor) return;
-
-  const next = normalizeDragWindowPosition({
-    x: cursor.x - dragOffset.x,
-    y: cursor.y - dragOffset.y
-  });
-  if (!next) {
-    stopDragMode();
-    return;
-  }
-
-  petWindow.setPosition(next.x, next.y);
-}
+/* --- Drag mode IPC --- */
 
 registerMainIpcHandlers({
   ipcMain,
@@ -783,28 +699,9 @@ registerMainIpcHandlers({
   getPetWindow: () => petWindow,
   updateTrayMenu,
   appendLive2DDiagnostic,
-  onDragModeEnter: (point) => {
-    if (!petWindow || petWindow.isDestroyed()) return;
-    stopDragMode();
-
-    const cursor = normalizeDragPoint(point);
-    const winBounds = petWindow.getBounds();
-    dragOffset = { x: cursor.x - winBounds.x, y: cursor.y - winBounds.y };
-    dragModeActive = true;
-  },
-  onDragModeMove: (point) => {
-    if (!dragModeActive || !petWindow || petWindow.isDestroyed()) {
-      stopDragMode();
-      return;
-    }
-
-    pendingDragMovePoint = normalizeDragPoint(point);
-    scheduleDragMoveFrame();
-  },
-  onDragModeExit: () => {
-    flushPendingDragMove();
-    stopDragMode();
-  },
+  onDragModeEnter: dragMode.enter,
+  onDragModeMove: dragMode.move,
+  onDragModeExit: dragMode.exit,
   setClickThrough: (window, enabled) => {
     window.setIgnoreMouseEvents(enabled, { forward: true });
   },

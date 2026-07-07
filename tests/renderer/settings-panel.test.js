@@ -19,6 +19,7 @@ test('settings panel controls random speech and bottom button visibility', () =>
   const petBehavior = readSource('src', 'renderer', 'petBehavior.js');
   const preload = readSource('src', 'main', 'preload.js');
   const main = readSource('src', 'main', 'main.js');
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
 
   assert.match(html, /id="settingsBtn"/);
   assert.match(html, /aria-controls="settingsPanel"/);
@@ -56,6 +57,7 @@ test('settings panel controls random speech and bottom button visibility', () =>
   assert.match(preload, /autoLaunch:\s*\{/);
   assert.match(preload, /auto-launch:get-state/);
   assert.match(preload, /auto-launch:set-enabled/);
-  assert.match(main, /auto-launch:get-state/);
-  assert.match(main, /auto-launch:set-enabled/);
+  assert.match(main, /getAutoLaunchController/);
+  assert.match(ipcHandlers, /auto-launch:get-state/);
+  assert.match(ipcHandlers, /auto-launch:set-enabled/);
 });

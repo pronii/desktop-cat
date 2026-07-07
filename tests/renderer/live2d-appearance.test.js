@@ -64,16 +64,16 @@ test('renderer auto-loads Live2D from folder without adding an import button', (
 
 test('peer preload exposes read-only Live2D model lookup APIs', () => {
   const preload = readSource('src', 'main', 'peerPreload.js');
-  const main = readSource('src', 'main', 'main.js');
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
 
   assert.match(preload, /getLive2DModelById/);
   assert.match(preload, /ipcRenderer\.invoke\('peer-live2d:get-model-by-id'/);
   assert.match(preload, /getDefaultLive2DModel/);
   assert.match(preload, /ipcRenderer\.invoke\('peer-live2d:get-default-model'/);
-  assert.match(main, /peer-live2d:get-model-by-id/);
-  assert.match(main, /live2DAppearance\.getModelById/);
-  assert.match(main, /peer-live2d:get-default-model/);
-  assert.match(main, /live2DAppearance\.getCurrentModel/);
+  assert.match(ipcHandlers, /peer-live2d:get-model-by-id/);
+  assert.match(ipcHandlers, /live2DAppearance\.getModelById/);
+  assert.match(ipcHandlers, /peer-live2d:get-default-model/);
+  assert.match(ipcHandlers, /live2DAppearance\.getCurrentModel/);
 });
 
 test('peer pet page includes Live2D canvas, runtime scripts, and fallback classes', () => {
@@ -993,6 +993,7 @@ test('renderer makes transparent window areas click-through via setIgnoreMouseEv
   const renderer = readSource('src', 'renderer', 'renderer.js');
   const preload = readSource('src', 'main', 'preload.js');
   const main = readSource('src', 'main', 'main.js');
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
 
   // preload 暴露 setClickThrough API
   assert.match(preload, /setClickThrough/, 'preload should expose setClickThrough');
@@ -1003,7 +1004,12 @@ test('renderer makes transparent window areas click-through via setIgnoreMouseEv
   );
 
   // main 进程注册 IPC handler 调用 setIgnoreMouseEvents
-  assert.match(main, /window:set-click-through/, 'main should handle the IPC');
+  assert.match(ipcHandlers, /window:set-click-through/, 'main should handle the IPC');
+  assert.match(
+    ipcHandlers,
+    /setClickThrough\?\.\(petWindow,\s*enabled\)/,
+    'main IPC handler should delegate click-through updates'
+  );
   assert.match(
     main,
     /setIgnoreMouseEvents/,

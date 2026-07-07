@@ -54,6 +54,7 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   const renderer = readSource('src', 'renderer', 'renderer.js');
   const preload = readSource('src', 'main', 'preload.js');
   const main = readSource('src', 'main', 'main.js');
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
 
   assert.match(html, /id="catSizeBtn"/);
   assert.match(html, /class="toolbar-primary"/);
@@ -139,7 +140,7 @@ test('renderer exposes a draggable cat size button without a floating panel', ()
   assert.match(preload, /setCatScale:\s*\(scale\)\s*=>\s*ipcRenderer\.send\('pet:set-scale',\s*scale\)/);
   assert.match(renderer, /window\.desktopCat\?\.setCatScale\?\.\(catScale\)/);
   assert.match(main, /let\s+currentCatScale\s*=\s*CAT_SCALE_DEFAULT/);
-  assert.match(main, /ipcMain\.on\('pet:set-scale'/);
+  assert.match(ipcHandlers, /ipcMain\.on\('pet:set-scale'/);
   assert.match(renderer, /is-bottom-controls-visible/);
   assert.match(renderer, /is-cat-size-control-visible/);
   assert.match(renderer, /stage\?\.addEventListener\('pointerenter'/);
