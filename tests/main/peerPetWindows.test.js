@@ -15,6 +15,7 @@ class FakeBrowserWindow {
     this.bounds = null;
     this.closed = false;
     this.loadedFile = null;
+    this.ignoreMouseEventsCalls = [];
     this.webContents = {
       messages: [],
       send: (channel, payload) => {
@@ -30,6 +31,14 @@ class FakeBrowserWindow {
 
   setBounds(bounds) {
     this.bounds = bounds;
+  }
+
+  getBounds() {
+    return this.bounds;
+  }
+
+  setIgnoreMouseEvents(...args) {
+    this.ignoreMouseEventsCalls.push(args);
   }
 
   isDestroyed() {
@@ -104,6 +113,7 @@ test('peer pet manager creates a transparent window for each peer', () => {
   assert.equal(FakeBrowserWindow.instances.length, 1);
   assert.equal(FakeBrowserWindow.instances[0].options.transparent, true);
   assert.equal(FakeBrowserWindow.instances[0].options.frame, false);
+  assert.deepEqual(FakeBrowserWindow.instances[0].ignoreMouseEventsCalls, []);
   assert.equal(FakeBrowserWindow.instances[0].loadedFile, 'peer.html');
   assert.deepEqual(FakeBrowserWindow.instances[0].bounds, {
     x: 344,
@@ -201,6 +211,128 @@ test('peer pet manager lays out multiple peers beside the local pet', () => {
     { x: 344, y: 230, width: 160, height: 150 },
     { x: 508, y: 230, width: 160, height: 150 }
   ]);
+});
+
+test('peer pet manager keeps a dragged peer at its manual position across syncs', () => {
+  const manager = createManager();
+  const initialAnchorBounds = { x: 100, y: 200, width: 240, height: 180 };
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } },
+    { userId: 'cora', nickname: 'Cora', pet: { action: 'idle' } }
+  ], initialAnchorBounds);
+
+  assert.equal(manager.beginPeerDrag('bob', { screenX: 360, screenY: 245 }), true);
+  assert.equal(manager.movePeerDrag('bob', { screenX: 440, screenY: 305 }), true);
+  assert.equal(manager.endPeerDrag('bob'), true);
+
+  const draggedBobBounds = FakeBrowserWindow.instances[0].bounds;
+  assert.deepEqual(draggedBobBounds, {
+    x: 424,
+    y: 290,
+    width: 160,
+    height: 150
+  });
+
+  manager.syncPeers([
+    { userId: 'cora', nickname: 'Cora', pet: { action: 'drag' } },
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'drag' } }
+  ], { x: 300, y: 320, width: 240, height: 180 });
+
+  assert.deepEqual(FakeBrowserWindow.instances[0].bounds, draggedBobBounds);
+  assert.deepEqual(FakeBrowserWindow.instances[1].bounds, {
+    x: 708,
+    y: 350,
+    width: 160,
+    height: 150
+  });
+});
+
+test('peer pet manager clears manual peer positions when a peer leaves', () => {
+  const manager = createManager();
+  const anchorBounds = { x: 100, y: 200, width: 240, height: 180 };
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } }
+  ], anchorBounds);
+  manager.beginPeerDrag('bob', { screenX: 360, screenY: 245 });
+  manager.movePeerDrag('bob', { screenX: 520, screenY: 345 });
+  manager.endPeerDrag('bob');
+
+  manager.syncPeers([], anchorBounds);
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } }
+  ], anchorBounds);
+
+  assert.deepEqual(FakeBrowserWindow.instances[1].bounds, {
+    x: 344,
+    y: 230,
+    width: 160,
+    height: 150
+  });
+});
+
+test('peer pet manager keeps each peer position stable when room peer order changes', () => {
+  const manager = createManager();
+  const anchorBounds = { x: 100, y: 200, width: 240, height: 180 };
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } },
+    { userId: 'cora', nickname: 'Cora', pet: { action: 'idle' } }
+  ], anchorBounds);
+
+  const initialBoundsByUserId = new Map(FakeBrowserWindow.instances.map((window) => [
+    window.webContents.messages.at(-1).payload.userId,
+    window.bounds
+  ]));
+
+  manager.syncPeers([
+    { userId: 'cora', nickname: 'Cora', pet: { action: 'drag' } },
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'drag' } }
+  ], anchorBounds);
+
+  const nextBoundsByUserId = new Map(FakeBrowserWindow.instances.map((window) => [
+    window.webContents.messages.at(-1).payload.userId,
+    window.bounds
+  ]));
+
+  assert.deepEqual(nextBoundsByUserId.get('bob'), initialBoundsByUserId.get('bob'));
+  assert.deepEqual(nextBoundsByUserId.get('cora'), initialBoundsByUserId.get('cora'));
+});
+
+test('peer pet manager appends newly joined peers without reordering existing peers', () => {
+  const manager = createManager();
+  const anchorBounds = { x: 100, y: 200, width: 240, height: 180 };
+
+  manager.syncPeers([
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } },
+    { userId: 'cora', nickname: 'Cora', pet: { action: 'idle' } }
+  ], anchorBounds);
+
+  const initialBoundsByUserId = new Map(FakeBrowserWindow.instances.map((window) => [
+    window.webContents.messages.at(-1).payload.userId,
+    window.bounds
+  ]));
+
+  manager.syncPeers([
+    { userId: 'ada', nickname: 'Ada', pet: { action: 'idle' } },
+    { userId: 'cora', nickname: 'Cora', pet: { action: 'idle' } },
+    { userId: 'bob', nickname: 'Bob', pet: { action: 'idle' } }
+  ], anchorBounds);
+
+  const nextBoundsByUserId = new Map(FakeBrowserWindow.instances.map((window) => [
+    window.webContents.messages.at(-1).payload.userId,
+    window.bounds
+  ]));
+
+  assert.deepEqual(nextBoundsByUserId.get('bob'), initialBoundsByUserId.get('bob'));
+  assert.deepEqual(nextBoundsByUserId.get('cora'), initialBoundsByUserId.get('cora'));
+  assert.deepEqual(nextBoundsByUserId.get('ada'), {
+    x: 672,
+    y: 230,
+    width: 160,
+    height: 150
+  });
 });
 
 test('peer pet manager ignores peer screen coordinates when keeping fixed spacing', () => {

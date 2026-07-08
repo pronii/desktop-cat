@@ -88,16 +88,30 @@ function createRoomClientHarness(initialState = { status: 'disconnected', peers:
 
 function createPeerManagerHarness() {
   const syncs = [];
+  const dragCalls = [];
   let destroyAllCount = 0;
 
   return {
     syncs,
+    dragCalls,
     get destroyAllCount() {
       return destroyAllCount;
     },
     manager: {
       syncPeers(peers, anchorBounds) {
         syncs.push({ peers, anchorBounds });
+      },
+      beginPeerDrag(userId, point) {
+        dragCalls.push({ method: 'beginPeerDrag', userId, point });
+        return true;
+      },
+      movePeerDrag(userId, point) {
+        dragCalls.push({ method: 'movePeerDrag', userId, point });
+        return true;
+      },
+      endPeerDrag(userId) {
+        dragCalls.push({ method: 'endPeerDrag', userId });
+        return true;
       },
       destroyAll() {
         destroyAllCount += 1;
@@ -193,6 +207,22 @@ test('room pet sync reports local pet state on the interval and keeps peers alig
     peers: [{ userId: 'peer-2', pet: { action: 'drag' } }],
     anchorBounds: { x: 11, y: 22, width: 100, height: 120 }
   }]);
+});
+
+test('room pet sync delegates peer drag updates to the peer window manager', () => {
+  const { controller, peers } = createControllerHarness();
+
+  controller.setup();
+
+  assert.equal(controller.beginPeerPetDrag('bob', { screenX: 10, screenY: 20 }), true);
+  assert.equal(controller.movePeerPetDrag('bob', { screenX: 30, screenY: 40 }), true);
+  assert.equal(controller.endPeerPetDrag('bob'), true);
+
+  assert.deepEqual(peers.dragCalls, [
+    { method: 'beginPeerDrag', userId: 'bob', point: { screenX: 10, screenY: 20 } },
+    { method: 'movePeerDrag', userId: 'bob', point: { screenX: 30, screenY: 40 } },
+    { method: 'endPeerDrag', userId: 'bob' }
+  ]);
 });
 
 test('room pet sync destroys peer windows when the local pet window is unavailable', () => {

@@ -62,6 +62,21 @@ function createRoomPetSyncController({
     syncPeerPetsBesideLocal(roomClient.getState().peers || [], getLocalPetLayoutBounds?.());
   }
 
+  function beginPeerPetDrag(userId, point) {
+    if (!peerPetWindowManager) return false;
+    return peerPetWindowManager.beginPeerDrag(userId, point);
+  }
+
+  function movePeerPetDrag(userId, point) {
+    if (!peerPetWindowManager) return false;
+    return peerPetWindowManager.movePeerDrag(userId, point);
+  }
+
+  function endPeerPetDrag(userId) {
+    if (!peerPetWindowManager) return false;
+    return peerPetWindowManager.endPeerDrag(userId);
+  }
+
   function startReporting() {
     if (roomPetStateTimer) return;
     roomPetStateTimer = setInterval(() => {
@@ -116,6 +131,9 @@ function createRoomPetSyncController({
     setup,
     teardown,
     syncCurrentPeers,
+    beginPeerPetDrag,
+    movePeerPetDrag,
+    endPeerPetDrag,
     getRoomClient: () => roomClient
   };
 }

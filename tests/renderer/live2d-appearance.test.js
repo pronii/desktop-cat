@@ -76,6 +76,24 @@ test('peer preload exposes read-only Live2D model lookup APIs', () => {
   assert.match(ipcHandlers, /live2DAppearance\.getCurrentModel/);
 });
 
+test('peer preload exposes drag IPC APIs for peer windows', () => {
+  const preload = readSource('src', 'main', 'peerPreload.js');
+  const ipcHandlers = readSource('src', 'main', 'ipcHandlers.js');
+
+  assert.match(preload, /beginDrag/);
+  assert.match(preload, /ipcRenderer\.send\('peer-pet:drag-start'/);
+  assert.match(preload, /moveDrag/);
+  assert.match(preload, /ipcRenderer\.send\('peer-pet:drag-move'/);
+  assert.match(preload, /endDrag/);
+  assert.match(preload, /ipcRenderer\.send\('peer-pet:drag-end'/);
+  assert.match(ipcHandlers, /peer-pet:drag-start/);
+  assert.match(ipcHandlers, /onPeerPetDragStart\?\./);
+  assert.match(ipcHandlers, /peer-pet:drag-move/);
+  assert.match(ipcHandlers, /onPeerPetDragMove\?\./);
+  assert.match(ipcHandlers, /peer-pet:drag-end/);
+  assert.match(ipcHandlers, /onPeerPetDragEnd\?\./);
+});
+
 test('peer pet page includes Live2D canvas, runtime scripts, and fallback classes', () => {
   const html = readSource('src', 'renderer', 'peerPet.html');
   const css = readSource('src', 'renderer', 'peerPet.css');
@@ -95,6 +113,98 @@ test('peer pet page includes Live2D canvas, runtime scripts, and fallback classe
   assert.match(peerLive2D, /createPeerLive2D/);
   assert.match(peerLive2D, /Live2DModel\.from/);
   assert.match(peerLive2D, /showCssCat/);
+});
+
+test('peer renderer sends drag gestures with the current peer id', async () => {
+  const script = readSource('src', 'renderer', 'peerPet.js');
+  const css = readSource('src', 'renderer', 'peerPet.css');
+  let updateHandler = null;
+  const stageListeners = new Map();
+  const dragMessages = [];
+  const peerName = { textContent: '' };
+  const peerCat = { classList: { toggle() {} } };
+  const stage = {
+    classList: { toggle() {} },
+    addEventListener(type, handler) {
+      stageListeners.set(type, handler);
+    },
+    setPointerCapture(pointerId) {
+      dragMessages.push({ type: 'capture', pointerId });
+    },
+    releasePointerCapture(pointerId) {
+      dragMessages.push({ type: 'release', pointerId });
+    }
+  };
+  const fakeWindow = {
+    peerPet: {
+      onUpdate(callback) {
+        updateHandler = callback;
+      },
+      beginDrag(payload) {
+        dragMessages.push({ type: 'start', payload });
+      },
+      moveDrag(payload) {
+        dragMessages.push({ type: 'move', payload });
+      },
+      endDrag(payload) {
+        dragMessages.push({ type: 'end', payload });
+      }
+    }
+  };
+  const fakeDocument = {
+    getElementById(id) {
+      if (id === 'peerName') return peerName;
+      if (id === 'peerCat') return peerCat;
+      if (id === 'peerLive2DCanvas') return {};
+      return null;
+    },
+    querySelector(selector) {
+      return selector === '.peer-stage' ? stage : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console
+  });
+
+  await updateHandler({
+    userId: 'bob',
+    nickname: 'Bob',
+    renderMode: 'css-cat',
+    pet: { action: 'idle' }
+  });
+
+  stageListeners.get('pointerdown')({
+    button: 0,
+    pointerId: 7,
+    screenX: 120,
+    screenY: 240,
+    preventDefault() {}
+  });
+  stageListeners.get('pointermove')({
+    pointerId: 7,
+    screenX: 150,
+    screenY: 270,
+    preventDefault() {}
+  });
+  stageListeners.get('pointerup')({
+    pointerId: 7,
+    screenX: 150,
+    screenY: 270,
+    preventDefault() {}
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(dragMessages)), [
+    { type: 'capture', pointerId: 7 },
+    { type: 'start', payload: { userId: 'bob', screenX: 120, screenY: 240 } },
+    { type: 'move', payload: { userId: 'bob', screenX: 150, screenY: 270 } },
+    { type: 'end', payload: { userId: 'bob' } },
+    { type: 'release', pointerId: 7 }
+  ]);
+  assert.match(css, /\.peer-stage\s*\{[^}]*pointer-events:\s*auto/);
+  assert.doesNotMatch(css, /\.peer-stage\s*\{[^}]*pointer-events:\s*none/);
 });
 
 test('peer Live2D helper ignores a stale model load after CSS fallback', async () => {

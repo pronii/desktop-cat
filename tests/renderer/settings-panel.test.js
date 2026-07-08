@@ -61,3 +61,18 @@ test('settings panel controls random speech and bottom button visibility', () =>
   assert.match(ipcHandlers, /auto-launch:get-state/);
   assert.match(ipcHandlers, /auto-launch:set-enabled/);
 });
+
+test('settings panel closes when switching to another floating panel', () => {
+  const renderer = readSource('src', 'renderer', 'renderer.js');
+  const waterPanel = readSource('src', 'renderer', 'waterPanel.js');
+  const clipboardPanel = readSource('src', 'renderer', 'clipboardPanel.js');
+  const roomPanel = readSource('src', 'renderer', 'roomPanel.js');
+  const live2dPanel = readSource('src', 'renderer', 'live2dPanel.js');
+
+  assert.match(renderer, /window\.__closeSettingsPanel\s*=\s*\(\)\s*=>\s*setSettingsPanelOpen\(false\)/);
+  assert.match(waterPanel, /function openReminderDialog[\s\S]*?window\.__closeSettingsPanel\?\.\(\);[\s\S]*?waterReminderDialog\.classList\.add\('show'\)/);
+  assert.match(waterPanel, /waterCounter\?\.addEventListener\('click'[\s\S]*?window\.__closeSettingsPanel\?\.\(\);[\s\S]*?openPanel\(\)/);
+  assert.match(clipboardPanel, /clipboardBtn\.addEventListener\('click'[\s\S]*?window\.__closeSettingsPanel\?\.\(\);[\s\S]*?openClipboardPanel\(\)/);
+  assert.match(roomPanel, /function openPanel\(\)[\s\S]*?window\.__closeSettingsPanel\?\.\(\);[\s\S]*?setPanelOpen\(true\)/);
+  assert.match(live2dPanel, /live2dBtn\?\.addEventListener\('click'[\s\S]*?window\.__closeSettingsPanel\?\.\(\);[\s\S]*?setOpen\(!live2dPanel\?\.classList\.contains\('show'\)\)/);
+});

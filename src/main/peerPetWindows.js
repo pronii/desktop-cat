@@ -68,17 +68,54 @@ function resolvePeerBounds(anchorBounds, screen, index, total) {
   };
 }
 
+function normalizeDragPoint(point) {
+  if (!point || !Number.isFinite(point.screenX) || !Number.isFinite(point.screenY)) {
+    return null;
+  }
+  return {
+    screenX: Math.round(point.screenX),
+    screenY: Math.round(point.screenY)
+  };
+}
+
+function clampWindowBoundsToDisplay(bounds, screen) {
+  const display = getAnchorDisplay(screen, bounds);
+  const workArea = display.workArea;
+  return {
+    ...bounds,
+    x: clamp(bounds.x, workArea.x, workArea.x + workArea.width - bounds.width),
+    y: clamp(bounds.y, workArea.y, workArea.y + workArea.height - bounds.height)
+  };
+}
+
 function normalizeUniquePeers(peers) {
   const peersByUserId = new Map();
   for (const peer of peers || []) {
-    if (!peer || !peer.userId) continue;
-    peersByUserId.set(peer.userId, {
-      userId: peer.userId,
-      nickname: peer.nickname || peer.userId,
+    if (!peer || peer.userId === undefined || peer.userId === null) continue;
+    const userId = String(peer.userId).trim();
+    if (!userId) continue;
+    peersByUserId.set(userId, {
+      userId,
+      nickname: peer.nickname || userId,
       pet: peer.pet || {}
     });
   }
   return Array.from(peersByUserId.values());
+}
+
+function orderPeersForStableLayout(peers, windowsByUserId) {
+  const peersByUserId = new Map(peers.map((peer) => [peer.userId, peer]));
+  const orderedPeers = [];
+
+  for (const userId of windowsByUserId.keys()) {
+    const peer = peersByUserId.get(userId);
+    if (!peer) continue;
+    orderedPeers.push(peer);
+    peersByUserId.delete(userId);
+  }
+
+  orderedPeers.push(...peersByUserId.values());
+  return orderedPeers;
 }
 
 function wantsLive2D(peer) {
@@ -127,9 +164,6 @@ function createPeerWindow({ BrowserWindow, peerPetFile, peerPetPreload }) {
   }
 
   const window = new BrowserWindow(windowOptions);
-  if (typeof window.setIgnoreMouseEvents === 'function') {
-    window.setIgnoreMouseEvents(true, { forward: true });
-  }
   if (typeof window.setAlwaysOnTop === 'function') {
     window.setAlwaysOnTop(true, 'floating');
   }
@@ -149,6 +183,8 @@ function createPeerPetWindowManager({
   peerPetPreload
 }) {
   const windowsByUserId = new Map();
+  const manualBoundsByUserId = new Map();
+  const dragSessionsByUserId = new Map();
 
   function ensureWindow(peer) {
     let entry = windowsByUserId.get(peer.userId);
@@ -171,7 +207,10 @@ function createPeerPetWindowManager({
   }
 
   function syncPeers(peers, anchorBounds) {
-    const uniquePeers = decoratePeersForRender(normalizeUniquePeers(peers));
+    const uniquePeers = decoratePeersForRender(orderPeersForStableLayout(
+      normalizeUniquePeers(peers),
+      windowsByUserId
+    ));
     const activeUserIds = new Set();
 
     for (let index = 0; index < uniquePeers.length; index += 1) {
@@ -180,7 +219,10 @@ function createPeerPetWindowManager({
 
       const entry = ensureWindow(peer);
       entry.peer = peer;
-      entry.window.setBounds(resolvePeerBounds(anchorBounds, screen, index, uniquePeers.length));
+      const manualBounds = manualBoundsByUserId.get(peer.userId);
+      entry.window.setBounds(
+        manualBounds || resolvePeerBounds(anchorBounds, screen, index, uniquePeers.length)
+      );
       sendPeerUpdate(entry);
     }
 
@@ -190,7 +232,49 @@ function createPeerPetWindowManager({
         entry.window.close();
       }
       windowsByUserId.delete(userId);
+      manualBoundsByUserId.delete(userId);
+      dragSessionsByUserId.delete(userId);
     }
+  }
+
+  function beginPeerDrag(userId, point) {
+    const normalizedUserId = String(userId || '').trim();
+    const dragPoint = normalizeDragPoint(point);
+    const entry = windowsByUserId.get(normalizedUserId);
+    if (!entry || entry.window.isDestroyed() || !dragPoint || typeof entry.window.getBounds !== 'function') {
+      return false;
+    }
+
+    dragSessionsByUserId.set(normalizedUserId, {
+      startPoint: dragPoint,
+      startBounds: entry.window.getBounds()
+    });
+    return true;
+  }
+
+  function movePeerDrag(userId, point) {
+    const normalizedUserId = String(userId || '').trim();
+    const dragPoint = normalizeDragPoint(point);
+    const session = dragSessionsByUserId.get(normalizedUserId);
+    const entry = windowsByUserId.get(normalizedUserId);
+    if (!entry || entry.window.isDestroyed() || !session || !dragPoint) {
+      return false;
+    }
+
+    const nextBounds = clampWindowBoundsToDisplay({
+      ...session.startBounds,
+      x: session.startBounds.x + dragPoint.screenX - session.startPoint.screenX,
+      y: session.startBounds.y + dragPoint.screenY - session.startPoint.screenY
+    }, screen);
+    manualBoundsByUserId.set(normalizedUserId, nextBounds);
+    entry.window.setBounds(nextBounds);
+    return true;
+  }
+
+  function endPeerDrag(userId) {
+    const normalizedUserId = String(userId || '').trim();
+    const hadSession = dragSessionsByUserId.delete(normalizedUserId);
+    return hadSession;
   }
 
   function destroyAll() {
@@ -200,10 +284,15 @@ function createPeerPetWindowManager({
       }
     }
     windowsByUserId.clear();
+    manualBoundsByUserId.clear();
+    dragSessionsByUserId.clear();
   }
 
   return {
     syncPeers,
+    beginPeerDrag,
+    movePeerDrag,
+    endPeerDrag,
     destroyAll
   };
 }

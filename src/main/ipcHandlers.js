@@ -14,6 +14,9 @@ function registerMainIpcHandlers({
   onDragModeEnter,
   onDragModeMove,
   onDragModeExit,
+  onPeerPetDragStart,
+  onPeerPetDragMove,
+  onPeerPetDragEnd,
   setClickThrough,
   setCurrentCatScale,
   syncCurrentRoomPeersBesideLocal
@@ -162,6 +165,18 @@ function registerMainIpcHandlers({
 
   ipcMain.on('drag-mode:exit', () => {
     onDragModeExit?.();
+  });
+
+  ipcMain.on('peer-pet:drag-start', (_event, payload = {}) => {
+    onPeerPetDragStart?.(payload);
+  });
+
+  ipcMain.on('peer-pet:drag-move', (_event, payload = {}) => {
+    onPeerPetDragMove?.(payload);
+  });
+
+  ipcMain.on('peer-pet:drag-end', (_event, payload = {}) => {
+    onPeerPetDragEnd?.(payload);
   });
 
   ipcMain.on('pet:set-scale', (_event, scale) => {

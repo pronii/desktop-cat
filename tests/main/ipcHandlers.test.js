@@ -70,6 +70,9 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
   let dragModeEnterPoint = null;
   let dragModeMovePoint = null;
   let dragModeExited = false;
+  let peerPetDragStart = null;
+  let peerPetDragMove = null;
+  let peerPetDragEnd = null;
   let clickThroughWindow = null;
   let clickThroughEnabled = null;
   let currentCatScale = 1;
@@ -118,6 +121,15 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
     },
     onDragModeExit() {
       dragModeExited = true;
+    },
+    onPeerPetDragStart(payload) {
+      peerPetDragStart = payload;
+    },
+    onPeerPetDragMove(payload) {
+      peerPetDragMove = payload;
+    },
+    onPeerPetDragEnd(payload) {
+      peerPetDragEnd = payload;
     },
     setClickThrough(window, enabled) {
       clickThroughWindow = window;
@@ -173,6 +185,9 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
       'drag-mode:exit',
       'drag-mode:move',
       'pet:set-scale',
+      'peer-pet:drag-end',
+      'peer-pet:drag-move',
+      'peer-pet:drag-start',
       'window:set-click-through'
     ].sort()
   );
@@ -194,6 +209,9 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
   ipcMain.listeners.get('drag-mode:enter')(null, { x: 10, y: 20 });
   ipcMain.listeners.get('drag-mode:move')(null, { x: 15, y: 25 });
   ipcMain.listeners.get('drag-mode:exit')();
+  ipcMain.listeners.get('peer-pet:drag-start')(null, { userId: 'bob', screenX: 10, screenY: 20 });
+  ipcMain.listeners.get('peer-pet:drag-move')(null, { userId: 'bob', screenX: 30, screenY: 40 });
+  ipcMain.listeners.get('peer-pet:drag-end')(null, { userId: 'bob' });
   ipcMain.listeners.get('window:set-click-through')(null, true);
   ipcMain.listeners.get('pet:set-scale')(null, 1.2);
   ipcMain.listeners.get('diagnostics:live2d-log')(null, { message: 'hello' });
@@ -201,6 +219,9 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
   assert.deepEqual(dragModeEnterPoint, { x: 10, y: 20 });
   assert.deepEqual(dragModeMovePoint, { x: 15, y: 25 });
   assert.equal(dragModeExited, true);
+  assert.deepEqual(peerPetDragStart, { userId: 'bob', screenX: 10, screenY: 20 });
+  assert.deepEqual(peerPetDragMove, { userId: 'bob', screenX: 30, screenY: 40 });
+  assert.deepEqual(peerPetDragEnd, { userId: 'bob' });
   assert.equal(clickThroughWindow, petWindow);
   assert.equal(clickThroughEnabled, true);
   assert.equal(currentCatScale, 1.2);

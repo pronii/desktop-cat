@@ -188,6 +188,7 @@
     window.__closeClipboardPanel?.();
     window.__closeCatSizePanel?.();
     window.__closeLive2DPanel?.();
+    window.__closeSettingsPanel?.();
     setPanelOpen(true);
     refreshState();
   }

@@ -402,6 +402,7 @@
     window.__closeRoomPanel?.();
     window.__closeCatSizePanel?.();
     window.__closeLive2DPanel?.();
+    window.__closeSettingsPanel?.();
     closePanel();
     waterReminderDialog.classList.add('show');
     focusFirstReminderControl(waterReminderDialog);
@@ -502,6 +503,7 @@
       window.__closeRoomPanel?.();
       window.__closeCatSizePanel?.();
       window.__closeLive2DPanel?.();
+      window.__closeSettingsPanel?.();
       openPanel();
   });
 

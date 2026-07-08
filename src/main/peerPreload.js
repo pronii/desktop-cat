@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('peerPet', {
     return () => ipcRenderer.removeListener('peer-pet:update', handler);
   },
   getLive2DModelById: (modelId) => ipcRenderer.invoke('peer-live2d:get-model-by-id', modelId),
-  getDefaultLive2DModel: () => ipcRenderer.invoke('peer-live2d:get-default-model')
+  getDefaultLive2DModel: () => ipcRenderer.invoke('peer-live2d:get-default-model'),
+  beginDrag: (payload) => ipcRenderer.send('peer-pet:drag-start', payload),
+  moveDrag: (payload) => ipcRenderer.send('peer-pet:drag-move', payload),
+  endDrag: (payload) => ipcRenderer.send('peer-pet:drag-end', payload)
 });

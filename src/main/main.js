@@ -626,6 +626,15 @@ registerMainIpcHandlers({
   onDragModeEnter: dragMode.enter,
   onDragModeMove: dragMode.move,
   onDragModeExit: dragMode.exit,
+  onPeerPetDragStart: ({ userId, screenX, screenY } = {}) => {
+    roomPetSync.beginPeerPetDrag(userId, { screenX, screenY });
+  },
+  onPeerPetDragMove: ({ userId, screenX, screenY } = {}) => {
+    roomPetSync.movePeerPetDrag(userId, { screenX, screenY });
+  },
+  onPeerPetDragEnd: ({ userId } = {}) => {
+    roomPetSync.endPeerPetDrag(userId);
+  },
   setClickThrough: (window, enabled) => {
     window.setIgnoreMouseEvents(enabled, { forward: true });
   },

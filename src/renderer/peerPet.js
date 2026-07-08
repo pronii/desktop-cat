@@ -10,6 +10,42 @@
 
   let lastRequestedModelId = null;
   let updateVersion = 0;
+  let currentPeerUserId = null;
+  let activePointerId = null;
+  let activeDragUserId = null;
+
+  function toDragPayload(userId, event) {
+    return {
+      userId,
+      screenX: event.screenX,
+      screenY: event.screenY
+    };
+  }
+
+  function beginDrag(event) {
+    if (event.button !== 0 || !currentPeerUserId || activePointerId !== null) return;
+    activePointerId = event.pointerId;
+    activeDragUserId = currentPeerUserId;
+    event.preventDefault?.();
+    peerStage?.setPointerCapture?.(event.pointerId);
+    window.peerPet?.beginDrag?.(toDragPayload(activeDragUserId, event));
+  }
+
+  function moveDrag(event) {
+    if (event.pointerId !== activePointerId || !activeDragUserId) return;
+    event.preventDefault?.();
+    window.peerPet?.moveDrag?.(toDragPayload(activeDragUserId, event));
+  }
+
+  function endDrag(event) {
+    if (event.pointerId !== activePointerId || !activeDragUserId) return;
+    const userId = activeDragUserId;
+    event.preventDefault?.();
+    window.peerPet?.endDrag?.({ userId });
+    peerStage?.releasePointerCapture?.(event.pointerId);
+    activePointerId = null;
+    activeDragUserId = null;
+  }
 
   function setCssFallback() {
     lastRequestedModelId = null;
@@ -34,6 +70,7 @@
   async function applyPeer(peer) {
     if (!peer) return;
     const version = ++updateVersion;
+    currentPeerUserId = peer.userId ? String(peer.userId) : null;
 
     peerName.textContent = peer.nickname || peer.userId || '好友';
     const isDrag = peer.pet?.action === 'drag';
@@ -82,4 +119,9 @@
       setCssFallback();
     });
   });
+
+  peerStage?.addEventListener?.('pointerdown', beginDrag);
+  peerStage?.addEventListener?.('pointermove', moveDrag);
+  peerStage?.addEventListener?.('pointerup', endDrag);
+  peerStage?.addEventListener?.('pointercancel', endDrag);
 })();

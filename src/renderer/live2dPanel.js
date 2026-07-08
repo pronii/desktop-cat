@@ -319,6 +319,7 @@
     window.__closeClipboardPanel?.();
     window.__closeRoomPanel?.();
     window.__closeCatSizePanel?.();
+    window.__closeSettingsPanel?.();
     setOpen(!live2dPanel?.classList.contains('show'));
   });
 
