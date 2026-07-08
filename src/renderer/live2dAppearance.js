@@ -1,9 +1,28 @@
 (function initLive2DAppearance() {
   const CANVAS_SIZE = 240;
+  const CODEX_PET_KIND = 'codex-pet';
+  const CODEX_PET_CELL_WIDTH = 192;
+  const CODEX_PET_CELL_HEIGHT = 208;
+  const CODEX_PET_IDLE_ROW = 0;
+  const CODEX_PET_IDLE_FRAMES = 6;
+  const CODEX_PET_IDLE_DURATIONS = [280, 110, 110, 140, 140, 320];
+  const CODEX_PET_ACTION_ALIASES = {
+    tap: ['waving', 'jumping'],
+    hover: ['jumping', 'waving'],
+    'drag-left': ['running-left', 'running'],
+    'drag-right': ['running-right', 'running'],
+    drag: ['running', 'waiting'],
+    working: ['running', 'waiting'],
+    waiting: ['waiting'],
+    review: ['review'],
+    failed: ['failed'],
+    error: ['failed']
+  };
   let pixiApp = null;
   let currentModel = null;
   let motionController = null;
   let currentModelConfig = null;
+  let codexPetAnimation = null;
   let loadRequestId = 0;
 
   function logLive2D(message, details = {}) {
@@ -32,6 +51,10 @@
 
   function hasRuntime() {
     return Boolean(window.PIXI?.Application && window.PIXI?.live2d?.Live2DModel);
+  }
+
+  function isCodexPetModelConfig(modelConfig) {
+    return modelConfig?.kind === CODEX_PET_KIND;
   }
 
   function fitModelToCanvas(model, canvas) {
@@ -63,17 +86,38 @@
   function exposeMotionController(controller) {
     window.__desktopCatLive2D = controller
       ? {
+        playAlias: (alias, options) => controller.playAlias?.(alias, options),
         playTap: () => controller.playTap(),
         dispose: () => controller.dispose()
       }
       : null;
   }
 
+  function exposeCodexPetController() {
+    window.__desktopCatLive2D = {
+      playAlias: (alias, options) => playCodexPetAction(alias, options),
+      playTap: () => playCodexPetAction('tap'),
+      playHover: () => playCodexPetAction('hover'),
+      playDragLeft: () => playCodexPetAction('drag-left', { loop: true }),
+      playDragRight: () => playCodexPetAction('drag-right', { loop: true }),
+      playDrag: () => playCodexPetAction('drag', { loop: true }),
+      playWaiting: () => playCodexPetAction('waiting', { loop: true }),
+      playWorking: () => playCodexPetAction('working', { loop: true }),
+      playReview: () => playCodexPetAction('review', { loop: true }),
+      playFailed: () => playCodexPetAction('failed'),
+      playIdle: () => playCodexPetAction('idle', { loop: true }),
+      dispose: () => stopCodexPetAnimation()
+    };
+  }
+
   function getDebugSnapshot() {
     const stage = document.querySelector('.stage');
     const canvas = document.getElementById('live2dCanvas');
     const stageChildren = pixiApp?.stage?.children || [];
-    const isAttached = Boolean(currentModel && stageChildren.includes?.(currentModel));
+    const isCodexPet = currentModelConfig?.kind === CODEX_PET_KIND;
+    const isAttached = isCodexPet
+      ? Boolean(codexPetAnimation)
+      : Boolean(currentModel && stageChildren.includes?.(currentModel));
     const gl = pixiApp?.renderer?.gl || pixiApp?.renderer?.context?.gl;
     let contextLost = null;
     try {
@@ -84,9 +128,11 @@
 
     return {
       currentModelId: currentModelConfig?.id || null,
+      currentModelKind: currentModelConfig?.kind || 'live2d',
       currentModelAvailable: Boolean(currentModelConfig?.available),
-      hasCurrentModel: Boolean(currentModel),
+      hasCurrentModel: Boolean(currentModel || codexPetAnimation),
       hasPixiApp: Boolean(pixiApp),
+      hasCodexPetAnimation: Boolean(codexPetAnimation),
       isAttached,
       stageChildren: stageChildren.length || 0,
       stageHasLive2D: Boolean(stage?.classList.contains('has-live2d')),
@@ -97,13 +143,55 @@
     };
   }
 
-  function ensurePixiApp() {
-    if (pixiApp) return pixiApp;
-    const canvas = document.getElementById('live2dCanvas');
+  function markCanvasRenderContext(canvas, contextName) {
+    canvas.dataset = canvas.dataset || {};
+    canvas.dataset.renderContext = contextName;
+  }
+
+  function notifyLive2DCanvasReplaced(canvas) {
+    if (typeof document.dispatchEvent !== 'function') return;
+
+    const detail = { canvas };
+    let event = null;
+    if (typeof window.CustomEvent === 'function') {
+      event = new window.CustomEvent('desktop-cat:live2d-canvas-replaced', { detail });
+    } else {
+      event = { type: 'desktop-cat:live2d-canvas-replaced', detail };
+    }
+    document.dispatchEvent(event);
+  }
+
+  function prepareCanvasForRenderContext(contextName) {
+    let canvas = document.getElementById('live2dCanvas');
     if (!canvas) return null;
+
+    const previousContext = canvas.dataset?.renderContext || null;
+    if (
+      previousContext &&
+      previousContext !== contextName &&
+      typeof canvas.cloneNode === 'function' &&
+      typeof canvas.replaceWith === 'function'
+    ) {
+      const replacement = canvas.cloneNode(false);
+      replacement.width = CANVAS_SIZE;
+      replacement.height = CANVAS_SIZE;
+      replacement.dataset = replacement.dataset || {};
+      canvas.replaceWith(replacement);
+      canvas = replacement;
+      pixiApp = null;
+      notifyLive2DCanvasReplaced(canvas);
+    }
 
     canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
+    markCanvasRenderContext(canvas, contextName);
+    return canvas;
+  }
+
+  function ensurePixiApp() {
+    if (pixiApp) return pixiApp;
+    const canvas = prepareCanvasForRenderContext('webgl');
+    if (!canvas) return null;
     pixiApp = new window.PIXI.Application({
       view: canvas,
       width: CANVAS_SIZE,
@@ -132,6 +220,13 @@
     return pixiApp;
   }
 
+  function stopCodexPetAnimation() {
+    if (codexPetAnimation?.rafId && typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(codexPetAnimation.rafId);
+    }
+    codexPetAnimation = null;
+  }
+
   function disposeCurrentModel() {
     const reason = arguments[0] || 'unknown';
     logLive2D('dispose current model requested', {
@@ -140,16 +235,21 @@
     });
     motionController?.dispose?.();
     motionController = null;
+    stopCodexPetAnimation();
 
-    if (currentModel && pixiApp) {
+    if (currentModel && pixiApp && currentModelConfig?.kind !== CODEX_PET_KIND) {
       pixiApp.stage.removeChild(currentModel);
     }
-    currentModel?.destroy?.({ children: true, texture: false, baseTexture: false });
+    if (currentModelConfig?.kind !== CODEX_PET_KIND) {
+      currentModel?.destroy?.({ children: true, texture: false, baseTexture: false });
+    }
     currentModel = null;
     currentModelConfig = null;
 
     const canvas = document.getElementById('live2dCanvas');
     if (canvas) {
+      const context2d = canvas.dataset?.renderContext === '2d' ? canvas.getContext?.('2d') : null;
+      context2d?.clearRect?.(0, 0, canvas.width || CANVAS_SIZE, canvas.height || CANVAS_SIZE);
       canvas.setAttribute('aria-hidden', 'true');
     }
 
@@ -164,6 +264,15 @@
   function isCurrentModelVisible() {
     const stage = document.querySelector('.stage');
     const canvas = document.getElementById('live2dCanvas');
+    if (currentModelConfig?.kind === CODEX_PET_KIND) {
+      return Boolean(
+        currentModelConfig?.available &&
+        codexPetAnimation &&
+        stage?.classList.contains('has-live2d') &&
+        canvas?.getAttribute?.('aria-hidden') === 'false'
+      );
+    }
+
     const isAttached = Boolean(currentModel && pixiApp?.stage?.children?.includes?.(currentModel));
     return Boolean(
       currentModelConfig?.available &&
@@ -181,6 +290,14 @@
     const bufferHeight = gl.drawingBufferHeight || canvas.height;
     gl.readPixels(pixelX, bufferHeight - pixelY - 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
     return pixel[3];
+  }
+
+  function read2DAlphaAt(pixelX, pixelY) {
+    const context = codexPetAnimation?.context;
+    if (!context?.getImageData) return null;
+
+    const pixel = context.getImageData(pixelX, pixelY, 1, 1).data;
+    return pixel?.[3] ?? null;
   }
 
   function isPointOverVisible(clientX, clientY) {
@@ -207,12 +324,214 @@
     const pixelY = Math.min(canvas.height - 1, Math.max(0, Math.round((y - rect.top) * (canvas.height / rect.height))));
 
     try {
+      if (currentModelConfig?.kind === CODEX_PET_KIND) {
+        const alpha = read2DAlphaAt(pixelX, pixelY);
+        return alpha !== null && alpha > 10;
+      }
+
       pixiApp?.render?.();
       const alpha = readWebGLAlphaAt(canvas, pixelX, pixelY);
       return alpha !== null && alpha > 10;
     } catch (_error) {
       return false;
     }
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const ImageCtor = window.Image || Image;
+      const image = new ImageCtor();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Failed to load spritesheet: ${src}`));
+      image.src = src;
+    });
+  }
+
+  function normalizeCodexPetAction(action) {
+    const state = typeof action?.state === 'string' ? action.state.trim().toLowerCase() : '';
+    const row = Number(action?.row);
+    const frames = Number(action?.frames);
+    if (!state || !Number.isInteger(row) || row < 1 || !Number.isInteger(frames) || frames < 1) {
+      return null;
+    }
+    return {
+      state,
+      rowIndex: row - 1,
+      frameCount: frames
+    };
+  }
+
+  function createCodexPetActions(actionMap) {
+    const actions = new Map();
+    if (Array.isArray(actionMap)) {
+      for (const action of actionMap) {
+        const normalized = normalizeCodexPetAction(action);
+        if (normalized && !actions.has(normalized.state)) {
+          actions.set(normalized.state, normalized);
+        }
+      }
+    }
+
+    if (!actions.has('idle')) {
+      actions.set('idle', {
+        state: 'idle',
+        rowIndex: CODEX_PET_IDLE_ROW,
+        frameCount: CODEX_PET_IDLE_FRAMES
+      });
+    }
+    return actions;
+  }
+
+  function resolveCodexPetAction(animation, alias) {
+    const key = typeof alias === 'string' && alias.trim() ? alias.trim().toLowerCase() : 'idle';
+    const candidates = CODEX_PET_ACTION_ALIASES[key] || [key];
+    for (const state of candidates) {
+      const action = animation.actions.get(state);
+      if (action) return action;
+    }
+    return null;
+  }
+
+  function drawCodexPetFrame(animation) {
+    const action = animation.currentAction || animation.idleAction;
+    const frame = animation.frameIndex % action.frameCount;
+    const sx = frame * CODEX_PET_CELL_WIDTH;
+    const sy = action.rowIndex * CODEX_PET_CELL_HEIGHT;
+    const scale = Math.min(
+      animation.canvas.width / CODEX_PET_CELL_WIDTH,
+      animation.canvas.height / CODEX_PET_CELL_HEIGHT
+    );
+    const dw = Math.round(CODEX_PET_CELL_WIDTH * scale);
+    const dh = Math.round(CODEX_PET_CELL_HEIGHT * scale);
+    const dx = Math.round((animation.canvas.width - dw) / 2);
+    const dy = Math.round(animation.canvas.height - dh);
+
+    animation.context.clearRect(0, 0, animation.canvas.width, animation.canvas.height);
+    animation.context.imageSmoothingEnabled = false;
+    animation.context.drawImage(
+      animation.image,
+      sx,
+      sy,
+      CODEX_PET_CELL_WIDTH,
+      CODEX_PET_CELL_HEIGHT,
+      dx,
+      dy,
+      dw,
+      dh
+    );
+  }
+
+  function completeCodexPetFrameAdvance(animation) {
+    animation.frameIndex += 1;
+    if (animation.actionMode === 'once' && animation.frameIndex >= animation.currentAction.frameCount) {
+      animation.currentAction = animation.idleAction;
+      animation.actionMode = 'loop';
+      animation.frameIndex = 0;
+    }
+    drawCodexPetFrame(animation);
+  }
+
+  function scheduleCodexPetFrame(animation) {
+    if (typeof window.requestAnimationFrame !== 'function') return;
+
+    animation.rafId = window.requestAnimationFrame((time = 0) => {
+      if (animation !== codexPetAnimation) return;
+      const duration = CODEX_PET_IDLE_DURATIONS[animation.frameIndex % CODEX_PET_IDLE_DURATIONS.length];
+      if (animation.lastFrameTime === null) {
+        animation.lastFrameTime = time;
+      }
+      if (time - animation.lastFrameTime >= duration) {
+        animation.lastFrameTime = time;
+        completeCodexPetFrameAdvance(animation);
+      }
+      scheduleCodexPetFrame(animation);
+    });
+  }
+
+  function playCodexPetAction(alias, options = {}) {
+    const animation = codexPetAnimation;
+    if (!animation) return false;
+    const action = resolveCodexPetAction(animation, alias);
+    if (!action) return false;
+
+    const mode = options.loop ? 'loop' : 'once';
+    if (animation.currentAction === action && animation.actionMode === mode) {
+      return true;
+    }
+
+    animation.currentAction = action;
+    animation.actionMode = mode;
+    animation.frameIndex = 0;
+    animation.lastFrameTime = null;
+    drawCodexPetFrame(animation);
+    return true;
+  }
+
+  async function loadCodexPetModel(modelConfig, requestId) {
+    const stage = document.querySelector('.stage');
+    const initialCanvas = document.getElementById('live2dCanvas');
+    if (!stage || !initialCanvas) return;
+    if (!modelConfig.spritesheetUrl) {
+      throw new Error('Codex pet spritesheet is not configured.');
+    }
+
+    const image = await loadImage(modelConfig.spritesheetUrl);
+    if (requestId !== loadRequestId) {
+      logLive2D('codex pet load abandoned after image load', { modelId: modelConfig.id, requestId, loadRequestId });
+      return;
+    }
+
+    disposeCurrentModel(`replace with ${modelConfig.id}`);
+    const canvas = prepareCanvasForRenderContext('2d');
+    if (!canvas) return;
+    const context = canvas.getContext?.('2d', { willReadFrequently: true });
+    if (!context) {
+      throw new Error('2D canvas context is not available.');
+    }
+
+    const actions = createCodexPetActions(modelConfig.actionMap);
+    const idleAction = actions.get('idle');
+    const animation = {
+      kind: CODEX_PET_KIND,
+      canvas,
+      context,
+      image,
+      actions,
+      idleAction,
+      currentAction: idleAction,
+      actionMode: 'loop',
+      frameIndex: 0,
+      lastFrameTime: null,
+      rafId: null
+    };
+
+    if (requestId !== loadRequestId) {
+      logLive2D('codex pet load abandoned after setup', { modelId: modelConfig.id, requestId, loadRequestId });
+      return;
+    }
+
+    codexPetAnimation = animation;
+    currentModel = animation;
+    currentModelConfig = modelConfig;
+    drawCodexPetFrame(animation);
+
+    stage.classList.add('has-live2d');
+    canvas.setAttribute('aria-hidden', 'false');
+    exposeCodexPetController();
+    setDebugState({
+      available: true,
+      kind: CODEX_PET_KIND,
+      name: modelConfig.name,
+      modelUrl: modelConfig.modelUrl,
+      spritesheetUrl: modelConfig.spritesheetUrl,
+      actionMap: Array.from(actions.keys()),
+      motionController: false
+    });
+    scheduleCodexPetFrame(animation);
+    logLive2D('codex pet load complete', {
+      modelId: modelConfig.id,
+      after: getDebugSnapshot()
+    });
   }
 
   async function loadModel(modelConfig) {
@@ -241,16 +560,22 @@
       return;
     }
 
+    const requestId = ++loadRequestId;
+    if (isCodexPetModelConfig(modelConfig)) {
+      await loadCodexPetModel(modelConfig, requestId);
+      return;
+    }
+
     if (!hasRuntime()) {
       logLive2D('load model failed: runtime unavailable', { modelId });
       throw new Error('Live2D runtime is not available.');
     }
 
-    const requestId = ++loadRequestId;
     const app = ensurePixiApp();
     if (!app) {
       throw new Error('Failed to create PIXI application.');
     }
+    let renderCanvas = document.getElementById('live2dCanvas') || canvas;
 
     const loadedModel = await window.PIXI.live2d.Live2DModel.from(modelConfig.modelUrl);
     if (requestId !== loadRequestId) {
@@ -261,7 +586,8 @@
 
     let nextMotionController = null;
     try {
-      fitModelToCanvas(loadedModel, canvas);
+      renderCanvas = document.getElementById('live2dCanvas') || renderCanvas;
+      fitModelToCanvas(loadedModel, renderCanvas);
       nextMotionController = createMotionController(loadedModel);
     } catch (error) {
       nextMotionController?.dispose?.();
@@ -300,7 +626,8 @@
     currentModelConfig = modelConfig;
 
     stage.classList.add('has-live2d');
-    canvas.setAttribute('aria-hidden', 'false');
+    renderCanvas = document.getElementById('live2dCanvas') || renderCanvas;
+    renderCanvas.setAttribute('aria-hidden', 'false');
     exposeMotionController(motionController);
     setDebugState({
       available: true,

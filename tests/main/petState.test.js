@@ -78,3 +78,24 @@ test('buildLocalPetState returns null for missing or destroyed windows', () => {
     live2DAppearance: null
   }), null);
 });
+test('buildLocalPetState preserves Codex pet appearance type for room sync', () => {
+  const state = buildLocalPetState({
+    petWindow: createWindow(),
+    screen: fakeScreen,
+    dragModeActive: false,
+    live2DAppearance: {
+      getCurrentModel: () => ({
+        available: true,
+        kind: 'codex-pet',
+        id: 'codex-pet/firefly--lingxiaotian',
+        name: '\u6d41\u8424',
+        modelUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/pet.json',
+        spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp'
+      })
+    }
+  });
+
+  assert.equal(state.appearanceType, 'codex-pet');
+  assert.equal(state.modelId, 'codex-pet/firefly--lingxiaotian');
+  assert.equal(state.modelName, '\u6d41\u8424');
+});

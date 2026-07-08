@@ -12,8 +12,10 @@ function readAppearanceState(live2DAppearance) {
     return { appearanceType: 'css-cat' };
   }
 
+  const appearanceType = currentModel.kind === 'codex-pet' ? 'codex-pet' : 'live2d';
+
   return {
-    appearanceType: 'live2d',
+    appearanceType,
     modelId: String(currentModel.id),
     modelName: String(currentModel.name || currentModel.id)
   };

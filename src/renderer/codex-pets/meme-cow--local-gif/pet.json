@@ -1,0 +1,7 @@
+{
+  "id": "meme-cow--local-gif",
+  "displayName": "Meme Cow",
+  "description": "A user-provided GIF converted into a Codex pet spritesheet and full PNG frame sequence.",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "animal"
+}

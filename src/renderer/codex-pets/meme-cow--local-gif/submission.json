@@ -1,0 +1,38 @@
+{
+  "slug": "meme-cow--local-gif",
+  "pet_slug": "meme-cow",
+  "author_slug": "local-gif",
+  "name": "Meme Cow",
+  "author": "Local GIF",
+  "author_handle": "local-gif",
+  "primary_category": "Animals",
+  "tags": [
+    "gif",
+    "sequence-frames",
+    "meme",
+    "cow",
+    "local"
+  ],
+  "source_type": "local-file",
+  "source_url": "D:\\Backup\\Downloads\\ff3b3815ea824315ab1c3b3b829289f8.gif",
+  "license": "User provided asset",
+  "preview_image": "preview.png",
+  "codex_install": {
+    "pet_json": "pet.json",
+    "spritesheet": "spritesheet.webp"
+  },
+  "preview_assets": {
+    "contact_sheet": "preview.png",
+    "frames_dir": "frames"
+  },
+  "action_map": [
+    {
+      "row": 1,
+      "state": "idle",
+      "frames": 6,
+      "meaning": "Six evenly sampled frames from the source GIF for the current Codex pet renderer."
+    }
+  ],
+  "asset_note": "Full 153-frame PNG sequence is stored in frames/. spritesheet.webp is a 192x208-cell idle sheet compatible with the current renderer.",
+  "spritesheet_sha256": "8cdb8eff186e6330b0de81b2957ac1b9524ff40a38ab45006c17a8385455f1a8"
+}

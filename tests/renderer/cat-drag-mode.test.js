@@ -114,7 +114,7 @@ function createRendererHarness({
   const source = readSource('src', 'renderer', 'renderer.js');
   const cat = new FakeElement();
   const stage = new FakeElement();
-  const live2dCanvas = new FakeElement({ rect: live2dCanvasRect });
+  let live2dCanvas = new FakeElement({ rect: live2dCanvasRect });
   const waterBowl = new FakeElement();
   const happyBubble = new FakeElement();
   const waterBubble = new FakeElement();
@@ -129,6 +129,12 @@ function createRendererHarness({
   const clipboardBtn = new FakeElement();
   const roomBtn = new FakeElement();
   const live2dSwitcherBtn = new FakeElement();
+  const updatePrompt = new FakeElement();
+  const updatePromptTitle = new FakeElement();
+  const updatePromptText = new FakeElement();
+  const updatePromptClose = new FakeElement();
+  const updatePromptPrimary = new FakeElement();
+  const updatePromptSecondary = new FakeElement();
   const documentElement = {
     classList: new FakeClassList(),
     style: { setProperty() {} }
@@ -147,6 +153,9 @@ function createRendererHarness({
   let currentAutoLaunchEnabled = autoLaunchEnabled;
   let autoLaunchGetCount = 0;
   const autoLaunchSetCalls = [];
+  const live2dActionCalls = [];
+  let updatePromptHandler = null;
+  const updateResponses = [];
   let now = 0;
 
   class FakeDate extends Date {
@@ -186,7 +195,18 @@ function createRendererHarness({
     desktopCatDebug: {},
     __desktopCatLive2DAppearance: live2dAppearance,
     __desktopCatLive2D: {
-      playTap() {}
+      playTap() {
+        live2dActionCalls.push(['playTap']);
+        return true;
+      },
+      playAlias(alias, options) {
+        live2dActionCalls.push(['playAlias', alias, options]);
+        return true;
+      },
+      playIdle() {
+        live2dActionCalls.push(['playIdle']);
+        return true;
+      }
     },
     desktopCat: {
       dragMode: {
@@ -210,6 +230,15 @@ function createRendererHarness({
         onTrigger(callback) {
           waterReminderTrigger = callback;
           return () => {};
+        }
+      },
+      updates: {
+        onPrompt(callback) {
+          updatePromptHandler = callback;
+          return () => {};
+        },
+        respond(id, response) {
+          updateResponses.push({ id, response });
         }
       },
       autoLaunch: {
@@ -294,7 +323,7 @@ function createRendererHarness({
       if (selector === '.bottom-bar') return bottomBar;
       if (selector === '.happy-bubble') return happyBubble;
       if (selector === '.water-panel.show, .clipboard-panel.show, .room-panel.show, .live2d-panel.show, .settings-panel.show, .water-reminder-dialog.show, .update-prompt.show') {
-        return settingsPanel.classList.contains('show') ? settingsPanel : null;
+        return settingsPanel.classList.contains('show') || updatePrompt.classList.contains('show') ? (settingsPanel.classList.contains('show') ? settingsPanel : updatePrompt) : null;
       }
       return null;
     },
@@ -310,6 +339,12 @@ function createRendererHarness({
       if (id === 'clipboardBtn') return clipboardBtn;
       if (id === 'roomBtn') return roomBtn;
       if (id === 'live2dSwitcherBtn') return live2dSwitcherBtn;
+      if (id === 'updatePrompt') return updatePrompt;
+      if (id === 'updatePromptTitle') return updatePromptTitle;
+      if (id === 'updatePromptText') return updatePromptText;
+      if (id === 'updatePromptClose') return updatePromptClose;
+      if (id === 'updatePromptPrimary') return updatePromptPrimary;
+      if (id === 'updatePromptSecondary') return updatePromptSecondary;
       return null;
     },
     querySelectorAll(selector) {
@@ -334,7 +369,13 @@ function createRendererHarness({
     document: fakeDocument,
     happyBubble,
     stage,
-    live2dCanvas,
+    get live2dCanvas() {
+      return live2dCanvas;
+    },
+    replaceLive2DCanvas(nextCanvas) {
+      live2dCanvas = nextCanvas;
+      fakeDocument.dispatch('desktop-cat:live2d-canvas-replaced', { detail: { canvas: nextCanvas } });
+    },
     waterBowl,
     waterBubble,
     waterCounter,
@@ -344,6 +385,12 @@ function createRendererHarness({
     catSizeBtn,
     settingsBtn,
     settingsPanel,
+    updatePrompt,
+    updatePromptTitle,
+    updatePromptText,
+    updatePromptClose,
+    updatePromptPrimary,
+    updatePromptSecondary,
     randomSpeechToggle,
     autoLaunchToggle,
     documentElement,
@@ -386,6 +433,15 @@ function createRendererHarness({
     },
     get autoLaunchSetCalls() {
       return autoLaunchSetCalls;
+    },
+    get live2dActionCalls() {
+      return live2dActionCalls;
+    },
+    get updatePromptHandler() {
+      return updatePromptHandler;
+    },
+    get updateResponses() {
+      return updateResponses;
     },
   };
 }
@@ -500,6 +556,48 @@ test('cat drag mode captures the active pointer and exits on captured pointerup'
   assert.equal(harness.cat.classList.contains('is-dragging'), false);
 });
 
+
+test('cat drag mode stays attached after Live2D replaces the canvas element', () => {
+  const harness = createRendererHarness({
+    supportsPointerEvents: true,
+    live2dDisplay: 'block',
+    live2dCanvasRect: { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 },
+    live2dAppearance: {
+      isPointOverVisible: () => true
+    },
+    elementFromPoint: ({ live2dCanvas }) => live2dCanvas
+  });
+  const replacementCanvas = new FakeElement({
+    rect: { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 }
+  });
+
+  harness.replaceLive2DCanvas(replacementCanvas);
+  replacementCanvas.dispatch('pointerdown', {
+    button: 0,
+    pointerId: 9,
+    clientX: 100,
+    clientY: 100,
+    screenX: 500,
+    screenY: 500,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+  harness.window.dispatch('pointermove', {
+    pointerId: 9,
+    buttons: 1,
+    clientX: 112,
+    clientY: 100,
+    screenX: 512,
+    screenY: 500
+  });
+
+  assert.deepEqual(replacementCanvas.capturedPointerIds, [9]);
+  assert.equal(harness.dragEnterCount, 1);
+  assert.deepEqual(harness.dragMovePoints, [{ x: 512, y: 500 }]);
+
+  replacementCanvas.dispatch('pointerup', { pointerId: 9 });
+  assert.equal(harness.dragExitCount, 1);
+});
 test('cat drag mode exits when the captured pointer is lost', () => {
   const harness = createRendererHarness({ supportsPointerEvents: true });
 
@@ -818,6 +916,94 @@ test('cat drag mode sends the original press point and each real move point', ()
   ]);
 });
 
+test('pet click asks Live2D actions to play tap', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('click');
+
+  assert.deepEqual(harness.live2dActionCalls, [['playTap']]);
+});
+
+test('pet hover asks Live2D actions to play hover', () => {
+  const harness = createRendererHarness();
+
+  harness.stage.dispatch('pointerenter', { clientX: 20, clientY: 20 });
+
+  assert.deepEqual(harness.live2dActionCalls, [['playAlias', 'hover', undefined]]);
+});
+
+test('pet drag asks Live2D actions to play drag direction and idle on release', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    screenX: 100,
+    screenY: 100,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 22,
+    clientY: 12,
+    screenX: 110,
+    screenY: 100
+  });
+
+  assert.equal(harness.live2dActionCalls.length, 1);
+  assert.deepEqual(harness.live2dActionCalls[0].slice(0, 2), ['playAlias', 'drag-right']);
+  assert.equal(harness.live2dActionCalls[0][2].loop, true);
+
+  harness.window.dispatch('mouseup');
+
+  assert.equal(harness.live2dActionCalls.length, 2);
+  assert.deepEqual(harness.live2dActionCalls[1], ['playIdle']);
+});
+
+test('pet drag asks Live2D actions to play the left drag direction', () => {
+  const harness = createRendererHarness();
+
+  harness.cat.dispatch('mousedown', {
+    button: 0,
+    clientX: 12,
+    clientY: 12,
+    screenX: 100,
+    screenY: 100,
+    preventDefault() {}
+  });
+  harness.flushTimers();
+  harness.document.dispatch('mousemove', {
+    buttons: 1,
+    clientX: 2,
+    clientY: 12,
+    screenX: 90,
+    screenY: 100
+  });
+
+  assert.equal(harness.live2dActionCalls.length, 1);
+  assert.deepEqual(harness.live2dActionCalls[0].slice(0, 2), ['playAlias', 'drag-left']);
+  assert.equal(harness.live2dActionCalls[0][2].loop, true);
+});
+test('update prompt asks Live2D actions to play review while open and idle after response', () => {
+  const harness = createRendererHarness();
+
+  assert.equal(typeof harness.updatePromptHandler, 'function');
+
+  harness.updatePromptHandler({ id: 'update-1', kind: 'available', version: '0.3.16', notes: 'test' });
+
+  assert.equal(harness.updatePrompt.classList.contains('show'), true);
+  assert.equal(harness.live2dActionCalls.length, 1);
+  assert.deepEqual(harness.live2dActionCalls[0].slice(0, 2), ['playAlias', 'review']);
+  assert.equal(harness.live2dActionCalls[0][2].loop, true);
+
+  harness.updatePromptSecondary.dispatch('click');
+
+  assert.equal(harness.updatePrompt.classList.contains('show'), false);
+  assert.deepEqual(harness.live2dActionCalls[1], ['playIdle']);
+  assert.deepEqual(harness.updateResponses, [{ id: 'update-1', response: 'secondary' }]);
+});
 test('live2d canvas click uses the same encouragement cycle as the default cat', () => {
   const harness = createRendererHarness();
 

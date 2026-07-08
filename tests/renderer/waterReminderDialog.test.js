@@ -70,6 +70,8 @@ test('renderer shows a water reminder dialog when reminder triggers', () => {
   assert.match(script, /payload\?\.type/);
   assert.match(script, /waterPanelToggle[\s\S]*?refreshConfig\(\)/);
   assert.match(script, /waterReminderDialog\.classList\.add\('show'\)/);
+  assert.match(script, /__desktopCatPlayLive2DAction\?\.\('waiting',\s*\{\s*loop:\s*true\s*\}\)/);
+  assert.match(script, /__desktopCatPlayLive2DAction\?\.\('idle',\s*\{\s*loop:\s*true\s*\}\)/);
 });
 
 test('water reminder dialog and floating panels keep a compact fixed width', () => {

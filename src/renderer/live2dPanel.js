@@ -1,5 +1,12 @@
 (function initLive2DPanel() {
   const SELECTED_MODEL_KEY = 'desktopCat.live2dModelId';
+  const CODEX_PET_KIND = 'codex-pet';
+  const CODEX_PET_CELL_WIDTH = 192;
+  const CODEX_PET_CELL_HEIGHT = 208;
+  const CODEX_PET_IDLE_FRAMES = 6;
+  const CODEX_PET_IDLE_DURATIONS = [280, 110, 110, 140, 140, 320];
+  const CODEX_PET_PREVIEW_WIDTH = 92;
+  const CODEX_PET_PREVIEW_HEIGHT = 86;
 
   const live2dBtn = document.getElementById('live2dSwitcherBtn');
   const live2dPanel = document.getElementById('live2dPanel');
@@ -9,6 +16,7 @@
   let models = [];
   let activeModelId = null;
   let modelsLoaded = false;
+  let previewAnimations = [];
 
   function logLive2DPanel(message, details = {}) {
     try {
@@ -36,7 +44,7 @@
       modelCount: models.length,
       activeModelId,
       renderedModelList: hasRenderedModelList(),
-      previewResourceCount: 0,
+      previewResourceCount: previewAnimations.length,
       appearance: window.__desktopCatLive2DAppearance?.getDebugSnapshot?.() || null
     };
   }
@@ -102,6 +110,7 @@
     logLive2DPanel('clear model list requested', {
       before: getPanelDebugSnapshot()
     });
+    stopPreviewAnimations();
     live2dModelList?.replaceChildren();
     logLive2DPanel('clear model list complete', {
       after: getPanelDebugSnapshot()
@@ -170,6 +179,140 @@
     await live2dAppearance?.loadModel?.(modelConfig);
   }
 
+  function isCodexPetModel(modelConfig) {
+    return modelConfig?.kind === CODEX_PET_KIND;
+  }
+
+  function stopPreviewAnimations() {
+    for (const animation of previewAnimations) {
+      if (animation.rafId && typeof window.cancelAnimationFrame === 'function') {
+        window.cancelAnimationFrame(animation.rafId);
+      }
+    }
+    previewAnimations = [];
+  }
+
+  function loadPreviewImage(src) {
+    return new Promise((resolve, reject) => {
+      const ImageCtor = window.Image || Image;
+      const image = new ImageCtor();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Failed to load preview image: ${src}`));
+      image.src = src;
+    });
+  }
+
+  function drawCodexPetPreviewFrame(animation) {
+    const frame = animation.frameIndex % CODEX_PET_IDLE_FRAMES;
+    const sx = frame * CODEX_PET_CELL_WIDTH;
+    const sy = 0;
+    const scale = Math.min(
+      animation.canvas.width / CODEX_PET_CELL_WIDTH,
+      animation.canvas.height / CODEX_PET_CELL_HEIGHT
+    );
+    const dw = Math.round(CODEX_PET_CELL_WIDTH * scale);
+    const dh = Math.round(CODEX_PET_CELL_HEIGHT * scale);
+    const dx = Math.round((animation.canvas.width - dw) / 2);
+    const dy = Math.round(animation.canvas.height - dh);
+
+    animation.context.clearRect(0, 0, animation.canvas.width, animation.canvas.height);
+    animation.context.imageSmoothingEnabled = false;
+    animation.context.drawImage(
+      animation.image,
+      sx,
+      sy,
+      CODEX_PET_CELL_WIDTH,
+      CODEX_PET_CELL_HEIGHT,
+      dx,
+      dy,
+      dw,
+      dh
+    );
+  }
+
+  function scheduleCodexPetPreviewFrame(animation) {
+    if (typeof window.requestAnimationFrame !== 'function') return;
+
+    animation.rafId = window.requestAnimationFrame((time = 0) => {
+      if (!previewAnimations.includes(animation)) return;
+      if (animation.lastFrameTime === null) {
+        animation.lastFrameTime = time;
+      }
+      const duration = CODEX_PET_IDLE_DURATIONS[animation.frameIndex % CODEX_PET_IDLE_DURATIONS.length];
+      if (time - animation.lastFrameTime >= duration) {
+        animation.frameIndex += 1;
+        animation.lastFrameTime = time;
+        drawCodexPetPreviewFrame(animation);
+      }
+      scheduleCodexPetPreviewFrame(animation);
+    });
+  }
+
+  function renderCodexPetPreview(modelConfig, canvas, card) {
+    const spritesheetUrl = modelConfig?.spritesheetUrl || modelConfig?.previewImageUrl;
+    logLive2DPanel('render codex pet preview requested', {
+      modelId: modelConfig?.id || null,
+      hasSpritesheetUrl: Boolean(spritesheetUrl),
+      before: getPanelDebugSnapshot()
+    });
+    if (!spritesheetUrl) {
+      card.classList.add('is-preview-unavailable');
+      return;
+    }
+
+    loadPreviewImage(spritesheetUrl).then((image) => {
+      const context = canvas.getContext?.('2d');
+      if (!context) {
+        card.classList.add('is-preview-unavailable');
+        return;
+      }
+      const animation = {
+        canvas,
+        context,
+        image,
+        frameIndex: 0,
+        lastFrameTime: null,
+        rafId: null
+      };
+      previewAnimations.push(animation);
+      drawCodexPetPreviewFrame(animation);
+      scheduleCodexPetPreviewFrame(animation);
+      logLive2DPanel('codex pet preview loaded', {
+        modelId: modelConfig.id,
+        after: getPanelDebugSnapshot()
+      });
+    }).catch((error) => {
+      card.classList.add('is-preview-unavailable');
+      logLive2DPanel('codex pet preview failed', {
+        modelId: modelConfig?.id || null,
+        error: error?.message || String(error),
+        after: getPanelDebugSnapshot()
+      });
+    });
+  }
+
+  function createCodexPetPreview(modelConfig, card) {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'live2d-model-preview live2d-model-preview-canvas';
+    canvas.width = CODEX_PET_PREVIEW_WIDTH;
+    canvas.height = CODEX_PET_PREVIEW_HEIGHT;
+    canvas.setAttribute('aria-hidden', 'true');
+    renderCodexPetPreview(modelConfig, canvas, card);
+    return canvas;
+  }
+
+  function createStaticPreview(modelConfig, card) {
+    const preview = document.createElement('img');
+    preview.className = 'live2d-model-preview';
+    preview.alt = '';
+    preview.draggable = false;
+    preview.decoding = 'async';
+    preview.loading = 'eager';
+    preview.setAttribute('aria-hidden', 'true');
+    renderModelPreview(modelConfig, preview, card);
+    return preview;
+  }
+
   function renderModelPreview(modelConfig, preview, card) {
     logLive2DPanel('render static preview requested', {
       modelId: modelConfig?.id || null,
@@ -208,14 +351,9 @@
     card.dataset.modelId = modelConfig.id;
     card.setAttribute('aria-pressed', 'false');
 
-    const preview = document.createElement('img');
-    preview.className = 'live2d-model-preview';
-    preview.alt = '';
-    preview.draggable = false;
-    preview.decoding = 'async';
-    preview.loading = 'eager';
-    preview.setAttribute('aria-hidden', 'true');
-    renderModelPreview(modelConfig, preview, card);
+    const preview = isCodexPetModel(modelConfig)
+      ? createCodexPetPreview(modelConfig, card)
+      : createStaticPreview(modelConfig, card);
 
     const name = document.createElement('span');
     name.className = 'live2d-model-name';
@@ -225,6 +363,7 @@
     card.addEventListener('click', () => {
       selectModel(modelConfig.id).catch((error) => {
         console.warn('Live2D model failed to switch.', error);
+        window.__desktopCatPlayLive2DAction?.('failed');
       });
     });
 

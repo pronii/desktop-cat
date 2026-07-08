@@ -405,11 +405,16 @@
     window.__closeSettingsPanel?.();
     closePanel();
     waterReminderDialog.classList.add('show');
+    window.__desktopCatPlayLive2DAction?.('waiting', { loop: true });
     focusFirstReminderControl(waterReminderDialog);
   }
 
   function closeReminderDialog() {
+    const wasOpen = waterReminderDialog?.classList.contains('show');
     waterReminderDialog?.classList.remove('show');
+    if (wasOpen) {
+      window.__desktopCatPlayLive2DAction?.('idle', { loop: true });
+    }
     restoreReminderFocus(waterReminderReturnFocus);
     waterReminderReturnFocus = null;
   }

@@ -3,8 +3,11 @@ const path = require('node:path');
 
 const LIVE2D_PROTOCOL = 'desktop-cat-live2d';
 const MODEL_JSON_PATTERN = /\.model3\.json$/i;
+const CODEX_PET_JSON = 'pet.json';
+const CODEX_PET_KIND = 'codex-pet';
 const MAX_SEARCH_DEPTH = 4;
 const BUILT_IN_LIVE2D_MODELS_DIR = path.join(__dirname, '..', 'renderer', 'live2d-models');
+const BUILT_IN_CODEX_PETS_DIR = path.join(__dirname, '..', 'renderer', 'codex-pets');
 
 function uniquePaths(paths) {
   const seen = new Set();
@@ -55,6 +58,39 @@ function resolveLive2DSearchRoots({
   return uniquePaths(roots);
 }
 
+function resolveCodexPetSearchRoots({
+  isPackaged = false,
+  portableExecutableDir = process.env.PORTABLE_EXECUTABLE_DIR,
+  execPath = process.execPath,
+  cwd = process.cwd(),
+  userDataDir,
+  builtInCodexPetsDir = BUILT_IN_CODEX_PETS_DIR
+} = {}) {
+  const roots = [];
+
+  if (isPackaged && portableExecutableDir) {
+    roots.push(path.join(portableExecutableDir, 'codex-pets'));
+  }
+
+  if (isPackaged && execPath) {
+    roots.push(path.join(path.dirname(execPath), 'codex-pets'));
+  }
+
+  if (cwd) {
+    roots.push(path.join(cwd, 'codex-pets'));
+  }
+
+  if (userDataDir) {
+    roots.push(path.join(userDataDir, 'codex-pets'));
+  }
+
+  if (builtInCodexPetsDir) {
+    roots.push(builtInCodexPetsDir);
+  }
+
+  return uniquePaths(roots);
+}
+
 function findModelJsons(rootDir, depth = 0) {
   if (depth > MAX_SEARCH_DEPTH) return [];
   let entries;
@@ -82,12 +118,40 @@ function findModelJsons(rootDir, depth = 0) {
   return found;
 }
 
-function readModelJson(modelJsonPath) {
+function findCodexPetJsons(rootDir, depth = 0) {
+  if (depth > MAX_SEARCH_DEPTH) return [];
+  let entries;
+
   try {
-    return JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
+    entries = fs.readdirSync(rootDir, { withFileTypes: true });
+  } catch (_error) {
+    return [];
+  }
+
+  const petJson = entries.find((entry) => entry.isFile() && entry.name === CODEX_PET_JSON);
+  const found = petJson ? [path.join(rootDir, CODEX_PET_JSON)] : [];
+
+  const dirs = entries
+    .filter((entry) => entry.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const dir of dirs) {
+    found.push(...findCodexPetJsons(path.join(rootDir, dir.name), depth + 1));
+  }
+
+  return found;
+}
+
+function readJson(jsonPath) {
+  try {
+    return JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
   } catch (_error) {
     return null;
   }
+}
+
+function readModelJson(modelJsonPath) {
+  return readJson(modelJsonPath);
 }
 
 function readModelName(modelJsonPath, modelJson) {
@@ -165,26 +229,118 @@ function createLive2DModelRecord(searchRoot, modelJsonPath) {
   return model;
 }
 
-function discoverLive2DModels({ searchRoots = [] } = {}) {
+function readCodexPetName(petJsonPath, petJson, submissionJson) {
+  const displayName = petJson?.displayName || petJson?.name || submissionJson?.name;
+  return typeof displayName === 'string' && displayName.trim()
+    ? displayName.trim()
+    : path.basename(path.dirname(petJsonPath));
+}
+
+function readCodexPetSlug(petJsonPath, petJson, submissionJson) {
+  const slug = petJson?.id || submissionJson?.slug || path.basename(path.dirname(petJsonPath));
+  return typeof slug === 'string' && slug.trim()
+    ? slug.trim()
+    : path.basename(path.dirname(petJsonPath));
+}
+
+function normalizeCodexPetActionMap(actionMap) {
+  if (!Array.isArray(actionMap)) return null;
+
+  const normalized = [];
+  for (const action of actionMap) {
+    const row = Number(action?.row);
+    const frames = Number(action?.frames);
+    const state = typeof action?.state === 'string' ? action.state.trim() : '';
+    if (!state || !Number.isInteger(row) || row < 1 || !Number.isInteger(frames) || frames < 1) {
+      continue;
+    }
+
+    const entry = { row, state, frames };
+    if (typeof action.meaning === 'string' && action.meaning.trim()) {
+      entry.meaning = action.meaning.trim();
+    }
+    normalized.push(entry);
+  }
+
+  return normalized.length ? normalized : null;
+}
+function createCodexPetRecord(_searchRoot, petJsonPath) {
+  const rootDir = path.dirname(petJsonPath);
+  const petJson = readJson(petJsonPath);
+  if (!petJson) return null;
+
+  const submissionJson = readJson(path.join(rootDir, 'submission.json')) || {};
+  const spritesheetRelativePath = petJson.spritesheetPath
+    || submissionJson.codex_install?.spritesheet
+    || 'spritesheet.webp';
+  const spritesheetPath = resolveModelAssetPath(rootDir, spritesheetRelativePath);
+  if (!spritesheetPath || !fs.existsSync(spritesheetPath)) return null;
+
+  const id = `${CODEX_PET_KIND}/${readCodexPetSlug(petJsonPath, petJson, submissionJson)}`;
+  const model = {
+    available: true,
+    kind: CODEX_PET_KIND,
+    id,
+    name: readCodexPetName(petJsonPath, petJson, submissionJson),
+    rootDir,
+    modelJsonPath: petJsonPath,
+    spritesheetPath,
+    modelUrl: createLive2DModelUrl(rootDir, petJsonPath, id),
+    spritesheetUrl: createLive2DModelUrl(rootDir, spritesheetPath, id),
+    previewImagePath: spritesheetPath,
+    previewImageUrl: createLive2DModelUrl(rootDir, spritesheetPath, id)
+  };
+
+  if (typeof submissionJson.license === 'string' && submissionJson.license.trim()) {
+    model.license = submissionJson.license.trim();
+  }
+  if (typeof submissionJson.author === 'string' && submissionJson.author.trim()) {
+    model.author = submissionJson.author.trim();
+  }
+  if (typeof submissionJson.primary_category === 'string' && submissionJson.primary_category.trim()) {
+    model.category = submissionJson.primary_category.trim();
+  }
+  const actionMap = normalizeCodexPetActionMap(submissionJson.action_map);
+  if (actionMap) {
+    model.actionMap = actionMap;
+  }
+
+  return model;
+}
+
+function discoverLive2DModels({ searchRoots = [], codexPetRoots = [] } = {}) {
   const models = [];
   const seen = new Set();
 
+  function pushIfNew(filePath, createRecord, root) {
+    const key = process.platform === 'win32'
+      ? path.resolve(filePath).toLowerCase()
+      : path.resolve(filePath);
+    if (seen.has(key)) return;
+    seen.add(key);
+    const model = createRecord(root, filePath);
+    if (model) {
+      models.push(model);
+    }
+  }
+
   for (const root of searchRoots) {
     for (const modelJsonPath of findModelJsons(root)) {
-      const key = process.platform === 'win32'
-        ? path.resolve(modelJsonPath).toLowerCase()
-        : path.resolve(modelJsonPath);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      models.push(createLive2DModelRecord(root, modelJsonPath));
+      pushIfNew(modelJsonPath, createLive2DModelRecord, root);
+    }
+  }
+
+  for (const root of codexPetRoots) {
+    for (const petJsonPath of findCodexPetJsons(root)) {
+      pushIfNew(petJsonPath, createCodexPetRecord, root);
     }
   }
 
   return models;
 }
 
-function discoverLive2DModel({ searchRoots = [] } = {}) {
-  const [model] = discoverLive2DModels({ searchRoots });
+function discoverLive2DModel({ searchRoots = [], codexPetRoots = [] } = {}) {
+  const [model] = discoverLive2DModels({ searchRoots, codexPetRoots });
   if (model) {
     return model;
   }
@@ -274,7 +430,7 @@ function resolveLive2DProtocolPath(protocolState, requestUrl) {
   return isInsidePath(resolved, model.rootDir) ? resolved : null;
 }
 
-function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRoots } = {}) {
+function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRoots, codexPetRoots: configuredCodexPetRoots } = {}) {
   let currentModel = { available: false };
   let availableModels = [];
 
@@ -286,7 +442,14 @@ function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRo
         cwd: process.cwd(),
         userDataDir: app.getPath('userData')
       });
-    availableModels = discoverLive2DModels({ searchRoots });
+    const codexPetRoots = configuredCodexPetRoots || (configuredSearchRoots ? [] : resolveCodexPetSearchRoots({
+        isPackaged: app.isPackaged,
+        portableExecutableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+        execPath: process.execPath,
+        cwd: process.cwd(),
+        userDataDir: app.getPath('userData')
+      }));
+    availableModels = discoverLive2DModels({ searchRoots, codexPetRoots });
     const currentId = currentModel.available ? currentModel.id : null;
     currentModel = availableModels.find((model) => model.id === currentId) || availableModels[0] || { available: false };
     return currentModel;
@@ -300,8 +463,26 @@ function createLive2DAppearance({ app, protocol, searchRoots: configuredSearchRo
       modelUrl: model.modelUrl
     };
 
+    if (model.kind) {
+      serialized.kind = model.kind;
+    }
     if (model.previewImageUrl) {
       serialized.previewImageUrl = model.previewImageUrl;
+    }
+    if (model.spritesheetUrl) {
+      serialized.spritesheetUrl = model.spritesheetUrl;
+    }
+    if (model.license) {
+      serialized.license = model.license;
+    }
+    if (model.author) {
+      serialized.author = model.author;
+    }
+    if (model.category) {
+      serialized.category = model.category;
+    }
+    if (model.actionMap) {
+      serialized.actionMap = model.actionMap;
     }
 
     return serialized;

@@ -1,0 +1,24 @@
+{
+  "slug": "tingyun--lingxiaotian",
+  "pet_slug": "tingyun",
+  "author_slug": "lingxiaotian",
+  "name": "Tingyun",
+  "author": "Lingxiaotian",
+  "author_handle": "legeling",
+  "author_url": "https://github.com/legeling",
+  "primary_category": "Anime Characters",
+  "tags": ["anime", "honkai-star-rail", "tingyun", "fox-ears", "gold-brown"],
+  "source_type": "fan-art",
+  "source_url": "",
+  "license": "CC BY-NC 4.0",
+  "description": "A Tingyun-inspired fan-art Codex pet with fox ears, a plush tail, green eyes, and a warm gold-brown palette in a compact chibi sprite style.",
+  "preview_image": "../../assets/previews/tingyun--lingxiaotian/gifs/idle.gif",
+  "codex_install": {
+    "pet_json": "pet.json",
+    "spritesheet": "spritesheet.webp"
+  },
+  "preview_assets": {
+    "contact_sheet": "../../assets/previews/tingyun--lingxiaotian/contact-sheet.png",
+    "gifs_dir": "../../assets/previews/tingyun--lingxiaotian/gifs"
+  }
+}

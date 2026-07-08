@@ -38,6 +38,37 @@ function writeModel(root, relativePath, name = 'Hiyori') {
   return filePath;
 }
 
+function writeCodexPet(root, slug = 'firefly--lingxiaotian') {
+  const petDir = path.join(root, slug);
+  fs.mkdirSync(petDir, { recursive: true });
+  const petJsonPath = path.join(petDir, 'pet.json');
+  const spritesheetPath = path.join(petDir, 'spritesheet.webp');
+  fs.writeFileSync(
+    petJsonPath,
+    JSON.stringify({
+      id: slug,
+      displayName: '\u6d41\u8424',
+      description: 'Codex pet sprite package',
+      spritesheetPath: 'spritesheet.webp'
+    }),
+    'utf-8'
+  );
+  fs.writeFileSync(
+    path.join(petDir, 'submission.json'),
+    JSON.stringify({
+      slug,
+      name: 'Firefly',
+      author: 'Lingxiaotian',
+      author_handle: 'legeling',
+      primary_category: 'Anime Characters',
+      license: 'CC BY-NC 4.0'
+    }),
+    'utf-8'
+  );
+  fs.writeFileSync(spritesheetPath, 'spritesheet');
+  return { petDir, petJsonPath, spritesheetPath };
+}
+
 test('resolveLive2DSearchRoots prefers the packaged executable live2d folder', () => {
   const roots = resolveLive2DSearchRoots({
     isPackaged: true,
@@ -153,6 +184,47 @@ test('discoverLive2DModels gives every model an isolated protocol url for previe
   assert.equal(
     resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, models[1].previewImageUrl),
     path.join(path.dirname(maoModelPath), 'textures', 'texture_00.png')
+  );
+});
+
+test('discoverLive2DModels includes Codex pet sprite packages with isolated protocol urls', (t) => {
+  const root = makeTempRoot(t);
+  const live2dRoot = path.join(root, 'live2d');
+  const codexPetRoot = path.join(root, 'codex-pets');
+  writeModel(live2dRoot, path.join('Hiyori', 'Hiyori.model3.json'), 'Hiyori');
+  const pet = writeCodexPet(codexPetRoot);
+
+  const models = discoverLive2DModels({ searchRoots: [live2dRoot], codexPetRoots: [codexPetRoot] });
+  const codexPet = models.find((model) => model.id === 'codex-pet/firefly--lingxiaotian');
+
+  assert.deepEqual(models.map((model) => model.id), ['Hiyori', 'codex-pet/firefly--lingxiaotian']);
+  assert.ok(codexPet);
+  assert.equal(codexPet.available, true);
+  assert.equal(codexPet.kind, 'codex-pet');
+  assert.equal(codexPet.name, '\u6d41\u8424');
+  assert.equal(codexPet.rootDir, pet.petDir);
+  assert.equal(codexPet.modelJsonPath, pet.petJsonPath);
+  assert.equal(codexPet.spritesheetPath, pet.spritesheetPath);
+  assert.equal(codexPet.modelUrl, `${LIVE2D_PROTOCOL}://model/codex-pet%2Ffirefly--lingxiaotian/pet.json`);
+  assert.equal(codexPet.spritesheetUrl, `${LIVE2D_PROTOCOL}://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp`);
+  assert.equal(codexPet.previewImageUrl, codexPet.spritesheetUrl);
+  assert.equal(codexPet.license, 'CC BY-NC 4.0');
+  assert.equal(codexPet.author, 'Lingxiaotian');
+  assert.equal(codexPet.category, 'Anime Characters');
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, codexPet.modelUrl),
+    pet.petJsonPath
+  );
+  assert.equal(
+    resolveLive2DProtocolPath({ availableModels: models, currentModel: models[0] }, codexPet.spritesheetUrl),
+    pet.spritesheetPath
+  );
+  assert.equal(
+    resolveLive2DProtocolPath(
+      { availableModels: models, currentModel: models[0] },
+      `${LIVE2D_PROTOCOL}://model/codex-pet%2Ffirefly--lingxiaotian/../secret.txt`
+    ),
+    null
   );
 });
 
@@ -273,4 +345,80 @@ test('createLive2DAppearance returns serialized model by id without filesystem p
   assert.equal(appearance.getModelById('missing').available, false);
   assert.equal(Object.hasOwn(model, 'rootDir'), false);
   assert.equal(Object.hasOwn(model, 'modelJsonPath'), false);
+});
+test('createLive2DAppearance serializes Codex pet metadata without filesystem paths', (t) => {
+  const root = makeTempRoot(t);
+  const codexPetRoot = path.join(root, 'codex-pets');
+  writeCodexPet(codexPetRoot);
+  const appearance = createLive2DAppearance({
+    app: {
+      isPackaged: false,
+      getPath: () => path.join(root, 'userData')
+    },
+    protocol: {
+      registerFileProtocol() {}
+    },
+    searchRoots: [],
+    codexPetRoots: [codexPetRoot]
+  });
+
+  const model = appearance.getModelById('codex-pet/firefly--lingxiaotian');
+
+  assert.deepEqual(model, {
+    available: true,
+    id: 'codex-pet/firefly--lingxiaotian',
+    kind: 'codex-pet',
+    name: '\u6d41\u8424',
+    modelUrl: `${LIVE2D_PROTOCOL}://model/codex-pet%2Ffirefly--lingxiaotian/pet.json`,
+    previewImageUrl: `${LIVE2D_PROTOCOL}://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp`,
+    spritesheetUrl: `${LIVE2D_PROTOCOL}://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp`,
+    license: 'CC BY-NC 4.0',
+    author: 'Lingxiaotian',
+    category: 'Anime Characters'
+  });
+  assert.equal(Object.hasOwn(model, 'rootDir'), false);
+  assert.equal(Object.hasOwn(model, 'modelJsonPath'), false);
+  assert.equal(Object.hasOwn(model, 'spritesheetPath'), false);
+});
+test('createLive2DAppearance serializes Codex pet action maps without filesystem paths', (t) => {
+  const root = makeTempRoot(t);
+  const codexPetRoot = path.join(root, 'codex-pets');
+  const pet = writeCodexPet(codexPetRoot, 'ruruka--ltmcliao-cmyk');
+  fs.writeFileSync(
+    path.join(pet.petDir, 'submission.json'),
+    JSON.stringify({
+      slug: 'ruruka--ltmcliao-cmyk',
+      name: 'RuRuKa',
+      author: 'ltmcliao-cmyk',
+      primary_category: 'Original Characters',
+      license: 'CC BY-NC 4.0',
+      action_map: [
+        { row: 1, state: 'idle', frames: 6, meaning: 'Autonomous idle animation.' },
+        { row: 4, state: 'waving', frames: 4, meaning: 'Greeting wave.' },
+        { row: 5, state: 'jumping', frames: 5, meaning: 'Hover interaction animation.' }
+      ]
+    }),
+    'utf-8'
+  );
+  const appearance = createLive2DAppearance({
+    app: {
+      isPackaged: false,
+      getPath: () => path.join(root, 'userData')
+    },
+    protocol: {
+      registerFileProtocol() {}
+    },
+    searchRoots: [],
+    codexPetRoots: [codexPetRoot]
+  });
+
+  const model = appearance.getModelById('codex-pet/ruruka--ltmcliao-cmyk');
+
+  assert.deepEqual(model.actionMap, [
+    { row: 1, state: 'idle', frames: 6, meaning: 'Autonomous idle animation.' },
+    { row: 4, state: 'waving', frames: 4, meaning: 'Greeting wave.' },
+    { row: 5, state: 'jumping', frames: 5, meaning: 'Hover interaction animation.' }
+  ]);
+  assert.equal(Object.hasOwn(model, 'rootDir'), false);
+  assert.equal(Object.hasOwn(model, 'spritesheetPath'), false);
 });

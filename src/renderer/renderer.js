@@ -23,7 +23,7 @@
 
   const stage = document.querySelector('.stage');
   const cat = document.querySelector('.cat');
-  const live2dCanvas = document.getElementById('live2dCanvas');
+  let live2dCanvas = document.getElementById('live2dCanvas');
   const happyBubble = document.querySelector('.happy-bubble');
   const waterCounter = document.getElementById('waterCounter');
   const bottomBar = document.querySelector('.bottom-bar');
@@ -321,6 +321,7 @@
   let pressStartPoint = null;
   let pressStartScreenPoint = null;
   let lastDragMovePoint = null;
+  let live2dHoverActive = false;
 
   function clearPendingLongPress() {
     if (!longPressTimer) return;
@@ -380,6 +381,44 @@
     return Boolean(a && b && a.x === b.x && a.y === b.y);
   }
 
+  function playLive2DAction(alias, options) {
+    const actionAlias = String(alias || '');
+    if (!actionAlias) return false;
+    if (actionAlias === 'idle' && window.__desktopCatLive2D?.playIdle?.()) return true;
+    if (actionAlias === 'tap' && window.__desktopCatLive2D?.playTap?.()) return true;
+    return Boolean(window.__desktopCatLive2D?.playAlias?.(actionAlias, options));
+  }
+
+  function playLive2DActionAlias(alias, options) {
+    return playLive2DAction(alias, options);
+  }
+
+  function playLive2DIdle() {
+    return playLive2DAction('idle', { loop: true });
+  }
+
+  window.__desktopCatPlayLive2DAction = playLive2DAction;
+
+  function clearLive2DHoverState() {
+    live2dHoverActive = false;
+  }
+
+  function updateLive2DHoverForPointer(x, y, knownIsOverPet) {
+    if (pressActive || isLongPress || catSizeDragState || isAnyOverlayOpen()) return;
+    const isOverPet = typeof knownIsOverPet === 'boolean' ? knownIsOverPet : isPointOverPetVisible(x, y);
+    if (isOverPet && !live2dHoverActive) {
+      playLive2DActionAlias('hover');
+    }
+    live2dHoverActive = isOverPet;
+  }
+
+  function playLive2DDragForPoint(point) {
+    const previousPoint = lastDragMovePoint || pressStartPoint;
+    const dx = point && previousPoint ? point.x - previousPoint.x : 0;
+    const alias = dx < 0 ? 'drag-left' : dx > 0 ? 'drag-right' : 'drag';
+    playLive2DActionAlias(alias, { loop: true });
+  }
+
   function rememberPressStartPoint(event) {
     pressStartPoint = getPointerScreenPoint(event);
     pressStartScreenPoint = getEventScreenPoint(event) || pressStartPoint;
@@ -410,6 +449,7 @@
       pressStartPoint = null;
       pressStartScreenPoint = null;
       lastDragMovePoint = null;
+      clearLive2DHoverState();
       return;
     }
 
@@ -422,6 +462,7 @@
         window.desktopCat.dragMode.exit();
         dragEntered = false;
       }
+      playLive2DIdle();
     }
 
     pressActive = false;
@@ -429,6 +470,7 @@
     pressStartPoint = null;
     pressStartScreenPoint = null;
     lastDragMovePoint = null;
+    clearLive2DHoverState();
     releasePressPointer();
   }
 
@@ -443,6 +485,7 @@
     dragEntered = false;
     rememberPressStartPoint(event);
     lastDragMovePoint = null;
+    clearLive2DHoverState();
 
     longPressTimer = window.setTimeout(() => {
       longPressTimer = null;
@@ -470,6 +513,7 @@
     if (dragEntered && window.desktopCat?.dragMode) {
       const point = getPointerScreenPoint(event);
       if (isSamePointerPoint(point, lastDragMovePoint)) return;
+      playLive2DDragForPoint(point);
       lastDragMovePoint = point;
       window.desktopCat.dragMode.move?.(getEventScreenPoint(event) || point || undefined);
     }
@@ -492,6 +536,7 @@
       pressStartPoint = null;
       pressStartScreenPoint = null;
       lastDragMovePoint = null;
+      clearLive2DHoverState();
       releasePressPointer();
     }
   }
@@ -501,8 +546,11 @@
   }
 
   const supportsPointerEvents = 'PointerEvent' in window;
+  const boundPetDragTargets = new WeakSet();
 
-  for (const dragTarget of [cat, live2dCanvas].filter(Boolean)) {
+  function bindPetDragTarget(dragTarget) {
+    if (!dragTarget || boundPetDragTargets.has(dragTarget)) return;
+    boundPetDragTargets.add(dragTarget);
     if (supportsPointerEvents) {
       dragTarget.addEventListener('pointerdown', handleCatPressStart);
       dragTarget.addEventListener('pointerup', handleCatPressEnd);
@@ -517,6 +565,24 @@
     dragTarget.addEventListener('click', handleCatClick);
     dragTarget.addEventListener('dragstart', preventElementDrag);
   }
+
+  function getLive2DCanvas() {
+    const currentCanvas = document.getElementById('live2dCanvas');
+    if (currentCanvas && currentCanvas !== live2dCanvas) {
+      live2dCanvas = currentCanvas;
+      bindPetDragTarget(live2dCanvas);
+    }
+    return live2dCanvas;
+  }
+
+  bindPetDragTarget(cat);
+  bindPetDragTarget(getLive2DCanvas());
+  document.addEventListener('desktop-cat:live2d-canvas-replaced', (event) => {
+    const nextCanvas = event?.detail?.canvas || document.getElementById('live2dCanvas');
+    if (!nextCanvas) return;
+    live2dCanvas = nextCanvas;
+    bindPetDragTarget(live2dCanvas);
+  });
 
   /* --- 透明区域点击穿透 ---
    * 窗口 380×380 透明，但小猫只占底部一小块。通过 setIgnoreMouseEvents
@@ -546,8 +612,9 @@
   }
 
   function isPointOverLive2DVisible(x, y) {
-    if (!live2dCanvas || window.getComputedStyle?.(live2dCanvas).display === 'none') return false;
-    const rect = live2dCanvas.getBoundingClientRect();
+    const canvas = getLive2DCanvas();
+    if (!canvas || window.getComputedStyle?.(canvas).display === 'none') return false;
+    const rect = canvas.getBoundingClientRect();
     if (!isPointInRect(x, y, rect)) return false;
     return Boolean(window.__desktopCatLive2DAppearance?.isPointOverVisible?.(x, y));
   }
@@ -568,11 +635,15 @@
   }
 
   function updateBottomControlsForPointer(x, y) {
-    if (isAnyOverlayOpen() || isPointOverPetVisible(x, y) || isPointOverBottomControls(x, y)) {
+    const isOverlayOpen = isAnyOverlayOpen();
+    const isOverPet = isOverlayOpen ? false : isPointOverPetVisible(x, y);
+    const isOverControls = isPointOverBottomControls(x, y);
+    if (isOverlayOpen || isOverPet || isOverControls) {
       showCatSizeControl();
     } else {
       hideCatSizeControl();
     }
+    return isOverPet;
   }
 
   function isAnyOverlayOpen() {
@@ -589,7 +660,7 @@
     if (!el) return true;
     if (el === document.body || el === document.documentElement || el === stage) return true;
     if (el === cat) return !isPointOverCatVisible(x, y);
-    if (el === live2dCanvas) return !isPointOverLive2DVisible(x, y);
+    if (el === getLive2DCanvas()) return !isPointOverLive2DVisible(x, y);
     return false;
   }
 
@@ -612,7 +683,8 @@
     } else {
       handleCatPressMove(event);
     }
-    updateBottomControlsForPointer(event.clientX, event.clientY);
+    const isOverPet = updateBottomControlsForPointer(event.clientX, event.clientY);
+    updateLive2DHoverForPointer(event.clientX, event.clientY, isOverPet);
     updateClickThrough(event.clientX, event.clientY);
   });
 
@@ -637,10 +709,12 @@
   });
 
   stage?.addEventListener('pointerenter', (event) => {
-    updateBottomControlsForPointer(event.clientX, event.clientY);
+    const isOverPet = updateBottomControlsForPointer(event.clientX, event.clientY);
+    updateLive2DHoverForPointer(event.clientX, event.clientY, isOverPet);
   });
 
   stage?.addEventListener('pointerleave', () => {
+    clearLive2DHoverState();
     scheduleCatSizeControlHide();
   });
 
@@ -734,7 +808,9 @@
       showCatSizeControl();
       applyClickThrough(false);
       focusFirstPromptControl(updatePrompt);
+      window.__desktopCatPlayLive2DAction?.('review', { loop: true });
     } else {
+      window.__desktopCatPlayLive2DAction?.('idle', { loop: true });
       restorePromptFocus(updatePromptReturnFocus);
       updatePromptReturnFocus = null;
     }

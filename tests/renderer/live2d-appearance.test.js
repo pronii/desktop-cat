@@ -487,10 +487,11 @@ test('live2d switcher panel renders model previews and selects a model', () => {
   assert.match(script, /document\.createElement\('img'\)/);
   assert.doesNotMatch(script, /Live2DModel\.from/);
   assert.doesNotMatch(script, /new\s+window\.PIXI\.Application/);
-  assert.doesNotMatch(script, /document\.createElement\('canvas'\)/);
+  assert.match(script, /document\.createElement\('canvas'\)/);
   assert.match(script, /live2dModelList/);
   assert.match(script, /live2d-model-card/);
   assert.match(script, /loadModel\?\.\(selected\)/);
+  assert.match(script, /__desktopCatPlayLive2DAction\?\.\('failed'\)/);
 });
 
 test('bundled live2d models do not include audio assets or sound motion bindings', () => {
@@ -888,6 +889,159 @@ test('live2d switcher button opens previews without touching the visible main mo
   assert.equal(previewModelLoads, 0);
   assert.equal(createdImages.length, 1);
   assert.equal(createdImages[0].src, modelConfig.previewImageUrl);
+});
+
+test('live2d switcher crops Codex pet spritesheets to an animated single-pet preview', async () => {
+  const script = readSource('src', 'renderer', 'live2dPanel.js');
+  const modelConfig = {
+    available: true,
+    kind: 'codex-pet',
+    id: 'codex-pet/mai--dwdestiny',
+    name: 'Mai',
+    modelUrl: 'desktop-cat-live2d://model/codex-pet%2Fmai--dwdestiny/pet.json',
+    previewImageUrl: 'desktop-cat-live2d://model/codex-pet%2Fmai--dwdestiny/spritesheet.webp',
+    spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Fmai--dwdestiny/spritesheet.webp'
+  };
+  let panelOpen = false;
+  let buttonClick = null;
+  const canvasDraws = [];
+  const imageSources = [];
+  const rafCallbacks = [];
+
+  function createElement(id = '') {
+    return {
+      children: [],
+      className: '',
+      dataset: {},
+      style: {},
+      width: 0,
+      height: 0,
+      classList: {
+        contains(name) {
+          return id === 'live2dPanel' && name === 'show' ? panelOpen : false;
+        },
+        toggle(name, value) {
+          if (id === 'live2dPanel' && name === 'show') panelOpen = Boolean(value);
+        },
+        add() {},
+        remove() {}
+      },
+      setAttribute() {},
+      addEventListener(type, handler) {
+        if (id === 'live2dSwitcherBtn' && type === 'click') buttonClick = handler;
+      },
+      querySelector(selector) {
+        if (selector === '.live2d-model-card, .live2d-panel-empty') return this.children[0] || null;
+        return null;
+      },
+      querySelectorAll() {
+        return [];
+      },
+      replaceChildren() {
+        this.children = [];
+      },
+      append(...children) {
+        this.children.push(...children);
+      },
+      contains() {
+        return false;
+      },
+      getContext(type) {
+        assert.equal(type, '2d');
+        return {
+          imageSmoothingEnabled: true,
+          clearRect() {},
+          drawImage(...args) {
+            canvasDraws.push(args);
+          }
+        };
+      }
+    };
+  }
+
+  const elements = new Map([
+    ['live2dSwitcherBtn', createElement('live2dSwitcherBtn')],
+    ['live2dPanel', createElement('live2dPanel')],
+    ['live2dPanelClose', createElement('live2dPanelClose')],
+    ['live2dModelList', createElement('live2dModelList')]
+  ]);
+
+  class FakeImage {
+    set src(value) {
+      imageSources.push(value);
+      setImmediate(() => this.onload?.());
+    }
+  }
+
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: {
+      appearance: {
+        getLive2DModels: async () => [modelConfig],
+        setLive2DModel: async () => modelConfig
+      }
+    },
+    __desktopCatLive2DAppearance: {
+      getCurrentModel: () => ({ id: modelConfig.id, available: true }),
+      isCurrentModelVisible: () => true
+    },
+    localStorage: {
+      getItem: () => null,
+      setItem() {}
+    },
+    Image: FakeImage,
+    requestAnimationFrame(callback) {
+      rafCallbacks.push(callback);
+      return rafCallbacks.length;
+    },
+    cancelAnimationFrame() {}
+  };
+
+  const fakeDocument = {
+    getElementById(id) {
+      return elements.get(id) || null;
+    },
+    createElement(tagName) {
+      const element = createElement();
+      element.tagName = tagName.toUpperCase();
+      return element;
+    },
+    createDocumentFragment() {
+      return {
+        children: [],
+        append(...children) {
+          this.children.push(...children);
+        }
+      };
+    },
+    addEventListener() {}
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console,
+    Image: FakeImage,
+    setImmediate
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  imageSources.length = 0;
+  canvasDraws.length = 0;
+  rafCallbacks.length = 0;
+
+  buttonClick({ preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.ok(imageSources.includes(modelConfig.spritesheetUrl));
+  assert.ok(canvasDraws.length > 0, 'Codex pet preview should draw a cropped frame');
+  assert.deepEqual(canvasDraws[0].slice(1, 5), [0, 0, 192, 208]);
+
+  rafCallbacks.shift()(0);
+  rafCallbacks.shift()(281);
+  assert.deepEqual(canvasDraws.at(-1).slice(1, 5), [192, 0, 192, 208]);
 });
 
 test('closing live2d switcher preview does not destroy the visible main model', async () => {
@@ -1609,4 +1763,582 @@ test('live2d appearance hit-tests WebGL pixels by alpha', async () => {
   assert.equal(fakeWindow.__desktopCatLive2DAppearance.isPointOverVisible(120, 40), false);
   assert.equal(fakeWindow.__desktopCatLive2DAppearance.isPointOverVisible(130, 40), true);
   assert.deepEqual(reads, [[120, 199], [130, 199]]);
+});
+test('live2d appearance loads Codex pet spritesheets without the PIXI runtime', async () => {
+  const script = readSource('src', 'renderer', 'live2dAppearance.js');
+  const stageClasses = new Set();
+  const drawCalls = [];
+  const imageSources = [];
+  const attributes = new Map();
+  const context2d = {
+    imageSmoothingEnabled: true,
+    clearRect() {},
+    drawImage(...args) {
+      drawCalls.push(args);
+    },
+    getImageData() {
+      return { data: [0, 0, 0, 255] };
+    }
+  };
+  const stage = {
+    classList: {
+      add(name) {
+        stageClasses.add(name);
+      },
+      remove(name) {
+        stageClasses.delete(name);
+      },
+      contains(name) {
+        return stageClasses.has(name);
+      }
+    }
+  };
+  const canvas = {
+    width: 0,
+    height: 0,
+    dataset: {},
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name);
+    },
+    addEventListener() {},
+    getContext(type) {
+      assert.equal(type, '2d');
+      return context2d;
+    },
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 };
+    }
+  };
+  class FakeImage {
+    constructor() {
+      this.width = 1536;
+      this.height = 1872;
+    }
+
+    set src(value) {
+      imageSources.push(value);
+      setImmediate(() => this.onload?.());
+    }
+  }
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: {
+      appearance: {
+        getLive2DModel: async () => ({ available: false })
+      }
+    },
+    requestAnimationFrame: () => 1,
+    cancelAnimationFrame() {},
+    Image: FakeImage
+  };
+  const fakeDocument = {
+    querySelector(selector) {
+      return selector === '.stage' ? stage : null;
+    },
+    getElementById(id) {
+      return id === 'live2dCanvas' ? canvas : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console,
+    Image: FakeImage,
+    setImmediate
+  });
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    kind: 'codex-pet',
+    id: 'codex-pet/firefly--lingxiaotian',
+    name: '\u6d41\u8424',
+    modelUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/pet.json',
+    spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp'
+  });
+
+  assert.deepEqual(imageSources, ['desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp']);
+  assert.ok(drawCalls.length > 0, 'spritesheet frame should be drawn to the 2D canvas');
+  assert.equal(context2d.imageSmoothingEnabled, false);
+  assert.equal(stageClasses.has('has-live2d'), true);
+  assert.equal(attributes.get('aria-hidden'), 'false');
+  assert.equal(fakeWindow.__desktopCatLive2DAppearance.getCurrentModel().kind, 'codex-pet');
+  assert.equal(fakeWindow.__desktopCatLive2DAppearance.isPointOverVisible(120, 120), true);
+});
+
+test('live2d appearance advances Codex pet idle frames on animation timing', async () => {
+  const script = readSource('src', 'renderer', 'live2dAppearance.js');
+  const stageClasses = new Set();
+  const drawCalls = [];
+  const rafCallbacks = [];
+  const context2d = {
+    imageSmoothingEnabled: true,
+    clearRect() {},
+    drawImage(...args) {
+      drawCalls.push(args);
+    },
+    getImageData() {
+      return { data: [0, 0, 0, 255] };
+    }
+  };
+  const canvas = {
+    width: 0,
+    height: 0,
+    dataset: {},
+    setAttribute() {},
+    addEventListener() {},
+    getContext(type) {
+      assert.equal(type, '2d');
+      return context2d;
+    },
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 };
+    }
+  };
+  class FakeImage {
+    set src(_value) {
+      setImmediate(() => this.onload?.());
+    }
+  }
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: { appearance: { getLive2DModel: async () => ({ available: false }) } },
+    requestAnimationFrame(callback) {
+      rafCallbacks.push(callback);
+      return rafCallbacks.length;
+    },
+    cancelAnimationFrame() {},
+    Image: FakeImage
+  };
+  const fakeDocument = {
+    querySelector(selector) {
+      return selector === '.stage'
+        ? { classList: { add: (name) => stageClasses.add(name), remove: (name) => stageClasses.delete(name), contains: (name) => stageClasses.has(name) } }
+        : null;
+    },
+    getElementById(id) {
+      return id === 'live2dCanvas' ? canvas : null;
+    }
+  };
+
+  vm.runInNewContext(script, { window: fakeWindow, document: fakeDocument, console, Image: FakeImage, setImmediate });
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    kind: 'codex-pet',
+    id: 'codex-pet/firefly--lingxiaotian',
+    name: '\u6d41\u8424',
+    modelUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/pet.json',
+    spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp'
+  });
+
+  assert.deepEqual(drawCalls.at(-1).slice(1, 5), [0, 0, 192, 208]);
+  rafCallbacks.shift()(0);
+  rafCallbacks.shift()(281);
+  assert.deepEqual(drawCalls.at(-1).slice(1, 5), [192, 0, 192, 208]);
+});
+test('live2d appearance replaces a WebGL canvas before switching to Codex pet rendering', async () => {
+  const script = readSource('src', 'renderer', 'live2dAppearance.js');
+  const stageClasses = new Set();
+  const drawCalls = [];
+  const context2d = {
+    imageSmoothingEnabled: true,
+    clearRect() {},
+    drawImage(...args) {
+      drawCalls.push(args);
+    },
+    getImageData() {
+      return { data: [0, 0, 0, 255] };
+    }
+  };
+  const stage = {
+    classList: {
+      add(name) {
+        stageClasses.add(name);
+      },
+      remove(name) {
+        stageClasses.delete(name);
+      },
+      contains(name) {
+        return stageClasses.has(name);
+      }
+    }
+  };
+  let replaceCount = 0;
+  let currentCanvas = null;
+  function createCanvas() {
+    const attributes = new Map();
+    const canvas = {
+      id: 'live2dCanvas',
+      width: 0,
+      height: 0,
+      dataset: {},
+      setAttribute(name, value) {
+        attributes.set(name, String(value));
+      },
+      getAttribute(name) {
+        return attributes.get(name);
+      },
+      addEventListener() {},
+      getContext(type) {
+        if (type === '2d' && this.dataset.renderContext === 'webgl') {
+          return null;
+        }
+        return type === '2d' ? context2d : {};
+      },
+      getBoundingClientRect() {
+        return { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 };
+      },
+      cloneNode() {
+        const next = createCanvas();
+        next.width = this.width;
+        next.height = this.height;
+        return next;
+      },
+      replaceWith(next) {
+        replaceCount += 1;
+        currentCanvas = next;
+      }
+    };
+    return canvas;
+  }
+  currentCanvas = createCanvas();
+  class FakeImage {
+    constructor() {
+      this.width = 1536;
+      this.height = 1872;
+    }
+
+    set src(_value) {
+      setImmediate(() => this.onload?.());
+    }
+  }
+  class FakePixiApplication {
+    constructor() {
+      this.stage = {
+        children: [],
+        addChild: (child) => {
+          this.stage.children.push(child);
+        },
+        removeChild: (child) => {
+          this.stage.children = this.stage.children.filter((entry) => entry !== child);
+        }
+      };
+    }
+  }
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: {
+      appearance: {
+        getLive2DModel: async () => ({ available: false })
+      }
+    },
+    live2dMotionController: {
+      createLive2DMotionController: () => ({
+        playTap() {},
+        dispose() {}
+      })
+    },
+    requestAnimationFrame: () => 1,
+    cancelAnimationFrame() {},
+    Image: FakeImage,
+    PIXI: {
+      Application: FakePixiApplication,
+      live2d: {
+        Live2DModel: {
+          from: async () => ({
+            width: 120,
+            height: 180,
+            anchor: { set() {} },
+            scale: { set() {} },
+            on() {},
+            destroy() {}
+          })
+        }
+      }
+    }
+  };
+  const fakeDocument = {
+    querySelector(selector) {
+      return selector === '.stage' ? stage : null;
+    },
+    getElementById(id) {
+      return id === 'live2dCanvas' ? currentCanvas : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console,
+    Image: FakeImage,
+    setImmediate
+  });
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    id: 'Haru',
+    name: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json'
+  });
+  assert.equal(currentCanvas.dataset.renderContext, 'webgl');
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    kind: 'codex-pet',
+    id: 'codex-pet/firefly--lingxiaotian',
+    name: '\u6d41\u8424',
+    modelUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/pet.json',
+    spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp'
+  });
+
+  assert.equal(replaceCount, 1);
+  assert.equal(currentCanvas.dataset.renderContext, '2d');
+  assert.ok(drawCalls.length > 0, 'Codex pet frame should render after replacing the WebGL canvas');
+  assert.equal(stageClasses.has('has-live2d'), true);
+});
+
+test('live2d appearance marks the replacement WebGL canvas visible when switching from Codex pet rendering', async () => {
+  const script = readSource('src', 'renderer', 'live2dAppearance.js');
+  const stageClasses = new Set();
+  const context2d = {
+    imageSmoothingEnabled: true,
+    clearRect() {},
+    drawImage() {},
+    getImageData() {
+      return { data: [0, 0, 0, 255] };
+    }
+  };
+  const stage = {
+    classList: {
+      add(name) {
+        stageClasses.add(name);
+      },
+      remove(name) {
+        stageClasses.delete(name);
+      },
+      contains(name) {
+        return stageClasses.has(name);
+      }
+    }
+  };
+  let replaceCount = 0;
+  let currentCanvas = null;
+  function createCanvas() {
+    const attributes = new Map();
+    const canvas = {
+      id: 'live2dCanvas',
+      width: 0,
+      height: 0,
+      dataset: {},
+      setAttribute(name, value) {
+        attributes.set(name, String(value));
+      },
+      getAttribute(name) {
+        return attributes.get(name);
+      },
+      addEventListener() {},
+      getContext(type) {
+        return type === '2d' ? context2d : {};
+      },
+      getBoundingClientRect() {
+        return { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 };
+      },
+      cloneNode() {
+        const next = createCanvas();
+        next.width = this.width;
+        next.height = this.height;
+        for (const [name, value] of attributes) {
+          next.setAttribute(name, value);
+        }
+        return next;
+      },
+      replaceWith(next) {
+        replaceCount += 1;
+        currentCanvas = next;
+      }
+    };
+    return canvas;
+  }
+  currentCanvas = createCanvas();
+  class FakeImage {
+    set src(_value) {
+      setImmediate(() => this.onload?.());
+    }
+  }
+  class FakePixiApplication {
+    constructor(options) {
+      this.view = options.view;
+      this.stage = {
+        children: [],
+        addChild: (child) => {
+          this.stage.children.push(child);
+        },
+        removeChild: (child) => {
+          this.stage.children = this.stage.children.filter((entry) => entry !== child);
+        }
+      };
+    }
+  }
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: {
+      appearance: {
+        getLive2DModel: async () => ({ available: false })
+      }
+    },
+    live2dMotionController: {
+      createLive2DMotionController: () => ({
+        playTap() {},
+        dispose() {}
+      })
+    },
+    requestAnimationFrame: () => 1,
+    cancelAnimationFrame() {},
+    Image: FakeImage,
+    PIXI: {
+      Application: FakePixiApplication,
+      live2d: {
+        Live2DModel: {
+          from: async () => ({
+            width: 120,
+            height: 180,
+            anchor: { set() {} },
+            scale: { set() {} },
+            on() {},
+            destroy() {}
+          })
+        }
+      }
+    }
+  };
+  const fakeDocument = {
+    querySelector(selector) {
+      return selector === '.stage' ? stage : null;
+    },
+    getElementById(id) {
+      return id === 'live2dCanvas' ? currentCanvas : null;
+    }
+  };
+
+  vm.runInNewContext(script, {
+    window: fakeWindow,
+    document: fakeDocument,
+    console,
+    Image: FakeImage,
+    setImmediate
+  });
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    kind: 'codex-pet',
+    id: 'codex-pet/firefly--lingxiaotian',
+    name: '\u6d41\u8424',
+    modelUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/pet.json',
+    spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Ffirefly--lingxiaotian/spritesheet.webp'
+  });
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({ available: false });
+  assert.equal(currentCanvas.dataset.renderContext, '2d');
+  assert.equal(currentCanvas.getAttribute('aria-hidden'), 'true');
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    id: 'Haru',
+    name: 'Haru',
+    modelUrl: 'desktop-cat-live2d://model/Haru/Haru.model3.json'
+  });
+
+  assert.equal(replaceCount, 1);
+  assert.equal(currentCanvas.dataset.renderContext, 'webgl');
+  assert.equal(currentCanvas.getAttribute('aria-hidden'), 'false');
+  assert.equal(stageClasses.has('has-live2d'), true);
+});
+test('live2d appearance plays Codex pet action map aliases and returns to idle', async () => {
+  const script = readSource('src', 'renderer', 'live2dAppearance.js');
+  const stageClasses = new Set();
+  const drawCalls = [];
+  const rafCallbacks = [];
+  const context2d = {
+    imageSmoothingEnabled: true,
+    clearRect() {},
+    drawImage(...args) {
+      drawCalls.push(args);
+    },
+    getImageData() {
+      return { data: [0, 0, 0, 255] };
+    }
+  };
+  const canvas = {
+    width: 0,
+    height: 0,
+    dataset: {},
+    setAttribute() {},
+    addEventListener() {},
+    getContext(type) {
+      assert.equal(type, '2d');
+      return context2d;
+    },
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 240, bottom: 240, width: 240, height: 240 };
+    }
+  };
+  class FakeImage {
+    set src(_value) {
+      setImmediate(() => this.onload?.());
+    }
+  }
+  const fakeWindow = {
+    desktopCatDebug: {},
+    desktopCat: { appearance: { getLive2DModel: async () => ({ available: false }) } },
+    requestAnimationFrame(callback) {
+      rafCallbacks.push(callback);
+      return rafCallbacks.length;
+    },
+    cancelAnimationFrame() {},
+    Image: FakeImage
+  };
+  const fakeDocument = {
+    querySelector(selector) {
+      return selector === '.stage'
+        ? { classList: { add: (name) => stageClasses.add(name), remove: (name) => stageClasses.delete(name), contains: (name) => stageClasses.has(name) } }
+        : null;
+    },
+    getElementById(id) {
+      return id === 'live2dCanvas' ? canvas : null;
+    }
+  };
+
+  vm.runInNewContext(script, { window: fakeWindow, document: fakeDocument, console, Image: FakeImage, setImmediate });
+
+  await fakeWindow.__desktopCatLive2DAppearance.loadModel({
+    available: true,
+    kind: 'codex-pet',
+    id: 'codex-pet/ruruka--ltmcliao-cmyk',
+    name: 'RuRuKa',
+    modelUrl: 'desktop-cat-live2d://model/codex-pet%2Fruruka--ltmcliao-cmyk/pet.json',
+    spritesheetUrl: 'desktop-cat-live2d://model/codex-pet%2Fruruka--ltmcliao-cmyk/spritesheet.webp',
+    actionMap: [
+      { row: 1, state: 'idle', frames: 6 },
+      { row: 4, state: 'waving', frames: 4 },
+      { row: 5, state: 'jumping', frames: 5 },
+      { row: 2, state: 'running-right', frames: 8 }
+    ]
+  });
+
+  assert.deepEqual(drawCalls.at(-1).slice(1, 5), [0, 0, 192, 208]);
+  assert.equal(fakeWindow.__desktopCatLive2D.playTap(), true);
+  assert.deepEqual(drawCalls.at(-1).slice(1, 5), [0, 624, 192, 208]);
+
+  rafCallbacks.shift()(0);
+  rafCallbacks.shift()(281);
+  rafCallbacks.shift()(391);
+  rafCallbacks.shift()(501);
+  rafCallbacks.shift()(641);
+  assert.deepEqual(drawCalls.at(-1).slice(1, 5), [0, 0, 192, 208]);
+
+  assert.equal(fakeWindow.__desktopCatLive2D.playAlias('hover'), true);
+  assert.deepEqual(drawCalls.at(-1).slice(1, 5), [0, 832, 192, 208]);
 });
