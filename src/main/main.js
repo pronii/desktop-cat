@@ -11,7 +11,8 @@ const {
   protocol,
   screen,
   shell,
-  ipcMain
+  ipcMain,
+  globalShortcut
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { centerInWorkArea } = require('./windowMovement');
@@ -31,13 +32,13 @@ const {
   toggleAlwaysOnTop
 } = require('./menuState');
 const {
-  clearTemporaryHide,
   createFullscreenHideState,
-  createTemporaryHideState,
+  createManualHideState,
   enforceFullscreenVisibility,
-  enforceTemporaryHide,
-  revealTemporaryHiddenWindow,
-  startTemporaryHide
+  enforceManualHide,
+  hideManually,
+  isManualHideActive,
+  revealManuallyHiddenWindow
 } = require('./windowVisibility');
 const {
   createTrayIconDataUrl,
@@ -50,7 +51,8 @@ const { createAutoLaunchController } = require('./autoLaunch');
 const { createDeviceIdentity } = require('./deviceIdentity');
 const { createRoomClient, resolveRoomEndpoint } = require('./roomClient');
 const {
-  createLicenseClient,
+  // License activation is disabled for this version; keep endpoint resolver for online heartbeat.
+  // createLicenseClient,
   resolveLicenseEndpoint
 } = require('./licenseClient');
 const { createOnlineClient } = require('./onlineClient');
@@ -72,6 +74,7 @@ const { CAT_SCALE_DEFAULT } = require('../renderer/petBehavior');
 const { registerMainIpcHandlers } = require('./ipcHandlers');
 const { createDragModeController } = require('./dragMode');
 const { createRoomPetSyncController } = require('./roomPetSync');
+const { registerPetVisibilityShortcut } = require('./petVisibilityShortcut');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -92,21 +95,21 @@ const CALM_THRESHOLD = 4;
 let petWindow = null;
 let tray = null;
 let topmostTimer = null;
-let hideTimer = null;
 let topmostSuspended = false;
 let topmostChecking = false;
 let displayChangeTeardown = null;
 let calmProbes = 0;
 let currentTopmostInterval = TOPMOST_FAST_INTERVAL;
 let petMenuState = createPetMenuState();
-let temporaryHideState = createTemporaryHideState();
+let manualHideState = createManualHideState();
 let fullscreenHideState = createFullscreenHideState();
 let topmostSuspendState = createTopmostSuspendState();
 let waterReminder = createWaterReminder();
 let autoLaunchController = null;
 let roomUserId = `cat-${crypto.randomUUID()}`;
 let deviceIdentity = null;
-let licenseClient = null;
+// License activation is disabled for this version.
+// let licenseClient = null;
 let onlineClient = null;
 let updateManager = null;
 let currentCatScale = CAT_SCALE_DEFAULT;
@@ -228,7 +231,7 @@ function getNativeWindowId(window) {
 
 async function refreshTopmost(window) {
   if (!window || window.isDestroyed() || topmostChecking) return;
-  if (enforceTemporaryHide(window, temporaryHideState)) return;
+  if (enforceManualHide(window, manualHideState)) return;
 
   if (!petMenuState.alwaysOnTopEnabled) {
     topmostSuspended = false;
@@ -257,7 +260,7 @@ async function refreshTopmost(window) {
     topmostChecking = false;
   }
 
-  if (enforceTemporaryHide(window, temporaryHideState)) return;
+  if (enforceManualHide(window, manualHideState)) return;
 
   applyAdaptiveInterval(window, topmostSuspended);
 
@@ -326,29 +329,13 @@ function startTopmostWatch(window) {
   restartTopmostTimer(window, TOPMOST_FAST_INTERVAL);
 }
 
-function hideWindowTemporarily(window, durationMs = 5 * 60 * 1000) {
+function hidePetWindow(window) {
   if (!window || window.isDestroyed()) return;
 
-  if (hideTimer) {
-    clearTimeout(hideTimer);
-  }
-
-  startTemporaryHide(temporaryHideState, durationMs);
+  hideManually(manualHideState);
   suspendWindowTopmost(window);
   window.hide();
   updateTrayMenu(window);
-  hideTimer = setTimeout(() => {
-    hideTimer = null;
-    clearTemporaryHide(temporaryHideState);
-
-    if (!window || window.isDestroyed()) return;
-    window.showInactive();
-    refreshTopmost(window);
-  }, durationMs);
-
-  if (typeof hideTimer.unref === 'function') {
-    hideTimer.unref();
-  }
 }
 
 function togglePetAlwaysOnTop(window) {
@@ -360,18 +347,29 @@ function togglePetAlwaysOnTop(window) {
 function showPetWindow(window, { center = true } = {}) {
   if (!window || window.isDestroyed()) return;
 
-  if (hideTimer) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-
   if (center) {
     centerWindowOnScreen(window);
   }
 
-  revealTemporaryHiddenWindow(window, temporaryHideState);
+  revealManuallyHiddenWindow(window, manualHideState);
   refreshTopmost(window);
   updateTrayMenu(window);
+}
+
+function togglePetVisibility(window) {
+  if (!window || window.isDestroyed()) return;
+
+  if (isManualHideActive(manualHideState)) {
+    showPetWindow(window, { center: false });
+    return;
+  }
+
+  if (typeof window.isVisible === 'function' && !window.isVisible()) {
+    showPetWindow(window, { center: false });
+    return;
+  }
+
+  hidePetWindow(window);
 }
 
 function createPetContextMenu(window) {
@@ -382,7 +380,7 @@ function createPetContextMenu(window) {
       actions: {
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
         centerOnScreen: () => centerWindowOnScreen(window),
-        hideTemporarily: () => hideWindowTemporarily(window),
+        hidePet: () => hidePetWindow(window),
         openRoomPanel: () => openRoomPanel(window),
         openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js')),
         toggleWaterReminder: () => {
@@ -409,7 +407,7 @@ function createTrayContextMenu(window) {
       waterReminderConfig: waterReminder.getConfig(),
       actions: {
         showPet: () => showPetWindow(window),
-        hideTemporarily: () => hideWindowTemporarily(window),
+        hidePet: () => hidePetWindow(window),
         toggleAlwaysOnTop: () => togglePetAlwaysOnTop(window),
         openRoomPanel: () => openRoomPanel(window),
         openClipboardHistory: () => openHistoryWindow(path.join(__dirname, '..', 'clipboard-history', 'preload.js')),
@@ -509,7 +507,6 @@ function createPetWindow() {
   petWindow.on('closed', () => {
     dragMode.stop();
     clearInterval(topmostTimer);
-    clearTimeout(hideTimer);
     if (displayRecoveryTimer) {
       clearTimeout(displayRecoveryTimer);
       displayRecoveryTimer = null;
@@ -519,12 +516,11 @@ function createPetWindow() {
       displayChangeTeardown = null;
     }
     topmostTimer = null;
-    hideTimer = null;
     topmostSuspended = false;
     topmostChecking = false;
     calmProbes = 0;
     currentTopmostInterval = TOPMOST_FAST_INTERVAL;
-    temporaryHideState = createTemporaryHideState();
+    manualHideState = createManualHideState();
     fullscreenHideState = createFullscreenHideState();
     topmostSuspendState = createTopmostSuspendState();
     petWindow = null;
@@ -560,6 +556,7 @@ function buildLocalPetState() {
   });
 }
 
+/* License activation is disabled for this version.
 function setupLicenseClient() {
   if (licenseClient) return;
   licenseClient = createLicenseClient({
@@ -569,6 +566,7 @@ function setupLicenseClient() {
     fetch: globalThis.fetch
   });
 }
+*/
 
 function setupOnlineClient() {
   if (onlineClient) return;
@@ -615,10 +613,11 @@ registerMainIpcHandlers({
   setupRoomClient: () => {
     return roomPetSync.setup();
   },
-  setupLicenseClient: () => {
-    setupLicenseClient();
-    return licenseClient;
-  },
+  // License activation is disabled for this version.
+  // setupLicenseClient: () => {
+  //   setupLicenseClient();
+  //   return licenseClient;
+  // },
   getAutoLaunchController,
   getPetWindow: () => petWindow,
   updateTrayMenu,
@@ -668,7 +667,8 @@ if (!gotTheLock) {
       appVersion: app.getVersion()
     });
     setupOnlineClient();
-    setupLicenseClient();
+    // License activation is disabled for this version.
+    // setupLicenseClient();
     setupAutoLaunch();
     roomPetSync.setup();
     updateManager = createUpdateManager({
@@ -689,6 +689,11 @@ if (!gotTheLock) {
     });
     updateManager.start();
     createPetWindow();
+    registerPetVisibilityShortcut({
+      globalShortcut,
+      getPetWindow: () => petWindow,
+      togglePetVisibility
+    });
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -699,6 +704,9 @@ if (!gotTheLock) {
 }
 
 app.on('before-quit', () => {
+  if (app.isReady()) {
+    globalShortcut.unregisterAll();
+  }
   waterReminder.stop();
   if (updateManager) {
     updateManager.stop();

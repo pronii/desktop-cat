@@ -1,25 +1,25 @@
-function createTemporaryHideState() {
+function createManualHideState() {
   return {
-    hiddenUntil: 0
+    hiddenManually: false
   };
 }
 
-function startTemporaryHide(state, durationMs, now = Date.now()) {
-  state.hiddenUntil = now + Math.max(0, durationMs);
+function hideManually(state) {
+  state.hiddenManually = true;
   return state;
 }
 
-function clearTemporaryHide(state) {
-  state.hiddenUntil = 0;
+function clearManualHide(state) {
+  state.hiddenManually = false;
   return state;
 }
 
-function isTemporaryHideActive(state, now = Date.now()) {
-  return Number(state.hiddenUntil) > now;
+function isManualHideActive(state) {
+  return Boolean(state.hiddenManually);
 }
 
-function enforceTemporaryHide(window, state, now = Date.now()) {
-  if (!window || !isTemporaryHideActive(state, now)) {
+function enforceManualHide(window, state) {
+  if (!window || !isManualHideActive(state)) {
     return false;
   }
 
@@ -34,8 +34,8 @@ function enforceTemporaryHide(window, state, now = Date.now()) {
   return true;
 }
 
-function revealTemporaryHiddenWindow(window, state) {
-  clearTemporaryHide(state);
+function revealManuallyHiddenWindow(window, state) {
+  clearManualHide(state);
 
   if (window && typeof window.showInactive === 'function') {
     window.showInactive();
@@ -78,12 +78,18 @@ function enforceFullscreenVisibility(window, state, suspended) {
 }
 
 module.exports = {
-  clearTemporaryHide,
+  clearManualHide,
+  clearTemporaryHide: clearManualHide,
   createFullscreenHideState,
-  createTemporaryHideState,
+  createManualHideState,
+  createTemporaryHideState: createManualHideState,
   enforceFullscreenVisibility,
-  enforceTemporaryHide,
-  isTemporaryHideActive,
-  revealTemporaryHiddenWindow,
-  startTemporaryHide
+  enforceManualHide,
+  enforceTemporaryHide: enforceManualHide,
+  hideManually,
+  isManualHideActive,
+  isTemporaryHideActive: isManualHideActive,
+  revealManuallyHiddenWindow,
+  revealTemporaryHiddenWindow: revealManuallyHiddenWindow,
+  startTemporaryHide: hideManually
 };

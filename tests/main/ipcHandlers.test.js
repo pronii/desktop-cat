@@ -49,11 +49,6 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
     join: (payload) => ({ status: 'connecting', ...payload }),
     leave: () => ({ status: 'disconnected' })
   };
-  const licenseClient = {
-    getState: () => ({ status: 'none' }),
-    activate: async (licenseKey) => ({ status: 'active', licenseKey }),
-    check: async () => ({ status: 'active' })
-  };
   const autoLaunchController = {
     getState: () => ({ enabled: true }),
     setEnabled: (enabled) => ({ enabled })
@@ -89,9 +84,6 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
     pendingUpdatePrompts,
     setupRoomClient() {
       return roomClient;
-    },
-    setupLicenseClient() {
-      return licenseClient;
     },
     getAutoLaunchController() {
       return autoLaunchController;
@@ -151,9 +143,6 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
       'appearance:set-live2d-model',
       'auto-launch:get-state',
       'auto-launch:set-enabled',
-      'license:activate',
-      'license:check',
-      'license:get-state',
       'room:get-state',
       'room:join',
       'room:leave',
@@ -200,7 +189,9 @@ test('registerMainIpcHandlers wires the main process IPC surface', () => {
 
   assert.equal(ipcMain.handles.get('water-reminder:toggle')(), false);
   assert.equal(ipcMain.handles.get('room:join')(null, { roomCode: '123456', nickname: 'Alice' }).roomCode, '123456');
-  assert.equal(ipcMain.handles.get('license:get-state')().status, 'none');
+  assert.equal(ipcMain.handles.has('license:get-state'), false);
+  assert.equal(ipcMain.handles.has('license:activate'), false);
+  assert.equal(ipcMain.handles.has('license:check'), false);
   assert.equal(ipcMain.handles.get('peer-live2d:get-model-by-id')(null, 'cat-1').id, 'cat-1');
   assert.equal(ipcMain.handles.get('auto-launch:set-enabled')(null, true).enabled, true);
   assert.equal(ipcMain.handles.get('update:respond')(null, { id: 'prompt-1', response: 'primary' }), true);

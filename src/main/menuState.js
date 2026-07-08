@@ -31,8 +31,8 @@ function createPetContextMenuTemplate({ state, waterReminderConfig = {}, actions
       click: actions.centerOnScreen || noop
     },
     {
-      label: '隐藏 5 分钟',
-      click: actions.hideTemporarily || noop
+      label: '隐藏小猫',
+      click: actions.hidePet || actions.hideTemporarily || noop
     },
     {
       label: '好友同屏',

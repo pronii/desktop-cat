@@ -16,8 +16,8 @@ function createTrayMenuTemplate({ state, waterReminderConfig = {}, actions = {} 
       click: actions.showPet || noop
     },
     {
-      label: '隐藏 5 分钟',
-      click: actions.hideTemporarily || noop
+      label: '隐藏小猫',
+      click: actions.hidePet || actions.hideTemporarily || noop
     },
     {
       type: 'separator'

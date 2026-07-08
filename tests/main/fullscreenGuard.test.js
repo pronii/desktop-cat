@@ -87,6 +87,28 @@ test('suspends topmost when the foreground window is Windows screen clipping', (
   );
 });
 
+test('does not suspend topmost for taskbar window preview surfaces', () => {
+  const foreground = {
+    hwnd: 'taskbar-preview',
+    title: 'Browser preview',
+    className: 'TaskListThumbnailWnd',
+    processName: 'explorer',
+    x: 0,
+    y: 0,
+    width: 1920,
+    height: 1080
+  };
+
+  assert.equal(
+    shouldSuspendTopmost({
+      foreground,
+      windows: [foreground],
+      display,
+      petWindowId: 'pet'
+    }),
+    false
+  );
+});
 test('topmost refresh hides the pet window while fullscreen suspension is active', () => {
   const source = fs.readFileSync(
     path.join(__dirname, '..', '..', 'src', 'main', 'main.js'),

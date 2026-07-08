@@ -198,6 +198,7 @@ function isIgnoredSystemWindow(windowSnapshot) {
     'WorkerW',
     'Shell_TrayWnd',
     'Shell_SecondaryTrayWnd',
+        'TaskListThumbnailWnd',
     'Windows.UI.Core.CoreWindow',
     'DV2ControlHost',
     'MsgrIMEWindowClass'

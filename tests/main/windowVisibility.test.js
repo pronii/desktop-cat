@@ -3,7 +3,12 @@ const assert = require('node:assert/strict');
 
 const {
   createFullscreenHideState,
-  enforceFullscreenVisibility
+  createManualHideState,
+  enforceFullscreenVisibility,
+  enforceManualHide,
+  hideManually,
+  isManualHideActive,
+  revealManuallyHiddenWindow
 } = require('../../src/main/windowVisibility');
 
 function createFakeWindow({ visible = true } = {}) {
@@ -62,4 +67,29 @@ test('fullscreen visibility does not reveal a window hidden for another reason',
   assert.equal(enforceFullscreenVisibility(window, state, false), false);
   assert.deepEqual(window.calls, [['setAlwaysOnTop', false]]);
   assert.equal(window.visible, false);
+});
+
+test('manual pet hide stays active until explicitly revealed', () => {
+  const state = createManualHideState();
+  const window = createFakeWindow();
+
+  hideManually(state);
+
+  assert.equal(isManualHideActive(state), true);
+  assert.equal(enforceManualHide(window, state), true);
+  assert.deepEqual(window.calls, [
+    ['setAlwaysOnTop', false],
+    ['hide']
+  ]);
+  assert.equal(window.visible, false);
+
+  assert.equal(isManualHideActive(state), true);
+  assert.equal(enforceManualHide(window, state), true);
+  assert.equal(window.visible, false);
+
+  revealManuallyHiddenWindow(window, state);
+
+  assert.equal(isManualHideActive(state), false);
+  assert.equal(window.visible, true);
+  assert.equal(window.calls.at(-1)[0], 'showInactive');
 });

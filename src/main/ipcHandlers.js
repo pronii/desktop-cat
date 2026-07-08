@@ -6,7 +6,8 @@ function registerMainIpcHandlers({
   live2DAppearance,
   pendingUpdatePrompts,
   setupRoomClient,
-  setupLicenseClient,
+  // License activation is disabled for this version; keep the hook commented for quick restore.
+  // setupLicenseClient,
   getAutoLaunchController,
   getPetWindow,
   updateTrayMenu,
@@ -132,6 +133,7 @@ function registerMainIpcHandlers({
     return roomClient.leave();
   });
 
+  /* License activation is disabled for this version.
   ipcMain.handle('license:get-state', () => {
     const client = setupLicenseClient();
     return client.getState();
@@ -146,7 +148,7 @@ function registerMainIpcHandlers({
     const client = setupLicenseClient();
     return client.check();
   });
-
+  */
   ipcMain.handle('auto-launch:get-state', () => {
     return getAutoLaunchController().getState();
   });
